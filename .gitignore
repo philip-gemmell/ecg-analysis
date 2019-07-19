@@ -1,0 +1,13 @@
+.idea
+
+meshing/meshes
+meshing/__pycache__
+meshing/reInsertFibres.sh-original
+
+simulation
+
+ecg-analysis/__pycache__
+ecg-analysis/12LeadElectrodes.dat
+ecg-analysis/analysis_commands.txt
+ecg-analysis/figures
+ecg-analysis/vcg_analysis_*

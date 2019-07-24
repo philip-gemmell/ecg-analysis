@@ -1,6 +1,14 @@
 import pandas as pd
 import glob
 
+""" Add carputils functions (if not already present) """
+try:
+    from carputils.carpio import igb
+except ImportError:
+    import sys
+    sys.path.append('/home/pg16/software/carputils/')
+    from carputils.carpio import igb
+
 
 def get_mesh(file_root=None, file_pts=None, file_elem=None, file_lon=None):
     """ Function to extract data from .pts, .elem, .lon files """

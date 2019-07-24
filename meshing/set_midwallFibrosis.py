@@ -292,6 +292,9 @@ def set_scar_to_meshfile(file_uvc=None, file_elem=None, file_lon=None, lv_scar=T
     """ Determine centroid UVC model """
     centroid_uvc = get_centroid_uvc(uvc=uvc, elem=elem)
 
+    """ Set default bounds """
+    phi_bounds, rho_bounds, z_bounds = get_scar_bounds(phi_bounds, rho_bounds, z_bounds, lv_scar)
+
     """ Define scar within torso model """
     elem, lon = set_scar(centroid_uvc, elem, lon, phi_bounds=phi_bounds, rho_bounds=rho_bounds, z_bounds=z_bounds,
                          lv_scar=lv_scar, p_low=p_low, p_bz=p_bz, p_dense=p_dense)
@@ -311,6 +314,6 @@ def set_scar_to_meshfile(file_uvc=None, file_elem=None, file_lon=None, lv_scar=T
                                                                                rho_bounds[1], z_bounds[0], z_bounds[1])
 
     """ Write data to files (don't bother writing .pts file!) """
-    write_mesh(output_root, None, elem, lon)
+    open_mesh.write_mesh(output_root, None, elem, lon)
 
     return None

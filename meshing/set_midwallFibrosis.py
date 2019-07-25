@@ -274,7 +274,7 @@ def get_scar_bounds(phi_bounds=None, rho_bounds=None, z_bounds=None, lv_scar=Tru
 
 
 def set_scar_to_meshfile(file_uvc=None, file_elem=None, file_lon=None, lv_scar=True, phi_bounds=None,
-                         rho_bounds=None, z_bounds=None, p_low=0.6, p_bz=0.75, p_dense=0.9, output_root=None):
+                         rho_bounds=None, z_bounds=None, p_low=0.6, p_bz=0.75, p_dense=0.9, output_folder=None):
     """ Set scar in a given series of mesh files """
 
     """ Extract original mesh details """
@@ -300,15 +300,15 @@ def set_scar_to_meshfile(file_uvc=None, file_elem=None, file_lon=None, lv_scar=T
                          lv_scar=lv_scar, p_low=p_low, p_bz=p_bz, p_dense=p_dense)
 
     """ Derive filenames"""
-    if output_root is None:
-        output_root = ''
+    if output_folder is None:
+        output_folder = ''
     else:
-        if output_root[-1] != '/':
-            output_root += '/'
+        if output_folder[-1] != '/':
+            output_folder += '/'
     if lv_scar:
-        output_root += 'myoScarLV'
+        output_root = output_folder+'myoScarLV'
     else:
-        output_root += 'myoScarSeptum'
+        output_root = output_folder+'myoScarSeptum'
     output_root = '{}_phi{:.5f}-{:.5f}_rho{:.5f}-{:.5f}_z{:.5f}-{:.5f}'.format(output_root, phi_bounds[0],
                                                                                phi_bounds[1], rho_bounds[0],
                                                                                rho_bounds[1], z_bounds[0], z_bounds[1])

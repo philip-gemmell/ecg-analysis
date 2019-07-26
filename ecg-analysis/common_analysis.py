@@ -44,16 +44,22 @@ def convert_index_to_time(idx, t_start=0, t_end=200, dt=2):
     return x_val[idx]
 
 
-def get_plot_colours(n):
+def get_plot_colours(n, colourmap=None):
     """ Returns colour values to be used when plotting """
+
+    if colourmap is None:
+        if n < 11:
+            colourmap = 'tab10'
+        else:
+            colourmap = 'viridis'
 
     if n < 11:
         # cmap = plt.get_cmap('tab10')
-        cmap = cm.get_cmap('tab10')
+        cmap = cm.get_cmap(colourmap)
         return [cmap(i) for i in np.linspace(0, 1, 10)]
     else:
         # cmap = plt.get_cmap('viridis', n)
-        cmap = cm.get_cmap('viridis', n)
+        cmap = cm.get_cmap(colourmap, n)
         return [cmap(i) for i in np.linspace(0, 1, n)]
 
     # values = range(n)
@@ -61,6 +67,69 @@ def get_plot_colours(n):
     # scalar_cmap = cm.ScalarMappable(norm=c_norm, cmap=cmap)
     #
     # return [scalar_cmap.to_rgba(values[i]) for i in range(n)]
+
+
+def write_colourmap_to_xml(start_data, end_data, start_highlight, end_highlight, opacity_data=1, opacity_highlight=1,
+                           n_tags=20, colourmap='viridis', outfile='colourmap.xml'):
+    """ Creates a Paraview friendly colourmap useful for highlighting a particular range that can be imported to
+        Paraview. """
+
+    """ INPUT: 
+        start_data                      start value for overall data (can't just use data for region of interest -
+                                        Paraview will scale)
+        end_data                        end value for overall data
+        start_highlight                 start value for region of interest
+        end_highlight                   end value for region of interest
+        opacity_data        1.0         overall opacity to use for all data
+        opacity_highlight   1.0         opacity for region of interest
+        colourmap           'viridis'   colourmap to use
+        outfile             <filename>  filename to save .xml file under
+    """
+
+    """ Get colour values """
+    cmap = get_plot_colours(n_tags, colourmap=colourmap)
+
+    """ Get values for x, depending on start and end values """
+    x_offset = 0.2      # Value to provide safespace round x values
+    x_maintain = 0.01   # Value to maintain safespace round n_tag values
+    cmap_x_data = np.linspace(start_data, end_data, 20)
+    cmap_x_data = np.delete(cmap_x_data, np.where(np.logical_and(cmap_x_data > start_highlight-x_offset,
+                                                                 cmap_x_data < end_highlight+x_offset)))
+    cmap_x_highlight = np.linspace(start_highlight-x_offset, end_highlight+x_offset, n_tags)
+
+    """ Extract colourmap name from given value for outfile """
+    if outfile.endswith('.xml'):
+        name = outfile[:-4]
+    else:
+        name = outfile[:]
+        outfile = outfile+'.xml'
+
+    """ Write to file """
+    with open(outfile, 'w') as pFile:
+        pFile.write('<ColorMaps>\n'.format(name))
+        pFile.write('\t<ColorMap name="{}" space="RGB">\n'.format(name))
+
+        """ Write non-highlighted data values"""
+        for x in cmap_x_data:
+            pFile.write('\t\t<Point x="{}" o="{}" r="0.5" g="0.5" b="0.5"/>\n'.format(x, opacity_data))
+        pFile.write('\t\t<Point x="{}" o="{}" r="0.5" g="0.5" b="0.5"/>\n'.format(start_highlight-3*x_offset,
+                                                                                  opacity_data))
+        pFile.write('\t\t<Point x="{}" o="{}" r="0.5" g="0.5" b="0.5"/>\n'.format(end_highlight+3*x_offset,
+                                                                                  opacity_data))
+
+        """ Write highlighted data values """
+        for (rgb, x) in zip(cmap, cmap_x_highlight):
+            pFile.write('\t\t<Point x="{}" o="{}" r="{}" g="{}" b="{}"/>\n'.format(x-x_maintain, opacity_highlight,
+                                                                                   rgb[0], rgb[1], rgb[2]))
+            pFile.write('\t\t<Point x="{}" o="{}" r="{}" g="{}" b="{}"/>\n'.format(x, opacity_highlight,
+                                                                                   rgb[0], rgb[1], rgb[2]))
+            pFile.write('\t\t<Point x="{}" o="{}" r="{}" g="{}" b="{}"/>\n'.format(x+x_maintain, opacity_highlight,
+                                                                                   rgb[0], rgb[1], rgb[2]))
+
+        pFile.write('\t</ColorMap>\n')
+        pFile.write('</ColorMaps>')
+
+    return None
 
 
 def save_workspace(shelf_name):

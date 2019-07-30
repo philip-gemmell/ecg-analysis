@@ -15,13 +15,12 @@ class ECGClass:
         Private variables for all the data used to derive (including full phie.igb data - might need to rewrite to
         discard data if the variables get too big... """
 
-    def __init__(self, phie_file=None, electrode_file=None):
+    def __init__(self, phie_filename=None, electrode_filename=None):
         """ Assign values to ECG lead data. If filename is provided at time of instantiation, complete calculatons. """
 
         # Source data, including data that we extract before using
-        self.phie_file = phie_file
-        self.electrode_file = electrode_file
-        self.__phie_data = None
+        self.phie_filename = phie_filename
+        self.electrode_filename = electrode_filename
         self.__phie_v1 = None
         self.__phie_v2 = None
         self.__phie_v3 = None
@@ -51,51 +50,50 @@ class ECGClass:
         self.aVL = None
         self.aVF = None
 
-        if phie_file is not None:
-            self.get_ecg(phie_file, electrode_file)
+        if phie_filename is not None:
+            self.get_ecg(phie_filename, electrode_filename)
 
     def __repr__(self):
-        return "ECGClass("+self.phie_file+", "+self.electrode_file+")"
+        return "ECGClass("+self.phie_filename+", "+self.electrode_filename+")"
 
     def __str__(self):
-        return "ECG data for "+self.phie_file+", using electrode data from "+self.electrode_file
+        return "ECG data for "+self.phie_filename+", using electrode data from "+self.electrode_filename
 
     def __getitem__(self, key):
         return self.__dict__[key]
 
-    def get_ecg(self, phie_file, electrode_file=None):
+    def get_ecg(self, phie_filename, electrode_filename=None):
         """ Extract ECG data from a given file """
 
-        self.get_phie_data(phie_file)
-        self.get_electrode_phie(electrode_file)
+        self.get_electrode_phie_data(phie_filename, electrode_filename)
         self.convert_phie_to_ecg()
 
         return None
 
-    def get_phie_data(self, phie_file):
+    def get_electrode_phie_data(self, phie_filename, electrode_filename=None):
         """ Set phie.igb filename to reference, then read data """
 
-        self.phie_file = phie_file
-        self.__phie_data, _, _ = igb.read(phie_file)
-        return None
+        """ Extract full phie data """
+        self.phie_filename = phie_filename
+        phie_data, _, _ = igb.read(phie_filename)
 
-    def get_electrode_phie(self, electrode_file=None):
-        """ Extract electrode data """
+        if electrode_filename is None:
+            electrode_filename = '/home/pg16/Documents/ecg-scar/ecg-analysis/12LeadElectrodes.dat'
+        pts_electrodes = np.loadtxt(electrode_filename, usecols=(1,), dtype=int)
 
-        if electrode_file is None:
-            electrode_file = '/home/pg16/Documents/ecg-scar/ecg-analysis/12LeadElectrodes.dat'
-        pts_electrodes = np.loadtxt(electrode_file, usecols=(1,), dtype=int)
+        self.__phie_v1 = phie_data[pts_electrodes[0], :]
+        self.__phie_v2 = phie_data[pts_electrodes[1], :]
+        self.__phie_v3 = phie_data[pts_electrodes[2], :]
+        self.__phie_v4 = phie_data[pts_electrodes[3], :]
+        self.__phie_v5 = phie_data[pts_electrodes[4], :]
+        self.__phie_v6 = phie_data[pts_electrodes[5], :]
+        self.__phie_ra = phie_data[pts_electrodes[6], :]
+        self.__phie_la = phie_data[pts_electrodes[7], :]
+        self.__phie_rl = phie_data[pts_electrodes[8], :]
+        self.__phie_ll = phie_data[pts_electrodes[9], :]
 
-        self.__phie_v1 = self.__phie_data[pts_electrodes[0], :]
-        self.__phie_v2 = self.__phie_data[pts_electrodes[1], :]
-        self.__phie_v3 = self.__phie_data[pts_electrodes[2], :]
-        self.__phie_v4 = self.__phie_data[pts_electrodes[3], :]
-        self.__phie_v5 = self.__phie_data[pts_electrodes[4], :]
-        self.__phie_v6 = self.__phie_data[pts_electrodes[5], :]
-        self.__phie_ra = self.__phie_data[pts_electrodes[6], :]
-        self.__phie_la = self.__phie_data[pts_electrodes[7], :]
-        self.__phie_rl = self.__phie_data[pts_electrodes[8], :]
-        self.__phie_ll = self.__phie_data[pts_electrodes[9], :]
+        del phie_data
+
         return None
 
     def convert_phie_to_ecg(self):
@@ -117,9 +115,9 @@ class ECGClass:
         self.LIII = self.__phie_ll - self.__phie_la
 
         """ Augmented leads """
-        self.aVR = self.__phie_ra - 0.5 * (self.__phie_la + self.__phie_ll)
-        self.aVL = self.__phie_la - 0.5 * (self.__phie_ra + self.__phie_ll)
-        self.aVF = self.__phie_ll - 0.5 * (self.__phie_la + self.__phie_ra)
+        self.aVR = self.__phie_ra - 0.5*(self.__phie_la + self.__phie_ll)
+        self.aVL = self.__phie_la - 0.5*(self.__phie_ra + self.__phie_ll)
+        self.aVF = self.__phie_ll - 0.5*(self.__phie_la + self.__phie_ra)
 
         return None
 
@@ -129,65 +127,8 @@ def get_ecg(phie_file, electrode_file=None):
 
     if isinstance(phie_file, str):
         phie_file = [phie_file]
-    data = [data_tmp for data_tmp, _, _ in (igb.read(filename) for filename in phie_file)]
 
-    electrode_data = [get_electrode_phie(data_tmp, electrode_file) for data_tmp in data]
-
-    ecg = [convert_electrodes_to_ecg(elec_tmp) for elec_tmp in electrode_data]
-
-    return ecg
-
-
-def get_electrode_phie(phie_data, electrode_file=None):
-    """ Extract phi_e data corresponding to ECG electrode locations """
-
-    """ Import default arguments """
-    if electrode_file is None:
-        electrode_file = '/home/pg16/Documents/ecg-scar/ecg-analysis/12LeadElectrodes.dat'
-
-    """ Extract node locations for ECG data, then pull data corresponding to those nodes """
-    pts_electrodes = np.loadtxt(electrode_file, usecols=(1,), dtype=int)
-
-    electrode_data = {'V1': phie_data[pts_electrodes[0], :],
-                      'V2': phie_data[pts_electrodes[1], :],
-                      'V3': phie_data[pts_electrodes[2], :],
-                      'V4': phie_data[pts_electrodes[3], :],
-                      'V5': phie_data[pts_electrodes[4], :],
-                      'V6': phie_data[pts_electrodes[5], :],
-                      'RA': phie_data[pts_electrodes[6], :],
-                      'LA': phie_data[pts_electrodes[7], :],
-                      'RL': phie_data[pts_electrodes[8], :],
-                      'LL': phie_data[pts_electrodes[9], :]}
-
-    return electrode_data
-
-
-def convert_electrodes_to_ecg(electrode_data):
-    """ Converts electrode phi_e data to ECG lead data """
-
-    """ Wilson Central Terminal """
-    wct = electrode_data['LA']+electrode_data['RA']+electrode_data['LL']
-
-    """ V leads """
-    ecg = dict()
-    ecg['V1'] = electrode_data['V1']-wct/3
-    ecg['V2'] = electrode_data['V2']-wct/3
-    ecg['V3'] = electrode_data['V3']-wct/3
-    ecg['V4'] = electrode_data['V4']-wct/3
-    ecg['V5'] = electrode_data['V5']-wct/3
-    ecg['V6'] = electrode_data['V6']-wct/3
-
-    """ Eindhoven limb leads """
-    ecg['LI'] = electrode_data['LA']-electrode_data['RA']
-    ecg['LII'] = electrode_data['LL']-electrode_data['RA']
-    ecg['LIII'] = electrode_data['LL']-electrode_data['LA']
-
-    """ Augmented leads """
-    ecg['aVR'] = electrode_data['RA']-0.5*(electrode_data['LA']+electrode_data['LL'])
-    ecg['aVL'] = electrode_data['LA']-0.5*(electrode_data['RA']+electrode_data['LL'])
-    ecg['aVF'] = electrode_data['LL']-0.5*(electrode_data['LA']+electrode_data['RA'])
-
-    return ecg
+    return [ECGClass(file, electrode_file) for file in phie_file]
 
 
 def plot_ecg(ecg, legend=None, linewidth=3):

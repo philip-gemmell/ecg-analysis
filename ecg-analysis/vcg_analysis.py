@@ -148,8 +148,8 @@ def convert_ecg_to_vcg(ecg):
 
     vcg = list()
     for sim_ecg in ecg:
-        ecg_matrix = np.array([sim_ecg['LI'], sim_ecg['LII'], sim_ecg['V1'], sim_ecg['V2'], sim_ecg['V3'],
-                               sim_ecg['V4'], sim_ecg['V5'], sim_ecg['V6']])
+        ecg_matrix = np.array([sim_ecg.LI, sim_ecg.LII, sim_ecg.V1, sim_ecg.V2, sim_ecg.V3, sim_ecg.V4, sim_ecg.V5,
+                               sim_ecg.V6])
         vcg.append(np.dot(ecg_matrix.transpose(), kors))
 
     return vcg

@@ -7,21 +7,6 @@ sys.path.append('/home/pg16/software/carputils/')
 from carputils.carpio import igb
 
 
-class ecg:
-    """ Class category for ECG data. """
-
-    V1 = None
-    V2 = None
-    V3 = None
-    V4 = None
-    V5 = None
-    V6 = None
-    RA = None
-    LA = None
-    RL = None
-    LL = None
-
-
 def get_ecg(phie_file, electrode_file=None):
     """ Translate the phie.igb file(s) to ECG data """
 

@@ -1,4 +1,5 @@
 .idea
+scar_highlight.xml
 
 meshing/meshes
 meshing/__pycache__

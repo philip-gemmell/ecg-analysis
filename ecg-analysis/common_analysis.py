@@ -1,7 +1,7 @@
 from scipy import signal
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as mpl_colours
+# import matplotlib.pyplot as plt
+# import matplotlib.colors as mpl_colours
 import matplotlib.cm as cm
 import shelve
 

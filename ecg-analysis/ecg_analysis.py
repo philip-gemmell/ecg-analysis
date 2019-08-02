@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+import common_analysis
 
 """ Add carputils functions """
 sys.path.append('/home/pg16/software/carputils/')
@@ -73,8 +74,8 @@ def convert_electrodes_to_ecg(electrode_data):
     return ecg
 
 
-def plot_ecg(ecg, legend=None, linewidth=3):
-    """ Plots and labels the ECG data from simulation(s) """
+def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_start=None, qrs_end=None):
+    """ Plots and labels the ECG data from simulation(s). Optional to add in QRS start/end boundaries for plotting """
 
     """ Initialise figure and axis handles """
     fig = plt.figure()
@@ -94,9 +95,28 @@ def plot_ecg(ecg, legend=None, linewidth=3):
         legend = [None for _ in range(len(ecg))]
     else:
         assert(len(legend) == len(ecg))
-    for (sim_ecg, sim_label) in zip(ecg, legend):
+
+    time = [i*dt for i in range(len(ecg[0]['V1']))]
+    colours = common_analysis.get_plot_colours(len(ecg))
+    for (sim_ecg, sim_label, sim_colour) in zip(ecg, legend, colours):
         for key in plot_sequence:
-            ax[key].plot(sim_ecg[key], linewidth=linewidth, label=sim_label)
+            ax[key].plot(time, sim_ecg[key], linewidth=linewidth, label=sim_label, color=sim_colour)
+
+    """ Add QRS limits, if supplied. """
+    if qrs_start is not None:
+        if not isinstance(qrs_start, list):
+            qrs_start = [qrs_start]
+        assert len(ecg) == len(qrs_start)
+        for (sim_qrs_start, sim_colour) in zip(qrs_start, colours):
+            for key in plot_sequence:
+                ax[key].axvspan(sim_qrs_start, sim_qrs_start + 0.1, color=sim_colour, alpha=0.5)
+    if qrs_end is not None:
+        if not isinstance(qrs_end, list):
+            qrs_end = [qrs_end]
+        assert len(ecg) == len(qrs_start)
+        for (sim_qrs_end, sim_colour) in zip(qrs_end, colours):
+            for key in plot_sequence:
+                ax[key].axvspan(sim_qrs_end, sim_qrs_end + 0.1, color=sim_colour, alpha=0.5)
 
     """ Add legend, title and axis labels """
     if legend[0] is not None:

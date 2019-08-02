@@ -164,8 +164,6 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
     # dt                2ms
     # velocity_offset   2       Offset between values in VCG over which to calculate spatial velocity, i.e. 1 will
     #                           use neighbouring values to calculate the gradient/velocity
-    # pre_beat_ignore   10ms    assume can safely ignore the first 20ms of the wave, which will have repolarisation
-    #                           artefacts from prior beat
     # low_p             40      Low frequency for bandpass filter
     # order             2       Order for Butterworth filter
     # threshold_frac    0.2     Fraction of maximum spatial velocity to trigger QRS detection

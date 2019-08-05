@@ -77,6 +77,9 @@ def convert_electrodes_to_ecg(electrode_data):
 def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_start=None, qrs_end=None):
     """ Plots and labels the ECG data from simulation(s). Optional to add in QRS start/end boundaries for plotting """
 
+    """ Ensure LaTeX rendering is used """
+    plt.rc('text', usetex=True)
+
     """ Initialise figure and axis handles """
     fig = plt.figure()
     i = 1
@@ -104,22 +107,24 @@ def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_start=None, qrs_end=None):
 
     """ Add QRS limits, if supplied. """
     if qrs_start is not None:
-        if not isinstance(qrs_start, list):
-            qrs_start = [qrs_start]
-        assert len(ecg) == len(qrs_start)
-        for (sim_qrs_start, sim_colour) in zip(qrs_start, colours):
-            for key in plot_sequence:
-                ax[key].axvspan(sim_qrs_start, sim_qrs_start + 0.1, color=sim_colour, alpha=0.5)
+        add_limits_to_plot(ax, ecg, qrs_start, colours, plot_sequence)
     if qrs_end is not None:
-        if not isinstance(qrs_end, list):
-            qrs_end = [qrs_end]
-        assert len(ecg) == len(qrs_start)
-        for (sim_qrs_end, sim_colour) in zip(qrs_end, colours):
-            for key in plot_sequence:
-                ax[key].axvspan(sim_qrs_end, sim_qrs_end + 0.1, color=sim_colour, alpha=0.5)
+        add_limits_to_plot(ax, ecg, qrs_end, colours, plot_sequence)
 
     """ Add legend, title and axis labels """
     if legend[0] is not None:
         plt.legend(bbox_to_anchor=(1.04, 1.1), loc="center left")
 
     return fig, ax
+
+
+def add_limits_to_plot(ax, ecg, limits, colours, plot_sequence):
+    """ Plot limits to a given plot (e.g. add line marking start of QRS complex) """
+    if not isinstance(limits, list):
+        limits = [limits]
+    assert len(ecg) == len(limits)
+    for (sim_limit, sim_colour) in zip(limits, colours):
+        for key in plot_sequence:
+            ax[key].axvspan(sim_limit, sim_limit+0.1, color=sim_colour, alpha=0.5)
+
+    return None

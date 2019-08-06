@@ -156,7 +156,7 @@ def convert_ecg_to_vcg(ecg):
 
 
 def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold_frac=0.2, plot_sv=False,
-                      legend=None, t_end=200, matlab_match=False):
+                      legend=None, fig=None, t_end=200, matlab_match=False):
     """ Calculate the extent of the VCG QRS complex on the basis of max derivative """
 
     # vcg                       List of VCG data to get QRS start and end points for
@@ -170,6 +170,8 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
     # plot_sv           False   Plot the calculated spatial velocity and the original VCG, both showing derived QRS
     #                           limits
     # legend            None    Legend entries for spatial velocity plot
+    # fig               None    Fig of existing figure to plot results on (must have matching axes to figure produced
+    #                           using this function)
     # t_end             200     End time of simulation
     # matlab_math       False   Apply fudge factor to match Matlab results
 
@@ -177,29 +179,53 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
         vcg = [vcg]
 
     x_val = [list(range(velocity_offset, t_end, dt)) for _ in vcg]
-    if plot_sv:
-        fig = plt.figure()
-        gs = gridspec.GridSpec(3, 3)
-        ax_sv = fig.add_subplot(gs[:, :-1])
-        ax_vcg_x = fig.add_subplot(gs[0, -1])
-        ax_vcg_y = fig.add_subplot(gs[1, -1])
-        ax_vcg_z = fig.add_subplot(gs[2, -1])
-        plt.setp(ax_vcg_x.get_xticklabels(), visible=False)
-        plt.setp(ax_vcg_y.get_xticklabels(), visible=False)
-        gs.update(hspace=0.05)
-        colours = common_analysis.get_plot_colours(len(vcg))
-        if legend is not None:
-            assert len(legend) == len(vcg)
-            plt.rc('text', usetex=True)
 
+    """ Create figure and axis handles if required (or adopt them from a given figure), and adapt colour variables. """
+    if plot_sv:
+        if fig is None:
+            fig = plt.figure()
+            gs = gridspec.GridSpec(3, 3)
+            ax_sv = fig.add_subplot(gs[:, :-1])
+            ax_vcg_x = fig.add_subplot(gs[0, -1])
+            ax_vcg_y = fig.add_subplot(gs[1, -1])
+            ax_vcg_z = fig.add_subplot(gs[2, -1])
+            plt.setp(ax_vcg_x.get_xticklabels(), visible=False)
+            plt.setp(ax_vcg_y.get_xticklabels(), visible=False)
+            gs.update(hspace=0.05)
+            colours = common_analysis.get_plot_colours(len(vcg))
+        else:
+            ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z = fig.get_axes()
+            colours = common_analysis.get_plot_colours(len(ax_sv.lines) + len(vcg))
+            """ If too many lines already exist on the plot, need to recolour them all to prevent cross-talk """
+            if len(ax_sv.lines) + len(vcg) > 10:
+                for ax in ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z:
+                    lines = ax.get_lines()
+                    i_vcg = 0
+                    for line in lines:
+                        line.set_color(colours[i_vcg])
+                        i_vcg += 1
+        if isinstance(legend, str):
+            legend = [legend]
+    else:
+        ax_sv = None
+        ax_vcg_x = None
+        ax_vcg_y = None
+        ax_vcg_z = None
+        colours = None
+
+    """ Create indices to track (1) which colour to plot, and (2) which of the current set of VCGs is currently under
+        consideration """
+    if ax_sv is None:
+        i_colour = 0
+    else:
+        i_colour = len(ax_sv.lines)-1
+    i_vcg = 0
     qrs_start = list()
     qrs_end = list()
     qrs_duration = list()
-    i_vcg = 0
     for sim_vcg in vcg:
         """ Compute spatial velocity of VCG """
-
-        dvcg = ((sim_vcg[velocity_offset:]-sim_vcg[:-velocity_offset])/2)*dt
+        dvcg = ((sim_vcg[velocity_offset:] - sim_vcg[:-velocity_offset]) / 2) * dt
 
         # Calculates Euclidean distance based on spatial velocity in x, y and z directions
         sv = np.linalg.norm(dvcg, axis=1)
@@ -207,21 +233,21 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
         """ Determine threshold for QRS complex, then find start of QRS complex. Iteratively remove more of the plot 
             if the 'start' is found to be 0 (implies it is still getting confused by the preceding wave). 
             Alternatively, just cut off the first 10ms of the beat (original method) """
-        sample_freq = 1000/dt
+        sample_freq = 1000 / dt
         if matlab_match:
             sv = sv[5:]
             x_val[i_vcg] = x_val[i_vcg][5:]
             sv_filtered = common_analysis.filter_egm(sv, sample_freq, low_p, order)
-            threshold = max(sv)*threshold_frac
+            threshold = max(sv) * threshold_frac
             i_qrs_start = np.where(sv_filtered > threshold)[0][0] + 2
         else:
-            threshold = max(sv)*threshold_frac
+            threshold = max(sv) * threshold_frac
             sv_filtered = common_analysis.filter_egm(sv, sample_freq, low_p, order)
             i_qrs_start = np.where(sv_filtered > threshold)[0][0]
             while i_qrs_start == 0:
                 sv = sv[1:]
                 x_val[i_vcg] = x_val[i_vcg][1:]
-                threshold = max(sv)*threshold_frac
+                threshold = max(sv) * threshold_frac
 
                 sv_filtered = common_analysis.filter_egm(sv, sample_freq, low_p, order)
                 i_qrs_start = np.where(sv_filtered > threshold)[0][0]
@@ -229,7 +255,7 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
         """ Find end of QRS complex where it reduces below threshold (searching backwards from end). Fudge factors 
             are added to ensure uniformity with Matlab results """
         # i_qrs_end = np.where(sv_filtered[i_qrs_start+1:] < threshold)[0][0]+(i_qrs_start+1)
-        i_qrs_end = len(sv_filtered)-(np.where(np.flip(sv_filtered) > threshold)[0][0]-1)
+        i_qrs_end = len(sv_filtered) - (np.where(np.flip(sv_filtered) > threshold)[0][0] - 1)
         assert i_qrs_start < i_qrs_end
         assert i_qrs_end < len(sv_filtered)
 
@@ -238,19 +264,20 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
 
         qrs_start.append(qrs_start_temp)
         qrs_end.append(qrs_end_temp)
-        qrs_duration.append(qrs_end_temp-qrs_start_temp)
+        qrs_duration.append(qrs_end_temp - qrs_start_temp)
 
         if plot_sv:
-            ax_vcg_x.plot(list(range(0, t_end+dt, dt)), sim_vcg[:, 0], color=colours[i_vcg])
-            ax_vcg_y.plot(list(range(0, t_end+dt, dt)), sim_vcg[:, 1], color=colours[i_vcg])
-            ax_vcg_z.plot(list(range(0, t_end+dt, dt)), sim_vcg[:, 2], color=colours[i_vcg])
-            ax_sv.plot(x_val[i_vcg], sv_filtered, color=colours[i_vcg])
-            ax_sv.axhspan(threshold, threshold+0.001, color=colours[i_vcg], alpha=0.5)
+            ax_vcg_x.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 0], color=colours[i_colour])
+            ax_vcg_y.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 1], color=colours[i_colour])
+            ax_vcg_z.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 2], color=colours[i_colour])
+            ax_sv.plot(x_val[i_vcg], sv_filtered, color=colours[i_colour], label=legend[i_vcg])
+            ax_sv.axhspan(threshold, threshold + 0.001, color=colours[i_colour], alpha=0.5)
             for ax in [ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z]:
-                ax.axvspan(qrs_start_temp, qrs_start_temp+0.1, color=colours[i_vcg], alpha=0.5)
-                ax.axvspan(qrs_end_temp, qrs_end_temp+0.1, color=colours[i_vcg], alpha=0.5)
+                ax.axvspan(qrs_start_temp, qrs_start_temp + 0.1, color=colours[i_colour], alpha=0.5)
+                ax.axvspan(qrs_end_temp, qrs_end_temp + 0.1, color=colours[i_colour], alpha=0.5)
 
         i_vcg += 1
+        i_colour += 1
 
     if plot_sv:
         ax_sv.set_xlabel('Time (ms)')
@@ -259,10 +286,13 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
         ax_vcg_y.set_ylabel('VCG (y)')
         ax_vcg_z.set_ylabel('VCG (z)')
         ax_vcg_z.set_xlabel('Time (ms)')
-        if legend is None:
-            ax_sv.legend(range(len(vcg)))
-        else:
-            ax_sv.legend(legend)
+
+        lines = ax_sv.get_lines()
+        print(len(lines))
+        labels = list()
+        for line in lines:
+            labels.append(line.get_label())
+        ax_sv.legend(labels)
         return qrs_start, qrs_end, qrs_duration, fig, (ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z)
     else:
         return qrs_start, qrs_end, qrs_duration
@@ -293,9 +323,9 @@ def get_qrs_area(vcg, qrs_start=None, qrs_end=None, dt=2, t_end=200, matlab_matc
         """ Recalculate indices for start and end points of QRS, and extract relevant data """
         i_qrs_start, i_qrs_end = common_analysis.convert_time_to_index(sim_qrs_start, sim_qrs_end, t_end=t_end, dt=dt)
         if matlab_match:
-            sim_vcg_qrs = sim_vcg[i_qrs_start-1:i_qrs_end+1]
+            sim_vcg_qrs = sim_vcg[i_qrs_start - 1:i_qrs_end + 1]
         else:
-            sim_vcg_qrs = sim_vcg[i_qrs_start:i_qrs_end+1]
+            sim_vcg_qrs = sim_vcg[i_qrs_start:i_qrs_end + 1]
 
         """ Calculate area under x,y,z curves by trapezium rule, then combine """
         qrs_area_temp = np.trapz(sim_vcg_qrs, dx=dt, axis=0)
@@ -317,7 +347,7 @@ def get_azimuth_elevation(vcg, t_start=None, t_end=None):
     elevation = list()
     for (sim_vcg, sim_t_start, sim_t_end) in zip(vcg, t_start, t_end):
         i_start, i_end = common_analysis.convert_time_to_index(sim_t_start, sim_t_end)
-        sim_vcg = sim_vcg[i_start:i_end+1]
+        sim_vcg = sim_vcg[i_start:i_end + 1]
         dipole_magnitude = np.linalg.norm(sim_vcg, axis=1)
 
         phi = [acos(sim_vcg_t[1] / dipole_magnitude_t) for (sim_vcg_t, dipole_magnitude_t) in
@@ -346,24 +376,25 @@ def get_weighted_dipole_angles(vcg, t_start=None, t_end=None, matlab_match=False
         """ Calculate dipole at all points """
         i_start, i_end = common_analysis.convert_time_to_index(sim_t_start, sim_t_end)
         if matlab_match:
-            sim_vcg = sim_vcg[i_start-1:i_end]
+            sim_vcg = sim_vcg[i_start - 1:i_end]
         else:
-            sim_vcg = sim_vcg[i_start:i_end+1]
+            sim_vcg = sim_vcg[i_start:i_end + 1]
         dipole_magnitude = np.linalg.norm(sim_vcg, axis=1)
 
         # Weighted Elevation
-        phi_weighted = [acos(sim_vcg_t[1]/dipole_magnitude_t)*dipole_magnitude_t for (sim_vcg_t, dipole_magnitude_t) in
+        phi_weighted = [acos(sim_vcg_t[1] / dipole_magnitude_t) * dipole_magnitude_t for (sim_vcg_t, dipole_magnitude_t)
+                        in
                         zip(sim_vcg, dipole_magnitude)]
         # Weighted Azimuth
-        theta_weighted = [atan(sim_vcg_t[2]/sim_vcg_t[0])*dipole_magnitude_t for (sim_vcg_t, dipole_magnitude_t) in
+        theta_weighted = [atan(sim_vcg_t[2] / sim_vcg_t[0]) * dipole_magnitude_t for (sim_vcg_t, dipole_magnitude_t) in
                           zip(sim_vcg, dipole_magnitude)]
 
-        wae = sum(phi_weighted)/sum(dipole_magnitude)
-        waa = sum(theta_weighted)/sum(dipole_magnitude)
+        wae = sum(phi_weighted) / sum(dipole_magnitude)
+        waa = sum(theta_weighted) / sum(dipole_magnitude)
 
         weighted_average_elev.append(wae)
         weighted_average_azimuth.append(waa)
-        unit_weighted_dipole.append([sin(wae)*cos(waa), cos(wae), sin(wae)*sin(waa)])
+        unit_weighted_dipole.append([sin(wae) * cos(waa), cos(wae), sin(wae) * sin(waa)])
 
     return weighted_average_azimuth, weighted_average_elev, unit_weighted_dipole
 
@@ -385,12 +416,12 @@ def get_weighted_dipole_magnitudes(vcg, t_start=None, t_end=None, matlab_match=F
         """ Calculate dipole at all points """
         i_start, i_end = common_analysis.convert_time_to_index(sim_t_start, sim_t_end)
         if matlab_match:
-            sim_vcg_qrs = sim_vcg[i_start-1:i_end]
+            sim_vcg_qrs = sim_vcg[i_start - 1:i_end]
         else:
-            sim_vcg_qrs = sim_vcg[i_start:i_end+1]
+            sim_vcg_qrs = sim_vcg[i_start:i_end + 1]
         dipole_magnitude = np.linalg.norm(sim_vcg_qrs, axis=1)
 
-        weighted_magnitude.append(sum(dipole_magnitude)/len(sim_vcg_qrs))
+        weighted_magnitude.append(sum(dipole_magnitude) / len(sim_vcg_qrs))
         max_dipole_magnitude.append(max(dipole_magnitude))
         i_max = np.where(dipole_magnitude == max(dipole_magnitude))
         max_dipole_components.append(sim_vcg[i_max])
@@ -405,9 +436,9 @@ def calculate_delta_dipole_angle(azimuth1, elevation1, azimuth2, elevation2, con
 
     dt = list()
     for az1, ele1, az2, ele2 in zip(azimuth1, elevation1, azimuth2, elevation2):
-        dot_product = (sin(ele1)*cos(az1)*sin(ele2)*cos(az2)) + \
-                      (cos(ele1)*cos(ele2)) +\
-                      (sin(ele1)*sin(az1)*sin(ele2)*sin(az2))
+        dot_product = (sin(ele1) * cos(az1) * sin(ele2) * cos(az2)) + \
+                      (cos(ele1) * cos(ele2)) + \
+                      (sin(ele1) * sin(az1) * sin(ele2) * sin(az2))
         if abs(dot_product) > 1:
             warnings.warn("abs(dot_product) > 1: dot_product = {}".format(dot_product))
             if dot_product > 1:
@@ -418,7 +449,7 @@ def calculate_delta_dipole_angle(azimuth1, elevation1, azimuth2, elevation2, con
         dt.append(acos(dot_product))
 
     if convert_to_degrees:
-        return [dt_i*180/math.pi for dt_i in dt]
+        return [dt_i * 180 / math.pi for dt_i in dt]
     else:
         return dt
 
@@ -436,15 +467,15 @@ def compare_dipole_angles(vcg1, vcg2, t_start1=0, t_end1=None, t_start2=0, t_end
         i_end1 -= 1
         i_start2 -= 1
         i_end2 -= 1
-        idx_list1 = [int(round(i_start1 + i*(i_end1-i_start1)/10)) for i in range(1, n_compare+1)]
-        idx_list2 = [int(round(i_start2 + i*(i_end2-i_start2)/10)) for i in range(1, n_compare+1)]
+        idx_list1 = [int(round(i_start1 + i * (i_end1 - i_start1) / 10)) for i in range(1, n_compare + 1)]
+        idx_list2 = [int(round(i_start2 + i * (i_end2 - i_start2) / 10)) for i in range(1, n_compare + 1)]
     else:
         idx_list1 = [int(round(i)) for i in np.linspace(start=i_start1, stop=i_end1, num=n_compare)]
         idx_list2 = [int(round(i)) for i in np.linspace(start=i_start2, stop=i_end2, num=n_compare)]
 
     """ Calculate the dot product and magnitudes of vectors. If the fraction of the two is slightly greater than 1 or
         less than -1, give a warning and correct accordingly. """
-    cosdt = [np.dot(vcg1[i1], vcg2[i2]) / (np.linalg.norm(vcg1[i1])*np.linalg.norm(vcg2[i2])) for i1, i2 in
+    cosdt = [np.dot(vcg1[i1], vcg2[i2]) / (np.linalg.norm(vcg1[i1]) * np.linalg.norm(vcg2[i2])) for i1, i2 in
              zip(idx_list1, idx_list2)]
     greater_less_warning = [True if ((cosdt_i < -1) or (cosdt_i > 1)) else False for cosdt_i in cosdt]
     if any(greater_less_warning):
@@ -460,6 +491,6 @@ def compare_dipole_angles(vcg1, vcg2, t_start1=0, t_end1=None, t_start2=0, t_end
     dt = [acos(cosdt_i) for cosdt_i in cosdt]
 
     if convert_to_degrees:
-        return [dt_i*180/math.pi for dt_i in dt]
+        return [dt_i * 180 / math.pi for dt_i in dt]
     else:
         return dt

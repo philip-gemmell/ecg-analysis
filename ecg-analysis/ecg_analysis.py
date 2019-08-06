@@ -78,7 +78,6 @@ def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_start=None, qrs_end=None):
     """ Plots and labels the ECG data from simulation(s). Optional to add in QRS start/end boundaries for plotting """
 
     """ Ensure LaTeX rendering is used """
-    plt.rc('text', usetex=True)
 
     """ Initialise figure and axis handles """
     fig = plt.figure()
@@ -113,6 +112,7 @@ def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_start=None, qrs_end=None):
 
     """ Add legend, title and axis labels """
     if legend[0] is not None:
+        plt.rc('text', usetex=True)
         plt.legend(bbox_to_anchor=(1.04, 1.1), loc="center left")
 
     return fig, ax

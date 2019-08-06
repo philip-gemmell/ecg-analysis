@@ -155,8 +155,10 @@ def convert_ecg_to_vcg(ecg):
     return vcg
 
 
-def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold_frac=0.2, plot_sv=False,
-                      legend=None, fig=None, t_end=200, matlab_match=False):
+# def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold_frac=0.2, plot_sv=False,
+#                       legend=None, fig=None, t_end=200, matlab_match=False):
+def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold_frac=0.2, filter_sv=True, t_end=200,
+                      matlab_match=False):
     """ Calculate the extent of the VCG QRS complex on the basis of max derivative """
 
     # vcg                       List of VCG data to get QRS start and end points for
@@ -181,121 +183,272 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
     x_val = [list(range(velocity_offset, t_end, dt)) for _ in vcg]
 
     """ Create figure and axis handles if required (or adopt them from a given figure), and adapt colour variables. """
-    if plot_sv:
-        if fig is None:
-            fig = plt.figure()
-            gs = gridspec.GridSpec(3, 3)
-            ax_sv = fig.add_subplot(gs[:, :-1])
-            ax_vcg_x = fig.add_subplot(gs[0, -1])
-            ax_vcg_y = fig.add_subplot(gs[1, -1])
-            ax_vcg_z = fig.add_subplot(gs[2, -1])
-            plt.setp(ax_vcg_x.get_xticklabels(), visible=False)
-            plt.setp(ax_vcg_y.get_xticklabels(), visible=False)
-            gs.update(hspace=0.05)
-            colours = common_analysis.get_plot_colours(len(vcg))
-        else:
-            ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z = fig.get_axes()
-            colours = common_analysis.get_plot_colours(len(ax_sv.lines) + len(vcg))
-            """ If too many lines already exist on the plot, need to recolour them all to prevent cross-talk """
-            if len(ax_sv.lines) + len(vcg) > 10:
-                for ax in ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z:
-                    lines = ax.get_lines()
-                    i_vcg = 0
-                    for line in lines:
-                        line.set_color(colours[i_vcg])
-                        i_vcg += 1
-        if isinstance(legend, str):
-            legend = [legend]
-    else:
-        ax_sv = None
-        ax_vcg_x = None
-        ax_vcg_y = None
-        ax_vcg_z = None
-        colours = None
+    # if plot_sv:
+    #     if fig is None:
+    #         fig = plt.figure()
+    #         gs = gridspec.GridSpec(3, 3)
+    #         ax_sv = fig.add_subplot(gs[:, :-1])
+    #         ax_vcg_x = fig.add_subplot(gs[0, -1])
+    #         ax_vcg_y = fig.add_subplot(gs[1, -1])
+    #         ax_vcg_z = fig.add_subplot(gs[2, -1])
+    #         plt.setp(ax_vcg_x.get_xticklabels(), visible=False)
+    #         plt.setp(ax_vcg_y.get_xticklabels(), visible=False)
+    #         gs.update(hspace=0.05)
+    #         colours = common_analysis.get_plot_colours(len(vcg))
+    #     else:
+    #         ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z = fig.get_axes()
+    #         colours = common_analysis.get_plot_colours(len(ax_sv.lines) + len(vcg))
+    #         """ If too many lines already exist on the plot, need to recolour them all to prevent cross-talk """
+    #         if len(ax_sv.lines) + len(vcg) > 10:
+    #             for ax in ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z:
+    #                 lines = ax.get_lines()
+    #                 i_vcg = 0
+    #                 for line in lines:
+    #                     line.set_color(colours[i_vcg])
+    #                     i_vcg += 1
+    #     if isinstance(legend, str):
+    #         legend = [legend]
+    # else:
+    #     ax_sv = None
+    #     ax_vcg_x = None
+    #     ax_vcg_y = None
+    #     ax_vcg_z = None
+    #     colours = None
 
     """ Create indices to track (1) which colour to plot, and (2) which of the current set of VCGs is currently under
         consideration """
-    if ax_sv is None:
-        i_colour = 0
-    else:
-        i_colour = len(ax_sv.lines)-1
+    # if ax_sv is None:
+    #     i_colour = 0
+    # else:
+    #     i_colour = len(ax_sv.lines)-1
     i_vcg = 0
+    # x_val, sv = get_sv(vcg=vcg, velocity_offset=velocity_offset, t_end=t_end, dt=dt, threshold_frac=threshold_frac,
+    #                    matlab_match=matlab_match, filter_sv=filter_sv, low_p=low_p, order=order)
+    x_val, sv, threshold = get_sv(vcg=vcg, velocity_offset=velocity_offset, t_end=t_end, dt=dt,
+                                  threshold_frac=threshold_frac, matlab_match=matlab_match, filter_sv=filter_sv,
+                                  low_p=low_p, order=order)
     qrs_start = list()
     qrs_end = list()
     qrs_duration = list()
-    for sim_vcg in vcg:
+    # for sim_vcg in vcg:
+    for (sim_sv, sim_x, sim_threshold) in zip(sv, x_val, threshold):
         """ Compute spatial velocity of VCG """
-        dvcg = ((sim_vcg[velocity_offset:] - sim_vcg[:-velocity_offset]) / 2) * dt
-
-        # Calculates Euclidean distance based on spatial velocity in x, y and z directions
-        sv = np.linalg.norm(dvcg, axis=1)
-
-        """ Determine threshold for QRS complex, then find start of QRS complex. Iteratively remove more of the plot 
-            if the 'start' is found to be 0 (implies it is still getting confused by the preceding wave). 
-            Alternatively, just cut off the first 10ms of the beat (original method) """
-        sample_freq = 1000 / dt
+        # dvcg = ((sim_vcg[velocity_offset:] - sim_vcg[:-velocity_offset]) / 2) * dt
+        #
+        # # Calculates Euclidean distance based on spatial velocity in x, y and z directions
+        # sv = np.linalg.norm(dvcg, axis=1)
+        #
+        # """ Determine threshold for QRS complex, then find start of QRS complex. Iteratively remove more of the plot
+        #     if the 'start' is found to be 0 (implies it is still getting confused by the preceding wave).
+        #     Alternatively, just cut off the first 10ms of the beat (original method) """
+        # sample_freq = 1000 / dt
+        # if matlab_match:
+        #     sv = sv[5:]
+        #     x_val[i_vcg] = x_val[i_vcg][5:]
+        #     sv_filtered = common_analysis.filter_egm(sv, sample_freq, low_p, order)
+        #     threshold = max(sv) * threshold_frac
+        #     i_qrs_start = np.where(sv_filtered > threshold)[0][0] + 2
+        # else:
+        #     threshold = max(sv) * threshold_frac
+        #     sv_filtered = common_analysis.filter_egm(sv, sample_freq, low_p, order)
+        #     i_qrs_start = np.where(sv_filtered > threshold)[0][0]
+        #     while i_qrs_start == 0:
+        #         sv = sv[1:]
+        #         x_val[i_vcg] = x_val[i_vcg][1:]
+        #         threshold = max(sv) * threshold_frac
+        #
+        #         sv_filtered = common_analysis.filter_egm(sv, sample_freq, low_p, order)
+        #         i_qrs_start = np.where(sv_filtered > threshold)[0][0]
+        # threshold = max(sim_sv) * threshold_frac
         if matlab_match:
-            sv = sv[5:]
-            x_val[i_vcg] = x_val[i_vcg][5:]
-            sv_filtered = common_analysis.filter_egm(sv, sample_freq, low_p, order)
-            threshold = max(sv) * threshold_frac
-            i_qrs_start = np.where(sv_filtered > threshold)[0][0] + 2
+            i_qrs_start = np.where(sim_sv > sim_threshold)[0][0] + 2
         else:
-            threshold = max(sv) * threshold_frac
-            sv_filtered = common_analysis.filter_egm(sv, sample_freq, low_p, order)
-            i_qrs_start = np.where(sv_filtered > threshold)[0][0]
-            while i_qrs_start == 0:
-                sv = sv[1:]
-                x_val[i_vcg] = x_val[i_vcg][1:]
-                threshold = max(sv) * threshold_frac
-
-                sv_filtered = common_analysis.filter_egm(sv, sample_freq, low_p, order)
-                i_qrs_start = np.where(sv_filtered > threshold)[0][0]
+            i_qrs_start = np.where(sim_sv > sim_threshold)[0][0]
 
         """ Find end of QRS complex where it reduces below threshold (searching backwards from end). Fudge factors 
             are added to ensure uniformity with Matlab results """
         # i_qrs_end = np.where(sv_filtered[i_qrs_start+1:] < threshold)[0][0]+(i_qrs_start+1)
-        i_qrs_end = len(sv_filtered) - (np.where(np.flip(sv_filtered) > threshold)[0][0] - 1)
+        i_qrs_end = len(sim_sv) - (np.where(np.flip(sim_sv) > sim_threshold)[0][0] - 1)
         assert i_qrs_start < i_qrs_end
-        assert i_qrs_end < len(sv_filtered)
+        assert i_qrs_end < len(sim_sv)
 
-        qrs_start_temp = x_val[i_vcg][i_qrs_start]
-        qrs_end_temp = x_val[i_vcg][i_qrs_end]
+        # qrs_start_temp = x_val[i_vcg][i_qrs_start]
+        # qrs_end_temp = x_val[i_vcg][i_qrs_end]
+        qrs_start_temp = sim_x[i_qrs_start]
+        qrs_end_temp = sim_x[i_qrs_end]
 
         qrs_start.append(qrs_start_temp)
         qrs_end.append(qrs_end_temp)
         qrs_duration.append(qrs_end_temp - qrs_start_temp)
 
-        if plot_sv:
-            ax_vcg_x.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 0], color=colours[i_colour])
-            ax_vcg_y.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 1], color=colours[i_colour])
-            ax_vcg_z.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 2], color=colours[i_colour])
-            ax_sv.plot(x_val[i_vcg], sv_filtered, color=colours[i_colour], label=legend[i_vcg])
-            ax_sv.axhspan(threshold, threshold + 0.001, color=colours[i_colour], alpha=0.5)
-            for ax in [ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z]:
-                ax.axvspan(qrs_start_temp, qrs_start_temp + 0.1, color=colours[i_colour], alpha=0.5)
-                ax.axvspan(qrs_end_temp, qrs_end_temp + 0.1, color=colours[i_colour], alpha=0.5)
+        # if plot_sv:
+        #     ax_vcg_x.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 0], color=colours[i_colour])
+        #     ax_vcg_y.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 1], color=colours[i_colour])
+        #     ax_vcg_z.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 2], color=colours[i_colour])
+        #     ax_sv.plot(x_val[i_vcg], sv_filtered, color=colours[i_colour], label=legend[i_vcg])
+        #     ax_sv.axhspan(threshold, threshold + 0.001, color=colours[i_colour], alpha=0.5)
+        #     for ax in [ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z]:
+        #         ax.axvspan(qrs_start_temp, qrs_start_temp + 0.1, color=colours[i_colour], alpha=0.5)
+        #         ax.axvspan(qrs_end_temp, qrs_end_temp + 0.1, color=colours[i_colour], alpha=0.5)
 
         i_vcg += 1
+        # i_colour += 1
+
+    # if plot_sv:
+    #     ax_sv.set_xlabel('Time (ms)')
+    #     ax_sv.set_ylabel('Spatial velocity')
+    #     ax_vcg_x.set_ylabel('VCG (x)')
+    #     ax_vcg_y.set_ylabel('VCG (y)')
+    #     ax_vcg_z.set_ylabel('VCG (z)')
+    #     ax_vcg_z.set_xlabel('Time (ms)')
+    #
+    #     lines = ax_sv.get_lines()
+    #     print(len(lines))
+    #     labels = list()
+    #     for line in lines:
+    #         labels.append(line.get_label())
+    #     ax_sv.legend(labels)
+    #     return qrs_start, qrs_end, qrs_duration, fig, (ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z)
+    # else:
+    #     return qrs_start, qrs_end, qrs_duration
+    return qrs_start, qrs_end, qrs_duration
+
+
+def get_sv(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac=0.2, matlab_match=False, filter_sv=True, low_p=40,
+           order=2):
+    """ Calculate spatial velocity """
+
+    if isinstance(vcg, np.ndarray):
+        vcg = [vcg]
+    x_val = [list(range(velocity_offset, t_end, dt)) for _ in vcg]
+
+    sv = list()
+    x_val = list()
+    threshold_full = list()
+    for sim_vcg in vcg:
+        """ Compute spatial velocity of VCG """
+        dvcg = ((sim_vcg[velocity_offset:] - sim_vcg[:-velocity_offset]) / 2) * dt
+
+        # Calculates Euclidean distance based on spatial velocity in x, y and z directions
+        sim_sv = np.linalg.norm(dvcg, axis=1)
+
+        """ Determine threshold for QRS complex, then find start of QRS complex. Iteratively remove more of the plot 
+            if the 'start' is found to be 0 (implies it is still getting confused by the preceding wave). 
+            Alternatively, just cut off the first 10ms of the beat (original Matlab method) """
+        sample_freq = 1000 / dt
+        if matlab_match:
+            sim_sv = sim_sv[5:]
+            sim_x = list(range(velocity_offset, t_end, dt))[5:]
+            if filter_sv:
+                sim_sv = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
+            threshold = max(sv) * threshold_frac
+        else:
+            sim_x = list(range(velocity_offset, t_end, dt))
+            threshold = max(sim_sv)*threshold_frac
+            if filter_sv:
+                sv_filtered = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
+            else:
+                sv_filtered = sim_sv
+            i_qrs_start = np.where(sv_filtered > threshold)[0][0]
+            while i_qrs_start == 0:
+                sim_sv = sim_sv[1:]
+                sim_x = sim_x[1:]
+                threshold = max(sim_sv) * threshold_frac
+
+                if filter_sv:
+                    sv_filtered = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
+                else:
+                    sv_filtered = sim_sv
+                i_qrs_start = np.where(sv_filtered > threshold)[0][0]
+        sv.append(sim_sv)
+        x_val.append(sim_x)
+        threshold_full.append(threshold)
+
+    return x_val, sv, threshold_full
+
+
+def plot_sv(vcg, sv=None, qrs_start=None, qrs_end=None, fig=None, legend=None, t_end=200, dt=2, filter_sv=True):
+    """ Plot the spatial velocity and VCG elements, with QRS details if provided. Note that if spatial velocity is
+        not provided, default values will be used to calculate it - if anything else is desired, then spatial
+        velocity must be calculated first and provided to the function. """
+
+    """ Prepare figure and axes """
+    if fig is None:
+        fig = plt.figure()
+        gs = gridspec.GridSpec(3, 3)
+        ax_sv = fig.add_subplot(gs[:, :-1])
+        ax_vcg_x = fig.add_subplot(gs[0, -1])
+        ax_vcg_y = fig.add_subplot(gs[1, -1])
+        ax_vcg_z = fig.add_subplot(gs[2, -1])
+        plt.setp(ax_vcg_x.get_xticklabels(), visible=False)
+        plt.setp(ax_vcg_y.get_xticklabels(), visible=False)
+        gs.update(hspace=0.05)
+        colours = common_analysis.get_plot_colours(len(vcg))
+    else:
+        ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z = fig.get_axes()
+        colours = common_analysis.get_plot_colours(len(ax_sv.lines) + len(vcg))
+        """ If too many lines already exist on the plot, need to recolour them all to prevent cross-talk """
+        if len(ax_sv.lines) + len(vcg) > 10:
+            for ax in ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z:
+                lines = ax.get_lines()
+                i_vcg = 0
+                for line in lines:
+                    line.set_color(colours[i_vcg])
+                    i_vcg += 1
+
+    if isinstance(legend, str):
+        legend = [legend]
+
+    """ Prepare spatial velocity """
+    if sv is None:
+        x_val, sv = get_sv(vcg=vcg, t_end=t_end, dt=dt, filter_sv=filter_sv)
+
+    """ Plot spatial velocity and VCG components"""
+    i_colour = get_i_colour(ax_sv)
+    for (sim_x, sim_vcg, sim_sv) in zip(x_val, vcg, sv):
+        ax_vcg_x.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 0], color=colours[i_colour])
+        ax_vcg_y.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 1], color=colours[i_colour])
+        ax_vcg_z.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 2], color=colours[i_colour])
+        ax_sv.plot(sim_x, sim_sv, color=colours[i_colour], label=legend[i_vcg])
         i_colour += 1
 
-    if plot_sv:
-        ax_sv.set_xlabel('Time (ms)')
-        ax_sv.set_ylabel('Spatial velocity')
-        ax_vcg_x.set_ylabel('VCG (x)')
-        ax_vcg_y.set_ylabel('VCG (y)')
-        ax_vcg_z.set_ylabel('VCG (z)')
-        ax_vcg_z.set_xlabel('Time (ms)')
+    """ Plot QRS limits, if provided """
+    i_colour = get_i_colour(ax_sv)
+    if qrs_start is not None:
+        assert len(qrs_start) == len(vcg)
+        for sim_qrs_start in qrs_start:
+            for ax in [ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z]:
+                ax.axvspan(sim_qrs_start, sim_qrs_start+0.1, color=colours[i_colour], alpha=0.5)
+    if qrs_end is not None:
+        assert len(qrs_end) == len(vcg)
+        for sim_qrs_end in qrs_start:
+            for ax in [ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z]:
+                ax.axvspan(sim_qrs_end, sim_qrs_end+0.1, color=colours[i_colour], alpha=0.5)
+        i_colour += 1
 
-        lines = ax_sv.get_lines()
-        print(len(lines))
-        labels = list()
-        for line in lines:
-            labels.append(line.get_label())
-        ax_sv.legend(labels)
-        return qrs_start, qrs_end, qrs_duration, fig, (ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z)
+    ax_sv.set_xlabel('Time (ms)')
+    ax_sv.set_ylabel('Spatial velocity')
+    ax_vcg_x.set_ylabel('VCG (x)')
+    ax_vcg_y.set_ylabel('VCG (y)')
+    ax_vcg_z.set_ylabel('VCG (z)')
+    ax_vcg_z.set_xlabel('Time (ms)')
+
+    lines = ax_sv.get_lines()
+    print(len(lines))
+    labels = list()
+    for line in lines:
+        labels.append(line.get_label())
+    ax_sv.legend(labels)
+
+    return fig
+
+
+def get_i_colour(axis_handle):
+    """ Get index appropriate to colour value to plot on a figure (will be 0 if brand new figure) """
+    if axis_handle is None:
+        return 0
     else:
-        return qrs_start, qrs_end, qrs_duration
+        return len(axis_handle.lines)-1
 
 
 def get_qrs_area(vcg, qrs_start=None, qrs_end=None, dt=2, t_end=200, matlab_match=False):

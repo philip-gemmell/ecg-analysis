@@ -1,7 +1,11 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+
 import common_analysis
+
+# import matplotlib
+# matplotlib.use('Agg')
 
 """ Add carputils functions """
 sys.path.append('/home/pg16/software/carputils/')

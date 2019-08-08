@@ -7,6 +7,9 @@ import warnings
 
 import common_analysis
 
+# import matplotlib
+# matplotlib.use('Agg')
+
 
 def plot_vcg_single(vcg, legend=None):
     """ Plot the 3 spatial components of VCG. If multiple VCGs given, will plot VCGs on separate figures"""
@@ -266,12 +269,89 @@ def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac
     return x_val, sv, threshold_full
 
 
-def plot_spatial_velocity(vcg, sv=None, qrs_start=None, qrs_end=None, fig=None, legend=None, t_end=200, dt=2,
-                          filter_sv=True):
-    """ Plot the spatial velocity and VCG elements, with QRS details if provided. Note that if spatial velocity is
-        not provided, default values will be used to calculate it - if anything else is desired, then spatial
-        velocity must be calculated first and provided to the function. """
+def plot_spatial_velocity(vcg, sv=None, qrs_limits=None, fig=None, legend=None, t_end=200, dt=2, filter_sv=True):
+    """ Plot the spatial velocity and VCG elements, with limits (e.g. QRS limits) if provided. Note that if spatial
+        velocity is not provided, default values will be used to calculate it - if anything else is desired,
+        then spatial velocity must be calculated first and provided to the function.
+    """
 
+    fig, ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z, colours = __plot_spatial_velocity_prep_axes(vcg, fig)
+    vcg, legend = __plot_spatial_velocity_preprocess_inputs(vcg, legend)
+    x_val, sv = __plot_spatial_velocity_get_plot_data(sv, vcg, t_end, dt, filter_sv)
+
+    """ Plot spatial velocity and VCG components"""
+    i_colour = get_i_colour(ax_sv)
+    x_vcg_data = list(range(0, t_end + dt, dt))
+    for (sim_x, sim_vcg, sim_sv, sim_label) in zip(x_val, vcg, sv, legend):
+        __plot_spatial_velocity_plot_data(sim_x, sim_sv, x_vcg_data, sim_vcg, sim_label, colours[i_colour],
+                                          ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z)
+        i_colour += 1
+
+    """ Plot QRS limits, if provided """
+    if qrs_limits is not None:
+        # Cycle through each limit provided, e.g. QRS start, QRS end...
+        for qrs_limit in qrs_limits:
+            i_colour = get_i_colour(ax_sv)-len(vcg)
+            assert len(qrs_limit) == len(vcg)
+
+            # Plot limits for each given VCG
+            for sim_qrs_limit in qrs_limit:
+                __plot_spatial_velocity_plot_limits(sim_qrs_limit, ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z,
+                                                    colours[i_colour])
+                i_colour += 1
+
+    """ Add legend (or legend for limits, if appropriate """
+    labels = [line.get_label() for line in ax_sv.get_lines()]
+    plt.rc('text', usetex=True)
+    ax_sv.legend(labels)
+
+    return fig
+
+
+def plot_spatial_velocity_multilimit(vcg, sv=None, qrs_limits=None, fig=None, legend=None, t_end=200, dt=2,
+                                     filter_sv=True):
+    """ Plot a single instance of a spatial velocity curve, but with multiple limits for QRS """
+
+    """ Confirm VCG and limit data are correctly formatted """
+    assert isinstance(vcg, np.ndarray)
+    for qrs_limit in qrs_limits:
+        assert len(qrs_limit) == len(qrs_limits[0])
+
+    fig, ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z, colours = __plot_spatial_velocity_prep_axes(vcg, fig)
+    vcg, legend = __plot_spatial_velocity_preprocess_inputs(vcg, legend)
+    x_val, sv = __plot_spatial_velocity_get_plot_data(sv, vcg, t_end, dt, filter_sv)
+
+    """ Plot spatial velocity and VCG components"""
+    x_vcg_data = list(range(0, t_end + dt, dt))
+    __plot_spatial_velocity_plot_data(x_val[0], sv[0], x_vcg_data, vcg[0], None, None,
+                                      ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z)
+
+    """ Plot QRS limits, along with proxy patches for the legend """
+    colours = common_analysis.get_plot_colours(n=len(qrs_limits[0]))
+    import matplotlib.lines as mlines
+    for qrs_limit in qrs_limits:
+        line_handles = list()
+        for i in range(len(qrs_limit)):
+            # blue_line = mlines.Line2D([], [], color=colours[i], label=legend_limits[i])
+            line_handles.append(mlines.Line2D([], [], color=colours[i], label=legend[i]))
+            __plot_spatial_velocity_plot_limits(qrs_limit[i], ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z, colours[i])
+    # ax_sv.legend(handles=[blue_line])
+    ax_sv.legend(handles=line_handles)
+    return None
+
+
+def __plot_spatial_velocity_preprocess_inputs(vcg, legend):
+    """ Preprocess other inputs """
+    if isinstance(vcg, np.ndarray):
+        vcg = [vcg]
+    if isinstance(legend, str):
+        legend = [legend]
+    elif legend is None:
+        legend = [str(i) for i in range(len(vcg))]
+    return vcg, legend
+
+
+def __plot_spatial_velocity_prep_axes(vcg, fig):
     """ Prepare figure and axes """
     if fig is None:
         fig = plt.figure()
@@ -296,42 +376,7 @@ def plot_spatial_velocity(vcg, sv=None, qrs_start=None, qrs_end=None, fig=None, 
                     line.set_color(colours[i_vcg])
                     i_vcg += 1
 
-    if isinstance(legend, str):
-        legend = [legend]
-    elif legend is None:
-        legend = [str(i) for i in range(len(vcg))]
-
-    """ Prepare spatial velocity """
-    if sv is None:
-        x_val, sv, _ = get_spatial_velocity(vcg=vcg, t_end=t_end, dt=dt, filter_sv=filter_sv)
-    else:
-        x_val = list()
-        for sim_sv in sv:
-            x_val.append([(i*dt)+2 for i in range(len(sim_sv))])
-
-    """ Plot spatial velocity and VCG components"""
-    i_colour = get_i_colour(ax_sv)
-    for (sim_x, sim_vcg, sim_sv, sim_label) in zip(x_val, vcg, sv, legend):
-        ax_vcg_x.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 0], color=colours[i_colour])
-        ax_vcg_y.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 1], color=colours[i_colour])
-        ax_vcg_z.plot(list(range(0, t_end + dt, dt)), sim_vcg[:, 2], color=colours[i_colour])
-        ax_sv.plot(sim_x, sim_sv, color=colours[i_colour], label=sim_label)
-        i_colour += 1
-
-    """ Plot QRS limits, if provided """
-    i_colour = get_i_colour(ax_sv)
-    if qrs_start is not None:
-        assert len(qrs_start) == len(vcg)
-        for sim_qrs_start in qrs_start:
-            for ax in [ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z]:
-                ax.axvspan(sim_qrs_start, sim_qrs_start+0.1, color=colours[i_colour], alpha=0.5)
-    if qrs_end is not None:
-        assert len(qrs_end) == len(vcg)
-        for sim_qrs_end in qrs_start:
-            for ax in [ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z]:
-                ax.axvspan(sim_qrs_end, sim_qrs_end+0.1, color=colours[i_colour], alpha=0.5)
-        i_colour += 1
-
+    """ Add labels to axes """
     ax_sv.set_xlabel('Time (ms)')
     ax_sv.set_ylabel('Spatial velocity')
     ax_vcg_x.set_ylabel('VCG (x)')
@@ -339,14 +384,33 @@ def plot_spatial_velocity(vcg, sv=None, qrs_start=None, qrs_end=None, fig=None, 
     ax_vcg_z.set_ylabel('VCG (z)')
     ax_vcg_z.set_xlabel('Time (ms)')
 
-    lines = ax_sv.get_lines()
-    print(len(lines))
-    labels = list()
-    for line in lines:
-        labels.append(line.get_label())
-    ax_sv.legend(labels)
+    return fig, ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z, colours
 
-    return fig
+
+def __plot_spatial_velocity_get_plot_data(sv, vcg, t_end, dt, filter_sv):
+    """ Prepare spatial velocity """
+    if sv is None:
+        x_val, sv, _ = get_spatial_velocity(vcg=vcg, t_end=t_end, dt=dt, filter_sv=filter_sv)
+    else:
+        x_val = list()
+        for sim_sv in sv:
+            x_val.append([(i * dt) + 2 for i in range(len(sim_sv))])
+    return x_val, sv
+
+
+def __plot_spatial_velocity_plot_data(x_sv_data, sv_data, x_vcg_data, vcg_data, data_label, plot_colour,
+                                      ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z):
+    ax_vcg_x.plot(x_vcg_data, vcg_data[:, 0], color=plot_colour)
+    ax_vcg_y.plot(x_vcg_data, vcg_data[:, 1], color=plot_colour)
+    ax_vcg_z.plot(x_vcg_data, vcg_data[:, 2], color=plot_colour)
+    ax_sv.plot(x_sv_data, sv_data, color=plot_colour, label=data_label)
+    return None
+
+
+def __plot_spatial_velocity_plot_limits(qrs_limit, ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z, limit_colour):
+    for ax in [ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z]:
+        ax.axvspan(qrs_limit, qrs_limit+0.1, color=limit_colour, alpha=0.5)
+    return None
 
 
 def get_i_colour(axis_handle):

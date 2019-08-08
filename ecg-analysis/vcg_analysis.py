@@ -158,9 +158,7 @@ def convert_ecg_to_vcg(ecg):
     return vcg
 
 
-# def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold_frac=0.2, plot_sv=False,
-#                       legend=None, fig=None, t_end=200, matlab_match=False):
-def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold_frac=0.2, filter_sv=True, t_end=200,
+def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold_frac=0.05, filter_sv=True, t_end=200,
                       matlab_match=False):
     """ Calculate the extent of the VCG QRS complex on the basis of max derivative """
 
@@ -217,7 +215,7 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
     return qrs_start, qrs_end, qrs_duration
 
 
-def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac=0.2, matlab_match=False,
+def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac=0.05, matlab_match=False,
                          filter_sv=True, low_p=40, order=2):
     """ Calculate spatial velocity """
 
@@ -332,13 +330,11 @@ def plot_spatial_velocity_multilimit(vcg, sv=None, qrs_limits=None, fig=None, le
     for qrs_limit in qrs_limits:
         line_handles = list()
         for i in range(len(qrs_limit)):
-            # blue_line = mlines.Line2D([], [], color=colours[i], label=legend_limits[i])
             line_handles.append(mlines.Line2D([], [], color=colours[i], label=legend[i]))
             if i > 0:
                 if qrs_limit[i] <= qrs_limit[i-1]:
                     qrs_limit[i] += 0.1
             __plot_spatial_velocity_plot_limits(qrs_limit[i], ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z, colours[i])
-    # ax_sv.legend(handles=[blue_line])
     ax_sv.legend(handles=line_handles)
     return None
 

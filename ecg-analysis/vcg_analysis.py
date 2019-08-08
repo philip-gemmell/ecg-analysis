@@ -326,7 +326,7 @@ def plot_spatial_velocity_multilimit(vcg, sv=None, qrs_limits=None, fig=None, le
     __plot_spatial_velocity_plot_data(x_val[0], sv[0], x_vcg_data, vcg[0], None, None,
                                       ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z)
 
-    """ Plot QRS limits, along with proxy patches for the legend """
+    """ Plot QRS limits, along with proxy patches for the legend. Adjust values for QRS limits to prevent overlap. """
     colours = common_analysis.get_plot_colours(n=len(qrs_limits[0]))
     import matplotlib.lines as mlines
     for qrs_limit in qrs_limits:
@@ -334,6 +334,9 @@ def plot_spatial_velocity_multilimit(vcg, sv=None, qrs_limits=None, fig=None, le
         for i in range(len(qrs_limit)):
             # blue_line = mlines.Line2D([], [], color=colours[i], label=legend_limits[i])
             line_handles.append(mlines.Line2D([], [], color=colours[i], label=legend[i]))
+            if i > 0:
+                if qrs_limit[i] <= qrs_limit[i-1]:
+                    qrs_limit[i] += 0.1
             __plot_spatial_velocity_plot_limits(qrs_limit[i], ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z, colours[i])
     # ax_sv.legend(handles=[blue_line])
     ax_sv.legend(handles=line_handles)

@@ -158,7 +158,7 @@ def convert_ecg_to_vcg(ecg):
     return vcg
 
 
-def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold_frac=0.05, filter_sv=True, t_end=200,
+def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold_frac=0.15, filter_sv=True, t_end=200,
                       matlab_match=False):
     """ Calculate the extent of the VCG QRS complex on the basis of max derivative """
 
@@ -215,7 +215,7 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
     return qrs_start, qrs_end, qrs_duration
 
 
-def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac=0.05, matlab_match=False,
+def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac=0.15, matlab_match=False,
                          filter_sv=True, low_p=40, order=2):
     """ Calculate spatial velocity """
 
@@ -241,6 +241,7 @@ def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac
             sim_x = list(range(velocity_offset, t_end, dt))[5:]
             if filter_sv:
                 sim_sv = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
+            threshold = max(sim_sv)*threshold_frac
         else:
             sim_x = list(range(velocity_offset, t_end, dt))
             threshold = max(sim_sv)*threshold_frac
@@ -259,6 +260,8 @@ def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac
                 else:
                     sv_filtered = sim_sv
                 i_qrs_start = np.where(sv_filtered > threshold)[0][0]
+                if sim_x[0] > 50:
+                    raise Exception('More than 50ms of trace removed - try changing threshold_frac')
             sim_sv = sv_filtered
         sv.append(sim_sv)
         x_val.append(sim_x)
@@ -327,6 +330,7 @@ def plot_spatial_velocity_multilimit(vcg, sv=None, qrs_limits=None, fig=None, le
     """ Plot QRS limits, along with proxy patches for the legend. Adjust values for QRS limits to prevent overlap. """
     colours = common_analysis.get_plot_colours(n=len(qrs_limits[0]))
     import matplotlib.lines as mlines
+    line_handles = None
     for qrs_limit in qrs_limits:
         line_handles = list()
         for i in range(len(qrs_limit)):

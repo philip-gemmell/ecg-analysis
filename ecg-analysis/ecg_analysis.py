@@ -78,11 +78,12 @@ def convert_electrodes_to_ecg(electrode_data):
     return ecg
 
 
-def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_limits=None):
+def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_limits=None, plot_sequence=None, single_fig=True):
     """ Plots and labels the ECG data from simulation(s). Optional to add in QRS start/end boundaries for plotting """
 
-    plot_sequence = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'LI', 'LII', 'LIII', 'aVR', 'aVL', 'aVF']
-    fig, ax = __plot_ecg_prep_axes(plot_sequence)
+    if plot_sequence is None:
+        plot_sequence = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'LI', 'LII', 'LIII', 'aVR', 'aVL', 'aVF']
+    fig, ax = __plot_ecg_prep_axes(plot_sequence, single_fig)
     ecg, legend = __plot_ecg_preprocess_inputs(ecg, legend)
 
     time = [i*dt for i in range(len(ecg[0]['V1']))]
@@ -145,15 +146,23 @@ def __plot_ecg_preprocess_inputs(ecg, legend):
     return ecg, legend
 
 
-def __plot_ecg_prep_axes(plot_sequence):
+def __plot_ecg_prep_axes(plot_sequence, single_fig=True):
     """ Initialise figure and axis handles """
-    fig = plt.figure()
-    i = 1
-    ax = dict()
-    for key in plot_sequence:
-        ax[key] = plt.subplot(2, 6, i)
-        ax[key].set_title(key)
-        i += 1
+    if single_fig:
+        fig = plt.figure()
+        i = 1
+        ax = dict()
+        for key in plot_sequence:
+            ax[key] = fig.add_subplot(2, 6, i)
+            ax[key].set_title(key)
+            i += 1
+    else:
+        fig = dict()
+        ax = dict()
+        for key in plot_sequence:
+            fig[key] = plt.figure()
+            ax[key] = fig[key].add_subplot(1, 1, 1)
+            ax[key].set_title(key)
     return fig, ax
 
 

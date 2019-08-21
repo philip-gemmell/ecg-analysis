@@ -207,6 +207,9 @@ def simplex_volume(*, vertices=None, sides=None) -> float:
     because they are coplanar, colinear or coincident).
 
     Warning: this algorithm has not been tested for numerical stability.
+
+    Originally from
+    https://codereview.stackexchange.com/questions/77593/calculating-the-volume-of-a-tetrahedron
     """
 
     # Implements http://mathworld.wolfram.com/Cayley-MengerDeterminant.html
@@ -242,6 +245,42 @@ def simplex_volume(*, vertices=None, sides=None) -> float:
     return np.sqrt(vol_square)
 
 
+def get_surface_area(file_surf, file_pts, convert_to_centroid_uvc=False):
+    """ Will calculate the surface area for a given surface file """
+    pts, _, _ = open_mesh.get_mesh(file_pts=file_pts)
+    surf = pd.read_csv(file_surf, skiprows=1, delimiter=' ', usecols=(1, 2, 3), header=None)
+
+    surf_val = surf.values
+    surf_val_flat = surf_val.reshape(surf_val.size)
+
+    # if convert_to_centroid_uvc:
+    #     pts_check = get_centroid_uvc(uvc=pts, elem=elem)
+    #     pts_check = pd.DataFrame(pts_check)
+    # else:
+    #     pts_check = pts
+
+    """ Extract x, y, z data, then reshape to required format """
+    xyz = pts.loc[surf_val_flat, :].values
+    shape_xyz_new = (int(xyz.shape[0] / 3), 3, 3)
+    try:
+        xyz_reshape = np.reshape(xyz, shape_xyz_new)
+    except ValueError:
+        print("Unable to reshape. Maybe used a UVC pts file instead of a xyz pts file...?")
+        return None
+    area = sum([simplex_volume(vertices=surf_pts) for surf_pts in xyz_reshape])
+    # area = sum([get_triangle_area(vertices=surf_pts) for surf_pts in xyz_reshape])
+    return area
+
+
+def get_triangle_area(vertices):
+    """ Calculate the area of a triangle via the cross product """
+
+    ab = vertices[0]-vertices[2]
+    ac = vertices[0]-vertices[1]
+    cross_product = np.cross(ab, ac)
+    return np.linalg.norm(cross_product)/2
+
+
 def get_bz_and_dense_scar(bounds, bound_reduction):
     """ Will calculate new bounds for a given bound_reduction fraction, e.g. will look for bounds that are 1/6 less
         on either side of the original bounds"""
@@ -250,9 +289,9 @@ def get_bz_and_dense_scar(bounds, bound_reduction):
     return lower_bound, upper_bound
 
 
-def reset_scar(elem):
+def retag_elements(elem, orig_tag=200, new_tag=22):
     """ Reset scar in a given elem variable """
-    elem.loc[elem[5] == 200, 5] = 22
+    elem.loc[elem[5] == orig_tag, 5] = new_tag
     print("Scar reset.")
 
     return elem
@@ -287,7 +326,7 @@ def set_scar_to_meshfile(file_uvc=None, file_elem=None, file_lon=None, lv_scar=T
     uvc, elem, lon = open_mesh.get_mesh(file_root=None, file_pts=file_uvc, file_elem=file_elem, file_lon=file_lon)
 
     """ Reset scar in elem """
-    elem = reset_scar(elem)
+    elem = retag_elements(elem, orig_tag=200, new_tag=22)
 
     """ Determine centroid UVC model """
     centroid_uvc = get_centroid_uvc(uvc=uvc, elem=elem)

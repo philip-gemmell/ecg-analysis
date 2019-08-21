@@ -134,6 +134,191 @@ def plot_vcg_multiple(vcg, legend=None, layout=None):
     return fig, ax
 
 
+def plot_xy_vcg(vcg_x, vcg_y, xlabel='VCG (x)', ylabel='VCG (y)', linestyle='-', fig=None):
+    """ Plot x vs y (or y vs z, or other combination) for VCG trace, with line colour shifting to show time
+        progression. """
+
+    from matplotlib.collections import LineCollection
+
+    if fig is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+    else:
+        ax = fig.gca()
+
+    """ Prepare line segments for plotting """
+    t = np.linspace(0, 1, vcg_x.shape[0])  # "time" variable
+    points = np.array([vcg_x, vcg_y]).transpose().reshape(-1, 1, 2)
+    segs = np.concatenate([points[:-1], points[1:]], axis=1)
+    lc = LineCollection(segs, cmap=plt.get_cmap('viridis'), linestyle=linestyle)
+    lc.set_array(t)
+
+    ax.add_collection(lc)  # add the collection to the plot
+    # line collections don't auto-scale the plot - set it up for a square plot
+    __get_axis_limits([vcg_x, vcg_y], ax)
+    # ax_min = min([vcg_x.min(), vcg_y.min()])
+    # ax_max = max([vcg_x.max(), vcg_y.max()])
+    # if abs(ax_min) > abs(ax_max):
+    #     ax_max = -ax_min
+    # else:
+    #     ax_min = -ax_max
+    # ax.set_xlim(ax_min, ax_max)
+    # ax.set_ylim(ax_min, ax_max)
+    # ax.set_aspect('equal', adjustable='box')
+
+    """ Change the positioning of the axes """
+    # Move left y-axis and bottom x-axis to centre, passing through (0,0)
+    ax.spines['left'].set_position('zero')
+    ax.spines['bottom'].set_position('zero')
+
+    # Eliminate upper and right axes
+    ax.spines['right'].set_color('none')
+    ax.spines['top'].set_color('none')
+
+    # Show ticks in the left and lower axes only
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+
+    # Move the labels to the edges of the plot
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel, rotation='horizontal')
+    ax.xaxis.set_label_coords(1.05, 0.5)
+    ax.yaxis.set_label_coords(0.5, 1.02)
+
+    return fig
+
+
+def plot_xyz_vcg(vcg_x, vcg_y, vcg_z, linestyle='-', fig=None):
+    """ Plot the evolution of VCG in 3D space """
+    from mpl_toolkits.mplot3d import Axes3D
+    from mpl_toolkits.mplot3d.art3d import Line3DCollection
+
+    """ Prepare line segments for plotting """
+    t = np.linspace(0, 1, vcg_x.shape[0])  # "time" variable
+    points = np.array([vcg_x, vcg_y, vcg_z]).transpose().reshape(-1, 1, 3)
+    segs = np.concatenate([points[:-1], points[1:]], axis=1)
+    lc = Line3DCollection(segs, cmap=plt.get_cmap('viridis'), linestyle=linestyle)
+    lc.set_array(t)
+
+    if fig is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        ax = fig.gca()
+    ax.add_collection3d(lc)  # add the collection to the plot
+
+    """ Set axis limits (not automatic for line collections) """
+    __get_axis_limits([vcg_x, vcg_y, vcg_z], ax)
+    # ax_min = min([vcg_x.min(), vcg_y.min(), vcg_z.min()])
+    # ax_max = max([vcg_x.max(), vcg_y.max(), vcg_z.max()])
+    # if abs(ax_min) > abs(ax_max):
+    #     ax_max = -ax_min
+    # else:
+    #     ax_min = -ax_max
+    # if ax_max < 1:
+    #     ax_min = -1
+    #     ax_max = 1
+    # ax.set_xlim(ax_min, ax_max)
+    # ax.set_ylim(ax_min, ax_max)
+    # ax.set_zlim(ax_min, ax_max)
+    # ax.set_aspect('equal', adjustable='box')
+
+    # ax.plot(vcg_x, vcg_y, vcg_z)
+    ax.set_xlabel('VCG (x)')
+    ax.set_ylabel('VCG (y)')
+    ax.set_zlabel('VCG (z)')
+
+    __plot_xyz_add_unit_sphere(ax)
+
+    return fig
+
+
+def plot_xyz_vector(x, y, z, fig=None, linecolour='k', linestyle='-'):
+    """ Plots a specific vector in 3D space (e.g. to reflect maximum dipole) """
+    # draw a vector
+    from matplotlib.patches import FancyArrowPatch
+    from mpl_toolkits.mplot3d import proj3d
+
+    class Arrow3D(FancyArrowPatch):
+
+        def __init__(self, xs, ys, zs, *args, **kwargs):
+            FancyArrowPatch.__init__(self, (0, 0), (0, 0), *args, **kwargs)
+            self._verts3d = xs, ys, zs
+
+        def draw(self, renderer):
+            xs3d, ys3d, zs3d = self._verts3d
+            xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
+            self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
+            FancyArrowPatch.draw(self, renderer)
+
+    if fig is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        ax = fig.gca()
+
+    """ Adapt linestyle variable if required
+    (see http://matplotlib.1069221.n5.nabble.com/linestyle-option-for-FancyArrowPatch-and-similar-commands-td39913.html)
+    """
+    if linestyle == '--':
+        linestyle = 'dashed'
+    elif linestyle == ':':
+        linestyle = 'dotted'
+    elif linestyle == '-.':
+        linestyle = 'dashdot'
+    elif linestyle == '-':
+        linestyle = 'solid'
+    else:
+        warnings.warn('Unrecognised value for linestyle variable...')
+
+    a = Arrow3D([0, x], [0, y], [0, z], mutation_scale=20, lw=1, arrowstyle="-|>", color=linecolour,
+                linestyle=linestyle)
+    ax.add_artist(a)
+
+    __plot_xyz_add_unit_sphere(ax)
+    ax.set_aspect('equal', adjustable='box')
+    ax.set_xlabel('VCG (x)')
+    ax.set_ylabel('VCG (y)')
+    ax.set_zlabel('VCG (z)')
+
+    return fig
+
+
+def __get_axis_limits(data, ax):
+    """ Set axis limits (not automatic for line collections) """
+    ax_min = min([i.min() for i in data])
+    ax_max = max([i.max() for i in data])
+    if abs(ax_min) > abs(ax_max):
+        ax_max = -ax_min
+    else:
+        ax_min = -ax_max
+    if ax_max < 1:
+        ax_min = -1
+        ax_max = 1
+    ax.set_xlim(ax_min, ax_max)
+    ax.set_ylim(ax_min, ax_max)
+    if len(data) == 3:
+        ax.set_zlim(ax_min, ax_max)
+    ax.set_aspect('equal', adjustable='box')
+    return None
+
+
+def __plot_xyz_add_unit_sphere(ax):
+    """ Plot dummy axes (can't move splines in 3D plots) """
+    # draw sphere
+    u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
+    x = np.cos(u) * np.sin(v)
+    y = np.sin(u) * np.sin(v)
+    z = np.cos(v)
+    ax.plot_wireframe(x, y, z, color="k", linewidth=0.5, alpha=0.5)
+
+    # draw axes
+    ax.plot([0, 0], [0, 0], [-1, 1], 'k', linewidth=1.5)
+    ax.plot([0, 0], [-1, 1], [0, 0], 'k', linewidth=1.5)
+    ax.plot([-1, 1], [0, 0], [0, 0], 'k', linewidth=1.5)
+    return None
+
+
 def convert_ecg_to_vcg(ecg):
     """ Convert ECG data to vectorcardiogram (VCG) data using the Kors matrix method """
 
@@ -527,7 +712,7 @@ def get_weighted_dipole_angles(vcg, t_start=None, t_end=None, matlab_match=False
 
 def get_weighted_dipole_magnitudes(vcg, t_start=None, t_end=None, matlab_match=False):
     """ Calculates metrics relating to the magnitude of the weighted dipole of the VCG: mean weighted dipole
-    magnitude, maximum dipole magnitude and x,y.z components of the maximum dipole """
+        magnitude, maximum dipole magnitude and x,y.z components of the maximum dipole """
 
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]

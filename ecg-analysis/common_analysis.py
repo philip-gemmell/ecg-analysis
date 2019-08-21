@@ -6,7 +6,7 @@ import matplotlib.cm as cm
 import shelve
 
 
-def filter_egm(egm, sample_freq=2.0, freq_filter=40, order=2, filter_type='low'):
+def filter_egm(egm, sample_freq=500, freq_filter=40, order=2, filter_type='low'):
     """ Filters EGM data (low pass) """
 
     """ egm             data to filter
@@ -20,6 +20,7 @@ def filter_egm(egm, sample_freq=2.0, freq_filter=40, order=2, filter_type='low')
     window = freq_filter/(sample_freq*0.5)
 
     [b, a] = signal.butter(order, window, filter_type)
+    # print("type(b) = {}, type(a) = {}".format(type(b),type(a)))
     filter_out = signal.filtfilt(b, a, egm)
 
     return filter_out

@@ -189,9 +189,21 @@ def get_mesh_volume_from_var(pts, elem, scar_label=None):
     except ValueError:
         print("Unable to reshape. Maybe used a UVC pts file instead of a xyz pts file...?")
         return None
-    volume = sum([simplex_volume(vertices=elem_pts) for elem_pts in xyz_reshape])
 
-    return volume
+    """ Try parallelising the process of calculating the volume of the individual elements """
+    import multiprocessing
+
+    try:
+        cpus = multiprocessing.cpu_count()-2
+    except NotImplementedError:
+        cpus = 6
+    with multiprocessing.Pool(processes=cpus) as pool:
+        volume = pool.map(__simplex_volume_vertices, xyz_reshape)
+    return sum(volume)
+
+
+def __simplex_volume_vertices(vertices):
+    return simplex_volume(vertices=vertices)
 
 
 def simplex_volume(*, vertices=None, sides=None) -> float:

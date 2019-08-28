@@ -121,6 +121,7 @@ def plot_ecg_multilimits(ecg, qrs_limits, legend=None, dt=2, linewidth=2):
 
     colours = common_analysis.get_plot_colours(n=len(qrs_limits[0]))
     import matplotlib.lines as mlines
+    line_handles = None
     for qrs_limit in qrs_limits:
         line_handles = list()
         for i in range(len(qrs_limit)):

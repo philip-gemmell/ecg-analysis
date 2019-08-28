@@ -155,7 +155,7 @@ def plot_xy_vcg(vcg_x, vcg_y, xlabel='VCG (x)', ylabel='VCG (y)', linestyle='-',
 
     ax.add_collection(lc)  # add the collection to the plot
     # line collections don't auto-scale the plot - set it up for a square plot
-    __get_axis_limits([vcg_x, vcg_y], ax)
+    __set_axis_limits([vcg_x, vcg_y], ax)
     # ax_min = min([vcg_x.min(), vcg_y.min()])
     # ax_max = max([vcg_x.max(), vcg_y.max()])
     # if abs(ax_min) > abs(ax_max):
@@ -208,36 +208,29 @@ def plot_xyz_vcg(vcg_x, vcg_y, vcg_z, linestyle='-', fig=None):
     ax.add_collection3d(lc)  # add the collection to the plot
 
     """ Set axis limits (not automatic for line collections) """
-    __get_axis_limits([vcg_x, vcg_y, vcg_z], ax)
-    # ax_min = min([vcg_x.min(), vcg_y.min(), vcg_z.min()])
-    # ax_max = max([vcg_x.max(), vcg_y.max(), vcg_z.max()])
-    # if abs(ax_min) > abs(ax_max):
-    #     ax_max = -ax_min
-    # else:
-    #     ax_min = -ax_max
-    # if ax_max < 1:
-    #     ax_min = -1
-    #     ax_max = 1
-    # ax.set_xlim(ax_min, ax_max)
-    # ax.set_ylim(ax_min, ax_max)
-    # ax.set_zlim(ax_min, ax_max)
-    # ax.set_aspect('equal', adjustable='box')
+    __set_axis_limits([vcg_x, vcg_y, vcg_z], ax)
 
-    # ax.plot(vcg_x, vcg_y, vcg_z)
     ax.set_xlabel('VCG (x)')
     ax.set_ylabel('VCG (y)')
     ax.set_zlabel('VCG (z)')
 
-    __plot_xyz_add_unit_sphere(ax)
+    add_unit_sphere(ax)
 
     return fig
 
 
-def plot_xyz_vector(x, y, z, fig=None, linecolour='k', linestyle='-'):
+def plot_xyz_vector(vector=None, x=None, y=None, z=None, fig=None, linecolour='C0', linestyle='-'):
     """ Plots a specific vector in 3D space (e.g. to reflect maximum dipole) """
     # draw a vector
     from matplotlib.patches import FancyArrowPatch
     from mpl_toolkits.mplot3d import proj3d
+
+    if (vector is None) == (x is None):
+        raise ValueError("Exactly one of vertices and x,y,z must be given")
+    if vector is not None:
+        x = vector[0]
+        y = vector[1]
+        z = vector[2]
 
     class Arrow3D(FancyArrowPatch):
 
@@ -275,7 +268,6 @@ def plot_xyz_vector(x, y, z, fig=None, linecolour='k', linestyle='-'):
                 linestyle=linestyle)
     ax.add_artist(a)
 
-    __plot_xyz_add_unit_sphere(ax)
     ax.set_aspect('equal', adjustable='box')
     ax.set_xlabel('VCG (x)')
     ax.set_ylabel('VCG (y)')
@@ -284,7 +276,7 @@ def plot_xyz_vector(x, y, z, fig=None, linecolour='k', linestyle='-'):
     return fig
 
 
-def __get_axis_limits(data, ax):
+def __set_axis_limits(data, ax):
     """ Set axis limits (not automatic for line collections) """
     ax_min = min([i.min() for i in data])
     ax_max = max([i.max() for i in data])
@@ -303,20 +295,119 @@ def __get_axis_limits(data, ax):
     return None
 
 
-def __plot_xyz_add_unit_sphere(ax):
-    """ Plot dummy axes (can't move splines in 3D plots) """
-    # draw sphere
+def add_unit_sphere(ax):
+    """ Add a unit sphere to a 3D plot"""
     u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
     x = np.cos(u) * np.sin(v)
     y = np.sin(u) * np.sin(v)
     z = np.cos(v)
-    ax.plot_wireframe(x, y, z, color="k", linewidth=0.5, alpha=0.5)
-
-    # draw axes
-    ax.plot([0, 0], [0, 0], [-1, 1], 'k', linewidth=1.5)
-    ax.plot([0, 0], [-1, 1], [0, 0], 'k', linewidth=1.5)
-    ax.plot([-1, 1], [0, 0], [0, 0], 'k', linewidth=1.5)
+    ax.plot_wireframe(x, y, z, color="k", linewidth=0.5, alpha=0.25)
     return None
+
+
+def add_xyz_axes(ax, uniform_axes=False, square_axes=False, unit_axes=False):
+    """ Plot dummy axes (can't move splines in 3D plots) """
+
+    """ Construct dummy 3D axes - make sure they're equal sizes """
+    # Extract all current axis properties before we start plotting anything new and changing them!
+    x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
+    z_min, z_max = ax.get_zlim()
+    ax_min = min([x_min, y_min, z_min])
+    ax_max = max([x_max, y_max, z_max])
+    if square_axes:
+        if abs(ax_min) > abs(ax_max):
+            ax_max = -ax_min
+        else:
+            ax_min = -ax_max
+    if unit_axes:
+        if ax_max < 1:
+            ax_min = -1
+            ax_max = 1
+    if uniform_axes:
+        x_min = ax_min
+        y_min = ax_min
+        z_min = ax_min
+        x_max = ax_max
+        y_max = ax_max
+        z_max = ax_max
+    ax.set_xlim([x_min, x_max])
+    ax.set_ylim([y_min, y_max])
+    ax.set_zlim([z_min, z_max])
+    x_ticks = ax.get_xticks()
+    y_ticks = ax.get_yticks()
+    z_ticks = ax.get_zticks()
+    x_ticks = x_ticks[(x_ticks >= x_min) & (x_ticks <= x_max)]
+    y_ticks = y_ticks[(y_ticks >= y_min) & (y_ticks <= y_max)]
+    z_ticks = z_ticks[(z_ticks >= z_min) & (z_ticks <= z_max)]
+
+    # Plot splines
+    ax.plot([0, 0], [0, 0], [x_min, x_max], 'k', linewidth=1.5)
+    ax.plot([0, 0], [y_min, y_max], [0, 0], 'k', linewidth=1.5)
+    ax.plot([z_min, z_max], [0, 0], [0, 0], 'k', linewidth=1.5)
+
+    # Import tick markers (use only those tick markers for the longest axis, as the changes are made to encourage a
+    # square set of axes)
+    x_tick_range = (x_max-x_min)/100
+    y_tick_range = (y_max-y_min)/100
+    z_tick_range = (z_max-z_min)/100
+    for x_tick in x_ticks:
+        ax.plot([x_tick, x_tick], [-x_tick_range, x_tick_range], [0, 0], 'k', linewidth=1.5)
+    for y_tick in y_ticks:
+        ax.plot([-y_tick_range, y_tick_range], [y_tick, y_tick], [0, 0], 'k', linewidth=1.5)
+    for z_tick in z_ticks:
+        ax.plot([0, 0], [-z_tick_range, z_tick_range], [z_tick, z_tick], 'k', linewidth=1.5)
+
+    # Label tick markers (only at the extremes, to prevent a confusing plot)
+    ax.text(x_ticks[0], -x_tick_range*12, 0, x_ticks[0], None)
+    ax.text(x_ticks[-1], -x_tick_range*12, 0, x_ticks[-1], None)
+    ax.text(y_tick_range*4, y_ticks[0], 0, y_ticks[0], None)
+    ax.text(y_tick_range*4, y_ticks[-1], 0, y_ticks[-1], None)
+    ax.text(z_tick_range*4, 0, z_ticks[0], z_ticks[0], None)
+    ax.text(z_tick_range*4, 0, z_ticks[-1], z_ticks[-1], None)
+
+    # Import axis labels
+    ax.text(x_max+x_tick_range, 0, 0, ax.get_xlabel(), None)
+    ax.text(0, y_max+y_tick_range, 0, ax.get_ylabel(), None)
+    ax.text(0, 0, z_max+z_tick_range*4, ax.get_zlabel(), None)
+
+    # Remove original axes
+    ax.set_axis_off()
+    return None
+
+
+def plot_arc3d(vector1, vector2, radius=0.2, fig=None, colour='C0'):
+    """ Plot arc between two given vectors in 3D space. """
+
+    """ Confirm correct input arguments """
+    assert len(vector1) == 3
+    assert len(vector2) == 3
+
+    """ Calculate vector between two vector end points, and the resulting spherical angles for various points along 
+        this vector. From this, derive points that lie along the arc between vector1 and vector2 """
+    v = [i-j for i, j in zip(vector1, vector2)]
+    v_points_direct = [(vector2[0]+v[0]*l, vector2[1]+v[1]*l, vector2[2]+v[2]*l) for l in np.linspace(0, 1)]
+    v_phis = [math.atan2(v_point[1], v_point[0]) for v_point in v_points_direct]
+    v_thetas = [math.acos(v_point[2]/np.linalg.norm(v_point)) for v_point in v_points_direct]
+
+    v_points_arc = [(radius*sin(theta)*cos(phi), radius*sin(theta)*sin(phi), radius*cos(theta))
+                    for theta, phi in zip(v_thetas, v_phis)]
+    v_points_arc.append((0, 0, 0))
+
+    if fig is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    else:
+        ax = fig.gca()
+
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    """ Plot polygon (face colour must be set afterwards, otherwise it over-rides the transparency)
+        https://stackoverflow.com/questions/18897786/transparency-for-poly3dcollection-plot-in-matplotlib """
+    points_collection = Poly3DCollection([v_points_arc], alpha=0.4)
+    points_collection.set_facecolor(colour)
+    ax.add_collection3d(points_collection)
+
+    return fig
 
 
 def convert_ecg_to_vcg(ecg):
@@ -693,12 +784,11 @@ def get_weighted_dipole_angles(vcg, t_start=None, t_end=None, matlab_match=False
         dipole_magnitude = np.linalg.norm(sim_vcg, axis=1)
 
         # Weighted Elevation
-        phi_weighted = [acos(sim_vcg_t[1] / dipole_magnitude_t) * dipole_magnitude_t for (sim_vcg_t, dipole_magnitude_t)
-                        in
-                        zip(sim_vcg, dipole_magnitude)]
+        phi_weighted = [acos(sim_vcg_t[1] / dipole_magnitude_t) * dipole_magnitude_t
+                        for (sim_vcg_t, dipole_magnitude_t) in zip(sim_vcg, dipole_magnitude)]
         # Weighted Azimuth
-        theta_weighted = [atan(sim_vcg_t[2] / sim_vcg_t[0]) * dipole_magnitude_t for (sim_vcg_t, dipole_magnitude_t) in
-                          zip(sim_vcg, dipole_magnitude)]
+        theta_weighted = [atan(sim_vcg_t[2] / sim_vcg_t[0]) * dipole_magnitude_t
+                          for (sim_vcg_t, dipole_magnitude_t) in zip(sim_vcg, dipole_magnitude)]
 
         wae = sum(phi_weighted) / sum(dipole_magnitude)
         waa = sum(theta_weighted) / sum(dipole_magnitude)

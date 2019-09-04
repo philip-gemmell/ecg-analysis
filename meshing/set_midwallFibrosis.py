@@ -279,8 +279,18 @@ def get_surface_area(file_surf, file_pts, convert_to_centroid_uvc=False):
     except ValueError:
         print("Unable to reshape. Maybe used a UVC pts file instead of a xyz pts file...?")
         return None
-    area = sum([simplex_volume(vertices=surf_pts) for surf_pts in xyz_reshape])
+    # area = sum([simplex_volume(vertices=surf_pts) for surf_pts in xyz_reshape])
     # area = sum([get_triangle_area(vertices=surf_pts) for surf_pts in xyz_reshape])
+
+    import multiprocessing
+
+    try:
+        cpus = multiprocessing.cpu_count()-2
+    except NotImplementedError:
+        cpus = 6
+    with multiprocessing.Pool(processes=cpus) as pool:
+        volume = pool.map(__simplex_volume_vertices, xyz_reshape)
+    return sum(volume)
     return area
 
 

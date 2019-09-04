@@ -1,14 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from math import sin, cos, acos, atan
 import math
 import warnings
 
 import common_analysis
 
-# import matplotlib
-# matplotlib.use('Agg')
+__all__ = ['Axes3D']    # Workaround to prevent Axes3D import statement to be labelled as unused
 
 
 def plot_vcg_single(vcg, legend=None):
@@ -77,9 +78,6 @@ def plot_vcg_multiple(vcg, legend=None, layout=None):
         ax['x'] = fig_h[0].add_subplot(gs[0], ylabel='x')
         ax['y'] = fig_h[1].add_subplot(gs[1], ylabel='y', sharex=ax['x'], sharey=ax['x'])
         ax['z'] = fig_h[2].add_subplot(gs[2], ylabel='z', sharex=ax['x'], sharey=ax['x'])
-        # ax['x'] = fig_h[0].add_subplot(1, 3, 1, ylabel='x')
-        # ax['y'] = fig_h[1].add_subplot(1, 3, 2, ylabel='y', sharex=ax['x'], sharey=ax['x'])
-        # ax['z'] = fig_h[2].add_subplot(1, 3, 3, ylabel='z', sharex=ax['x'], sharey=ax['x'])
         plt.setp(ax['y'].get_yticklabels(), visible=False)
         plt.setp(ax['z'].get_yticklabels(), visible=False)
         gs.update(wspace=0.025, hspace=0.05)
@@ -88,9 +86,6 @@ def plot_vcg_multiple(vcg, legend=None, layout=None):
         ax['x'] = fig_h[0].add_subplot(gs[0], ylabel='x')
         ax['y'] = fig_h[1].add_subplot(gs[1], ylabel='y', sharex=ax['x'], sharey=ax['x'])
         ax['z'] = fig_h[2].add_subplot(gs[2], ylabel='z', sharex=ax['x'], sharey=ax['x'])
-        # ax['x'] = fig_h[0].add_subplot(3, 1, 1, ylabel='x')
-        # ax['y'] = fig_h[1].add_subplot(3, 1, 2, ylabel='y', sharex=ax['x'], sharey=ax['x'])
-        # ax['z'] = fig_h[2].add_subplot(3, 1, 3, ylabel='z', sharex=ax['x'], sharey=ax['x'])
         plt.setp(ax['y'].get_xticklabels(), visible=False)
         plt.setp(ax['z'].get_xticklabels(), visible=False)
         gs.update(wspace=0.025, hspace=0.05)
@@ -106,9 +101,6 @@ def plot_vcg_multiple(vcg, legend=None, layout=None):
         ax['x'] = fig_h[0].add_subplot(gs[0], ylabel='x')
         ax['y'] = fig_h[1].add_subplot(gs[1], ylabel='y', sharex=ax['x'], sharey=ax['x'])
         ax['z'] = fig_h[2].add_subplot(gs[2], ylabel='z', sharex=ax['x'], sharey=ax['x'])
-        # ax['x'] = fig_h[0].add_subplot(2, 2, 1, ylabel='x')
-        # ax['y'] = fig_h[1].add_subplot(2, 2, 2, ylabel='y', sharex=ax['x'], sharey=ax['x'])
-        # ax['z'] = fig_h[2].add_subplot(2, 2, 3, ylabel='z', sharex=ax['x'], sharey=ax['x'])
         plt.setp(ax['x'].get_xticklabels(), visible=False)
         plt.setp(ax['y'].get_yticklabels(), visible=False)
         gs.update(wspace=0.025, hspace=0.05)
@@ -156,15 +148,6 @@ def plot_xy_vcg(vcg_x, vcg_y, xlabel='VCG (x)', ylabel='VCG (y)', linestyle='-',
     ax.add_collection(lc)  # add the collection to the plot
     # line collections don't auto-scale the plot - set it up for a square plot
     __set_axis_limits([vcg_x, vcg_y], ax)
-    # ax_min = min([vcg_x.min(), vcg_y.min()])
-    # ax_max = max([vcg_x.max(), vcg_y.max()])
-    # if abs(ax_min) > abs(ax_max):
-    #     ax_max = -ax_min
-    # else:
-    #     ax_min = -ax_max
-    # ax.set_xlim(ax_min, ax_max)
-    # ax.set_ylim(ax_min, ax_max)
-    # ax.set_aspect('equal', adjustable='box')
 
     """ Change the positioning of the axes """
     # Move left y-axis and bottom x-axis to centre, passing through (0,0)
@@ -190,8 +173,6 @@ def plot_xy_vcg(vcg_x, vcg_y, xlabel='VCG (x)', ylabel='VCG (y)', linestyle='-',
 
 def plot_xyz_vcg(vcg_x, vcg_y, vcg_z, linestyle='-', fig=None):
     """ Plot the evolution of VCG in 3D space """
-    from mpl_toolkits.mplot3d import Axes3D
-    from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
     """ Prepare line segments for plotting """
     t = np.linspace(0, 1, vcg_x.shape[0])  # "time" variable
@@ -213,8 +194,6 @@ def plot_xyz_vcg(vcg_x, vcg_y, vcg_z, linestyle='-', fig=None):
     ax.set_xlabel('VCG (x)')
     ax.set_ylabel('VCG (y)')
     ax.set_zlabel('VCG (z)')
-
-    add_unit_sphere(ax)
 
     return fig
 
@@ -895,3 +874,100 @@ def compare_dipole_angles(vcg1, vcg2, t_start1=0, t_end1=None, t_start2=0, t_end
         return [dt_i * 180 / math.pi for dt_i in dt]
     else:
         return dt
+
+
+def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septum, metric_rho_lv, metric_rho_septum,
+                       metric_z_lv, metric_z_septum, metric_name):
+    """ Function to plot all the various figures for trend analysis in one go. """
+    plt.rc('text', usetex=True)
+
+    """ Underlying constants (volumes, sizes, labels, etc.) """
+    # Create volume variables (nb: percent of whole mesh)
+    vol_lv_phi = [0.0, 2.657, 8.667, 14.808]
+    vol_lv_rho = [0.0, 3.602, 7.243, 10.964, 14.808]
+    vol_lv_z = [0.0, 6.183, 10.897, 14.808]
+    vol_lv_size = [0.0, 0.294, 4.062, 14.808]
+
+    vol_septum_phi = [0.0, 6.926, 11.771, 17.019, 21.139]
+    vol_septum_rho = [0.0, 5.105, 10.275, 15.586, 21.139]
+    vol_septum_z = [0.0, 8.840, 15.818, 21.139]
+    vol_septum_size = [0.0, 0.672, 6.531, 21.139]
+
+    volume_complete = vol_lv_phi+vol_lv_rho+vol_lv_z+vol_lv_size+vol_septum_phi+vol_septum_rho+vol_septum_z+vol_septum_size
+    volume_lv = vol_lv_phi+vol_lv_rho+vol_lv_z+vol_lv_size
+    volume_septum = vol_septum_phi+vol_septum_rho+vol_septum_z+vol_septum_size
+
+    # Create area variables (in cm^2)
+    area_lv_phi = [0.0, 37.365, 85.575, 129.895]
+    area_lv_rho = [0.0, 109.697, 115.906, 122.457, 129.895]
+    area_lv_z = [0.0, 57.847, 97.439, 129.895]
+    area_lv_size = [0.0, 10.140, 57.898, 129.895]
+
+    area_septum_phi = [0.0, 56.066, 88.603, 122.337, 149.588]
+    area_septum_rho = [0.0, 126.344, 133.363, 141.091, 149.588]
+    area_septum_z = [0.0, 72.398, 114.937, 149.588]
+    area_septum_size = [0.0, 17.053, 72.104, 149.588]
+
+    area_complete = area_lv_phi+area_lv_rho+area_lv_z+area_lv_size+area_septum_phi+area_septum_rho+area_septum_z+area_septum_size
+    area_lv = area_lv_phi+area_lv_rho+area_lv_z+area_lv_size
+    area_septum = area_septum_phi+area_septum_rho+area_septum_z+area_septum_size
+    area_lv_norm = [i/area_septum_phi[-1] for i in area_lv]
+    area_septum_norm = [i/area_septum_phi[-1] for i in area_septum]
+
+    legend_phi_lv = ['None', r'$1.4\pi/2$ \textrightarrow $1.6\pi/2$', r'$1.2\pi/2$ \textrightarrow $1.8\pi/2$',
+                     r'$\pi/2$ \textrightarrow $\pi$']
+    legend_phi_septum = ['None', r'-0.25 \textrightarrow 0.25', r'-0.50 \textrightarrow 0.25',
+                         r'-0.75 \textrightarrow 0.75', r'-1.00 \textrightarrow 1.00']
+    legend_rho = ['None', r'0.4 \textrightarrow 0.6', r'0.3 \textrightarrow 0.7', r'0.2 \textrightarrow 0.8',
+                  r'0.1 \textrightarrow 0.9']
+    legend_z = ['None', r'0.5 \textrightarrow 0.7', r'0.4 \textrightarrow 0.8', r'0.3 \textrightarrow 0.9']
+
+    """ Set up figures and axes """
+    fig = plt.figure()
+    fig.suptitle(metric_name)
+    gs = gridspec.GridSpec(4, 3)
+    ax = dict()
+    ax['volume'] = fig.add_subplot(gs[:2, :2])
+    ax['area'] = fig.add_subplot(gs[2:, :2])
+    ax['phi_lv'] = fig.add_subplot(gs[0, 2])
+    ax['phi_septum'] = fig.add_subplot(gs[1, 2])
+    ax['rho'] = fig.add_subplot(gs[2, 2])
+    ax['z'] = fig.add_subplot(gs[3, 2])
+    # plt.setp(ax['y'].get_yticklabels(), visible=False)
+    gs.update(left=0.05, right=0.95, bottom=0.05, top=0.95, wspace=0.08, hspace=0.25)
+
+    """ Plot data on axes """
+    ax['volume'].plot(volume_lv, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
+    ax['volume'].plot(volume_septum, metric_septum, 'o', markersize=10, markeredgewidth=3, label='Septum',
+                      markerfacecolor='none', color='C1')
+    ax['volume'].set_xlabel(r'Volume of scar (\% of mesh)')
+    ax['volume'].legend()
+
+    ax['area'].plot(area_lv_norm, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
+    ax['area'].plot(area_septum_norm, metric_septum, 'o', markersize=10, markeredgewidth=3, label='Septum',
+                    markerfacecolor='none', color='C1')
+    ax['area'].set_xlabel(r'Surface Area of scar (normalised)')
+
+    ax['phi_lv'].plot(metric_phi_lv, 'o-', label='LV', linewidth=3, color='C0')
+    ax['phi_lv'].set_xlabel(r'$\phi$')
+    ax['phi_lv'].set_xticks(list(range(len(legend_phi_lv))))
+    ax['phi_lv'].set_xticklabels(legend_phi_lv)
+
+    ax['phi_septum'].plot(metric_phi_septum, 'o-', label='LV', linewidth=3, color='C1')
+    ax['phi_septum'].set_xlabel(r'$\phi$')
+    ax['phi_septum'].set_xticks(list(range(len(legend_phi_septum))))
+    ax['phi_septum'].set_xticklabels(legend_phi_septum)
+
+    ax['rho'].plot(metric_rho_lv, 'o-', label='LV', linewidth=3, color='C0')
+    ax['rho'].plot(metric_rho_septum, 'o-', label='LV', linewidth=3, color='C1')
+    ax['rho'].set_xlabel(r'$\rho$')
+    ax['rho'].set_xticks(list(range(len(legend_rho))))
+    ax['rho'].set_xticklabels(legend_rho)
+
+    ax['z'].plot(metric_z_lv, 'o-', label='LV', linewidth=3, color='C0')
+    ax['z'].plot(metric_z_septum, 'o-', label='LV', linewidth=3, color='C1')
+    ax['z'].set_xlabel(r'$z$')
+    ax['z'].set_xticks(list(range(len(legend_z))))
+    ax['z'].set_xticklabels(legend_z)
+
+    return fig, ax

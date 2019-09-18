@@ -273,6 +273,7 @@ def get_surface_area(file_surf, file_pts, convert_to_centroid_uvc=False):
 
     """ Extract x, y, z data, then reshape to required format """
     xyz = pts.loc[surf_val_flat, :].values
+    assert xyz.shape[0]/3 == int(xyz.shape[0]/3)  # Confirm that the numbers break down correctly
     shape_xyz_new = (int(xyz.shape[0] / 3), 3, 3)
     try:
         xyz_reshape = np.reshape(xyz, shape_xyz_new)
@@ -291,7 +292,7 @@ def get_surface_area(file_surf, file_pts, convert_to_centroid_uvc=False):
     with multiprocessing.Pool(processes=cpus) as pool:
         volume = pool.map(__simplex_volume_vertices, xyz_reshape)
     return sum(volume)
-    return area
+    # return area
 
 
 def get_triangle_area(vertices):

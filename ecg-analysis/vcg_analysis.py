@@ -43,7 +43,7 @@ def plot_vcg_single(vcg, legend=None):
     return fig, ax
 
 
-def plot_vcg_multiple(vcg, legend=None, layout=None):
+def plot_vcg_multiple(vcg, legend=None, layout=None, colours=None, linestyles=None):
     """ Plot multiple instances of VCGs. To avoid too much cross-talk, plot x,y,z components on separate sub-figures """
 
     """ Layout options:
@@ -52,6 +52,21 @@ def plot_vcg_multiple(vcg, legend=None, layout=None):
         column      x,y,z plots are arranged in a vertical column in one figure
         best        x,y,z plots are arranged to try and optimise space
         grid        x,y,z plots are arranged in a grid (like best, but more rigid grid) """
+
+    """ Check colour and linestyle inputs """
+    if colours is None:
+        colours = common_analysis.get_plot_colours(len(vcg))
+    elif isinstance(colours, list):
+        assert len(colours) == len(vcg)
+    else:
+        colours = [colours for _ in vcg]
+
+    if linestyles is None:
+        linestyles = ['-' for _ in vcg]
+    elif isinstance(linestyles, list):
+        assert len(linestyles) == len(vcg)
+    else:
+        linestyles = [linestyles for _ in vcg]
 
     if legend is not None:
         assert len(vcg) == len(legend)
@@ -111,13 +126,13 @@ def plot_vcg_multiple(vcg, legend=None, layout=None):
     """ Plot data and add legend if required """
     xyz_label = ['x', 'y', 'z']
 
-    for (sim_vcg, sim_legend) in zip(vcg, legend):
+    for (sim_vcg, sim_legend, sim_colour, sim_linestyle) in zip(vcg, legend, colours, linestyles):
         if sim_vcg.shape[0] < sim_vcg.shape[1]:
             for (sim_vcg_xyz, xyz) in zip(sim_vcg, xyz_label):
-                ax[xyz].plot(sim_vcg_xyz, label=sim_legend)
+                ax[xyz].plot(sim_vcg_xyz, label=sim_legend, color=sim_colour, linestyle=sim_linestyle)
         else:
             for (sim_vcg_xyz, xyz) in zip(sim_vcg.T, xyz_label):
-                ax[xyz].plot(sim_vcg_xyz, label=sim_legend)
+                ax[xyz].plot(sim_vcg_xyz, label=sim_legend, color=sim_colour, linestyle=sim_linestyle)
 
     if legend[0] is not None:
         if layout == 'figures':

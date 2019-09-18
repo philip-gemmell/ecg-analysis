@@ -1,5 +1,6 @@
 import pandas as pd
 import glob
+import warnings
 
 
 def get_mesh(file_root=None, file_pts=None, file_elem=None, file_lon=None):
@@ -9,24 +10,36 @@ def get_mesh(file_root=None, file_pts=None, file_elem=None, file_lon=None):
     if file_pts is None:
         file_pts = look_for_file(file_root, '.pts')
     if file_pts is not None:
-        pts = pd.read_csv(file_pts, sep=' ', skiprows=1, header=None)
-        print("Successfully read {}".format(file_pts))
+        try:
+            pts = pd.read_csv(file_pts, sep=' ', skiprows=1, header=None)
+            print("Successfully read {}".format(file_pts))
+        except ValueError:
+            pts = None
+            print("Unable to read {}".format(file_pts))
     else:
         pts = None
 
     if file_elem is None:
         file_elem = look_for_file(file_root, '.elem')
     if file_elem is not None:
-        elem = pd.read_csv(file_elem, sep=' ', skiprows=1, usecols=(1, 2, 3, 4, 5), header=None)
-        print("Successfully read {}".format(file_elem))
+        try:
+            elem = pd.read_csv(file_elem, sep=' ', skiprows=1, usecols=(1, 2, 3, 4, 5), header=None)
+            print("Successfully read {}".format(file_elem))
+        except ValueError:
+            elem = None
+            print("Unable to read {}".format(file_elem))
     else:
         elem = None
 
     if file_lon is None:
         file_lon = look_for_file(file_root, '.lon')
     if file_lon is not None:
-        lon = pd.read_csv(file_lon, sep=' ', skiprows=1, header=None)
-        print("Successfully read {}".format(file_elem))
+        try:
+            lon = pd.read_csv(file_lon, sep=' ', skiprows=1, header=None)
+            print("Successfully read {}".format(file_lon))
+        except ValueError:
+            lon = None
+            print("Unable to read {}".format(file_lon))
     else:
         lon = None
 
@@ -63,12 +76,19 @@ def look_for_file(file_root=None, file_type=None):
     if file_root is not None:
         filename = glob.glob(file_root+'*'+file_type)
         if len(filename) > 1:
-            raise ValueError('Too many matching'+file_type+' files')
+            warnings.warn("Too many matching "+file_type+" files")
+            while len(filename) > 1:
+                for i, file in enumerate(filename):
+                    print("{}: {}".format(i, file))
+                i_file = int(input("Enter the appropriate integer for the file to open: "))
+                try:
+                    filename = [filename[i_file]]
+                except IndexError:
+                    warnings.warn("Invalid file selection made.")
         elif len(filename) == 0:
             print("No "+file_type+" file found.")
             filename = None
-        else:
-            filename = filename[0]
+        filename = filename[0]
     else:
         print("No "+file_type+" file found.")
         filename = None

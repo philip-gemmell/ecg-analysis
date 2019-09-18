@@ -70,6 +70,8 @@ echo ""
 	echo "================================="
 	return
 }
+
+# Convert .dat file to .vtk file
 echo ""
 echo ""
 {
@@ -92,9 +94,18 @@ echo ""
 }
 	
 
-#### Tidy up, if appropriate
+#### Tidy up
 echo ""
 echo ""
+echo "rm $EXTRACT_MESH.pts"
+echo "rm $EXTRACT_MESH.elem"
+echo "rm $EXTRACT_MESH.lon"
+rm $EXTRACT_MESH'.pts'
+rm $EXTRACT_MESH'.elem'
+rm $EXTRACT_MESH'.lon'
+echo "========================================"
+echo "== Extracted CARP mesh files removed. =="
+echo "========================================"
 if [ -f $FULL_MESH'.7z' ]; then
 	echo "rm $FULL_MESH.pts"
 	echo "rm $FULL_MESH.elem"
@@ -107,6 +118,6 @@ if [ -f $FULL_MESH'.7z' ]; then
 	echo "=============================="
 else
 	echo "================================="
-	echo "== NO CARP mesh files removed. =="
+	echo "== No CARP mesh files removed. =="
 	echo "================================="
 fi

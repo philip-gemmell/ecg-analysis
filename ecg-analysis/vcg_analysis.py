@@ -8,6 +8,7 @@ import math
 import warnings
 
 import common_analysis
+import set_midwallFibrosis as smF
 
 __all__ = ['Axes3D']    # Workaround to prevent Axes3D import statement to be labelled as unused
 
@@ -59,6 +60,8 @@ def plot_vcg_multiple(vcg, legend=None, layout=None):
         legend = [None for _ in vcg]
     if layout is None:
         layout = 'best'
+    if not isinstance(vcg, list):
+        vcg = [vcg]
 
     """ Create and assign figure handles, including a dummy variable for the figure handles for cross-compatability """
     if layout == 'figures':
@@ -126,7 +129,7 @@ def plot_vcg_multiple(vcg, legend=None, layout=None):
     return fig, ax
 
 
-def plot_xy_vcg(vcg_x, vcg_y, xlabel='VCG (x)', ylabel='VCG (y)', linestyle='-', fig=None):
+def plot_xy_vcg(vcg_x, vcg_y, xlabel='VCG (x)', ylabel='VCG (y)', linestyle='-', axis_limits=None, fig=None):
     """ Plot x vs y (or y vs z, or other combination) for VCG trace, with line colour shifting to show time
         progression. """
 
@@ -142,12 +145,12 @@ def plot_xy_vcg(vcg_x, vcg_y, xlabel='VCG (x)', ylabel='VCG (y)', linestyle='-',
     t = np.linspace(0, 1, vcg_x.shape[0])  # "time" variable
     points = np.array([vcg_x, vcg_y]).transpose().reshape(-1, 1, 2)
     segs = np.concatenate([points[:-1], points[1:]], axis=1)
-    lc = LineCollection(segs, cmap=plt.get_cmap('viridis'), linestyle=linestyle)
+    lc = LineCollection(segs, cmap=plt.get_cmap('viridis'), linestyle=linestyle, linewidths=3)
     lc.set_array(t)
 
     ax.add_collection(lc)  # add the collection to the plot
     # line collections don't auto-scale the plot - set it up for a square plot
-    __set_axis_limits([vcg_x, vcg_y], ax)
+    __set_axis_limits([vcg_x, vcg_y], ax, unit_min=False, axis_limits=axis_limits)
 
     """ Change the positioning of the axes """
     # Move left y-axis and bottom x-axis to centre, passing through (0,0)
@@ -255,17 +258,24 @@ def plot_xyz_vector(vector=None, x=None, y=None, z=None, fig=None, linecolour='C
     return fig
 
 
-def __set_axis_limits(data, ax):
+def __set_axis_limits(data, ax, unit_min=True, axis_limits=None):
     """ Set axis limits (not automatic for line collections) """
-    ax_min = min([i.min() for i in data])
-    ax_max = max([i.max() for i in data])
-    if abs(ax_min) > abs(ax_max):
-        ax_max = -ax_min
+    if axis_limits is None:
+        ax_min = min([i.min() for i in data])
+        ax_max = max([i.max() for i in data])
+        if abs(ax_min) > abs(ax_max):
+            ax_max = -ax_min
+        else:
+            ax_min = -ax_max
+        if unit_min:
+            if ax_max < 1:
+                ax_min = -1
+                ax_max = 1
     else:
-        ax_min = -ax_max
-    if ax_max < 1:
-        ax_min = -1
-        ax_max = 1
+        if axis_limits < 0:
+            axis_limits = -axis_limits
+        ax_min = -axis_limits
+        ax_max = axis_limits
     ax.set_xlim(ax_min, ax_max)
     ax.set_ylim(ax_min, ax_max)
     if len(data) == 3:
@@ -284,8 +294,13 @@ def add_unit_sphere(ax):
     return None
 
 
-def add_xyz_axes(ax, uniform_axes=False, square_axes=False, unit_axes=False):
-    """ Plot dummy axes (can't move splines in 3D plots) """
+def add_xyz_axes(ax, axis_limits=None, symmetrical_axes=False, equal_limits=False, unit_axes=False):
+    """ Plot dummy axes (can't move splines in 3D plots)
+        ax                  Axis handles
+        symmetrical_axes    Boolean: apply same limits to x, y and z axes
+        equal_limits        Boolean: set axis minimum to minus axis maximum (or vice versa)
+        unit_axes           Boolean: apply minimum of -1 -> 1 for axis limits
+    """
 
     """ Construct dummy 3D axes - make sure they're equal sizes """
     # Extract all current axis properties before we start plotting anything new and changing them!
@@ -294,22 +309,39 @@ def add_xyz_axes(ax, uniform_axes=False, square_axes=False, unit_axes=False):
     z_min, z_max = ax.get_zlim()
     ax_min = min([x_min, y_min, z_min])
     ax_max = max([x_max, y_max, z_max])
-    if square_axes:
-        if abs(ax_min) > abs(ax_max):
-            ax_max = -ax_min
-        else:
-            ax_min = -ax_max
-    if unit_axes:
-        if ax_max < 1:
-            ax_min = -1
-            ax_max = 1
-    if uniform_axes:
+    if equal_limits:
+        x_min, x_max = __set_symmetrical_axis_limits(x_min, x_max, unit_axes=unit_axes)
+        y_min, y_max = __set_symmetrical_axis_limits(y_min, y_max, unit_axes=unit_axes)
+        z_min, z_max = __set_symmetrical_axis_limits(z_min, z_max, unit_axes=unit_axes)
+        ax_min, ax_max = __set_symmetrical_axis_limits(ax_min, ax_max, unit_axes=unit_axes)
+    if symmetrical_axes:
         x_min = ax_min
         y_min = ax_min
         z_min = ax_min
         x_max = ax_max
         y_max = ax_max
         z_max = ax_max
+    if axis_limits is not None:
+        if not isinstance(axis_limits[0], list):
+            # If same axis limits applied to all 3 dimensions
+            if axis_limits[0] > min([x_min, y_min, z_min]):
+                warnings.warn('Lower limit provided greater than automatic.')
+            if axis_limits[1] < max([x_max, y_max, z_max]):
+                warnings.warn('Upper limit provided less than automatic.')
+            x_min = axis_limits[0]
+            x_max = axis_limits[1]
+            y_min = axis_limits[0]
+            y_max = axis_limits[1]
+            z_min = axis_limits[0]
+            z_max = axis_limits[1]
+        else:
+            # Different axis limits provided for each dimension
+            x_min = axis_limits[0][0]
+            x_max = axis_limits[0][1]
+            y_min = axis_limits[1][0]
+            y_max = axis_limits[1][1]
+            z_min = axis_limits[2][0]
+            z_max = axis_limits[2][1]
     ax.set_xlim([x_min, x_max])
     ax.set_ylim([y_min, y_max])
     ax.set_zlim([z_min, z_max])
@@ -350,9 +382,23 @@ def add_xyz_axes(ax, uniform_axes=False, square_axes=False, unit_axes=False):
     ax.text(0, y_max+y_tick_range, 0, ax.get_ylabel(), None)
     ax.text(0, 0, z_max+z_tick_range*4, ax.get_zlabel(), None)
 
-    # Remove original axes
+    # Remove original axes, and eliminate whitespace
     ax.set_axis_off()
+    plt.subplots_adjust(left=-0.4, right=1.4, top=1.35, bottom=-0.4)
     return None
+
+
+def __set_symmetrical_axis_limits(ax_min, ax_max, unit_axes=False):
+    if abs(ax_min) > abs(ax_max):
+        ax_max = -ax_min
+    else:
+        ax_min = -ax_max
+
+    if unit_axes:
+        if ax_max < 1:
+            ax_max = 1
+            ax_min = -1
+    return ax_min, ax_max
 
 
 def plot_arc3d(vector1, vector2, radius=0.2, fig=None, colour='C0'):
@@ -698,7 +744,8 @@ def get_qrs_area(vcg, qrs_start=None, qrs_end=None, dt=2, t_end=200, matlab_matc
         if len(qrs_end) != len(vcg):
             qrs_end = [qrs_end]
 
-    qrs_area = list()
+    qrs_area_3d = list()
+    qrs_area_pythag = list()
     qrs_area_components = list()
     for sim_vcg, sim_qrs_start, sim_qrs_end in zip(vcg, qrs_start, qrs_end):
         """ Recalculate indices for start and end points of QRS, and extract relevant data """
@@ -711,9 +758,13 @@ def get_qrs_area(vcg, qrs_start=None, qrs_end=None, dt=2, t_end=200, matlab_matc
         """ Calculate area under x,y,z curves by trapezium rule, then combine """
         qrs_area_temp = np.trapz(sim_vcg_qrs, dx=dt, axis=0)
         qrs_area_components.append(qrs_area_temp)
-        qrs_area.append(np.linalg.norm(qrs_area_temp))
+        qrs_area_pythag.append(np.linalg.norm(qrs_area_temp))
 
-    return qrs_area, qrs_area_components
+        """ Calculate the area under the curve in 3d space wrt to the origin. """
+        sim_triangles = np.array([(i, j, (0, 0, 0)) for i, j in zip(sim_vcg_qrs[:-1], sim_vcg_qrs[1:])])
+        qrs_area_3d.append(sum([smF.simplex_volume(vertices=sim_triangle) for sim_triangle in sim_triangles]))
+
+    return qrs_area_3d, qrs_area_pythag, qrs_area_components
 
 
 def get_azimuth_elevation(vcg, t_start=None, t_end=None):
@@ -887,30 +938,32 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
     vol_lv_rho = [0.0, 3.602, 7.243, 10.964, 14.808]
     vol_lv_z = [0.0, 6.183, 10.897, 14.808]
     vol_lv_size = [0.0, 0.294, 4.062, 14.808]
+    vol_lv_other = [5.333]
 
     vol_septum_phi = [0.0, 6.926, 11.771, 17.019, 21.139]
     vol_septum_rho = [0.0, 5.105, 10.275, 15.586, 21.139]
     vol_septum_z = [0.0, 8.840, 15.818, 21.139]
     vol_septum_size = [0.0, 0.672, 6.531, 21.139]
+    vol_septum_other = [8.944]
 
-    volume_complete = vol_lv_phi+vol_lv_rho+vol_lv_z+vol_lv_size+vol_septum_phi+vol_septum_rho+vol_septum_z+vol_septum_size
-    volume_lv = vol_lv_phi+vol_lv_rho+vol_lv_z+vol_lv_size
-    volume_septum = vol_septum_phi+vol_septum_rho+vol_septum_z+vol_septum_size
+    volume_lv = vol_lv_phi + vol_lv_rho + vol_lv_z + vol_lv_size + vol_lv_other
+    volume_septum = vol_septum_phi + vol_septum_rho + vol_septum_z + vol_septum_size + vol_septum_other
 
     # Create area variables (in cm^2)
     area_lv_phi = [0.0, 37.365, 85.575, 129.895]
     area_lv_rho = [0.0, 109.697, 115.906, 122.457, 129.895]
     area_lv_z = [0.0, 57.847, 97.439, 129.895]
     area_lv_size = [0.0, 10.140, 57.898, 129.895]
+    area_lv_other = [76.501]
 
     area_septum_phi = [0.0, 56.066, 88.603, 122.337, 149.588]
     area_septum_rho = [0.0, 126.344, 133.363, 141.091, 149.588]
     area_septum_z = [0.0, 72.398, 114.937, 149.588]
     area_septum_size = [0.0, 17.053, 72.104, 149.588]
+    area_septum_other = [97.174]
 
-    area_complete = area_lv_phi+area_lv_rho+area_lv_z+area_lv_size+area_septum_phi+area_septum_rho+area_septum_z+area_septum_size
-    area_lv = area_lv_phi+area_lv_rho+area_lv_z+area_lv_size
-    area_septum = area_septum_phi+area_septum_rho+area_septum_z+area_septum_size
+    area_lv = area_lv_phi + area_lv_rho + area_lv_z + area_lv_size + area_lv_other
+    area_septum = area_septum_phi + area_septum_rho + area_septum_z + area_septum_size + area_septum_other
     area_lv_norm = [i/area_septum_phi[-1] for i in area_lv]
     area_septum_norm = [i/area_septum_phi[-1] for i in area_septum]
 
@@ -921,6 +974,10 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
     legend_rho = ['None', r'0.4 \textrightarrow 0.6', r'0.3 \textrightarrow 0.7', r'0.2 \textrightarrow 0.8',
                   r'0.1 \textrightarrow 0.9']
     legend_z = ['None', r'0.5 \textrightarrow 0.7', r'0.4 \textrightarrow 0.8', r'0.3 \textrightarrow 0.9']
+
+    """ Assert correct data has been passed (insofar that it is of the right length!) """
+    assert len(area_lv) == len(metric_lv)
+    assert len(area_septum) == len(metric_septum)
 
     """ Set up figures and axes """
     fig = plt.figure()
@@ -934,7 +991,7 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
     ax['rho'] = fig.add_subplot(gs[2, 2])
     ax['z'] = fig.add_subplot(gs[3, 2])
     # plt.setp(ax['y'].get_yticklabels(), visible=False)
-    gs.update(left=0.05, right=0.95, bottom=0.05, top=0.95, wspace=0.08, hspace=0.25)
+    gs.update(left=0.05, right=0.95, bottom=0.05, top=0.95, wspace=0.09, hspace=0.25)
 
     """ Plot data on axes """
     ax['volume'].plot(volume_lv, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
@@ -969,5 +1026,47 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
     ax['z'].set_xlabel(r'$z$')
     ax['z'].set_xticks(list(range(len(legend_z))))
     ax['z'].set_xticklabels(legend_z)
+
+    return fig, ax
+
+
+def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_labels):
+    """ Plots a bar chart for the observed metrics. """
+
+    """ Conduct initial checks, and set up values appropriate to plotting """
+    assert len(metrics_cont) == len(metrics_lv)
+    assert len(metrics_cont) == len(metrics_sept)
+    assert len(metrics_cont) == len(metric_labels)
+
+    fig = plt.figure()
+    gs = gridspec.GridSpec(1, len(metrics_cont))
+    axes = list()
+    for i, metric_label in enumerate(metric_labels):
+        axes.append(fig.add_subplot(gs[i]))
+    # fig, ax = plt.subplots()
+
+    # index = np.arange(len(metrics_cont))
+    index = [0, 1, 2]
+    bar_width = 1.2
+    opacity = 0.8
+
+    for ax, metric_cont, metric_lv, metric_sept, label in zip(axes, metrics_cont, metrics_lv, metrics_sept,
+                                                              metric_labels):
+        ax.bar(index[0], metric_cont, label='Control', alpha=opacity, color='C2', width=bar_width)
+        ax.bar(index[1], metric_lv, label='LV Scar', alpha=opacity, color='C0', width=bar_width)
+        ax.bar(index[2], metric_sept, label='Septum Scar', alpha=opacity, color='C1', width=bar_width)
+        ax.set_title(label)
+        ax.set_xticks([])
+    axes[-1].legend()
+
+    # """ Plot bar charts """
+    # plt.bar(index-bar_width, metrics_cont, bar_width, label='Control')
+    # plt.bar(index, metrics_lv, bar_width, label='LV Scar')
+    # plt.bar(index+bar_width, metrics_sept, label='Septum Scar')
+    #
+    # """ Add labels """
+    # ax.set_ylabel('Fractional Change')
+    # ax.legend()
+    # ax.set_xticklabels(index, metric_labels)
 
     return fig, ax

@@ -78,24 +78,41 @@ def convert_electrodes_to_ecg(electrode_data):
     return ecg
 
 
-def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_limits=None, plot_sequence=None, single_fig=True):
+def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_limits=None, plot_sequence=None, single_fig=True, colours=None,
+             linestyles=None):
     """ Plots and labels the ECG data from simulation(s). Optional to add in QRS start/end boundaries for plotting """
 
+    """ Prepare axes and inputs """
     if plot_sequence is None:
         plot_sequence = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'LI', 'LII', 'LIII', 'aVR', 'aVL', 'aVF']
     fig, ax = __plot_ecg_prep_axes(plot_sequence, single_fig)
     ecg, legend = __plot_ecg_preprocess_inputs(ecg, legend)
 
+    """ Check colour and linestyle inputs """
+    if colours is None:
+        colours = common_analysis.get_plot_colours(len(ecg))
+    elif isinstance(colours, list):
+        assert len(colours) == len(ecg)
+    else:
+        colours = [colours for _ in ecg]
+
+    if linestyles is None:
+        linestyles = ['-' for _ in ecg]
+    elif isinstance(linestyles, list):
+        assert len(linestyles) == len(ecg)
+    else:
+        linestyles = [linestyles for _ in ecg]
+
+    """ Plot data """
     time = [i*dt for i in range(len(ecg[0]['V1']))]
-    colours = common_analysis.get_plot_colours(len(ecg))
-    for (sim_ecg, sim_label, sim_colour) in zip(ecg, legend, colours):
-        __plot_ecg_plot_data(time, sim_ecg, sim_label, sim_colour, ax, plot_sequence, linewidth)
+    for (sim_ecg, sim_label, sim_colour, sim_linestyle) in zip(ecg, legend, colours, linestyles):
+        __plot_ecg_plot_data(time, sim_ecg, sim_label, sim_colour, ax, plot_sequence, linewidth, sim_linestyle)
 
     """ Add QRS limits, if supplied. """
     if qrs_limits is not None:
         # Cycle through each limit provided, e.g. QRS start, QRS end...
         for qrs_limit in qrs_limits:
-            __plot_ecg_plot_limits(ax, qrs_limit, colours, plot_sequence)
+            __plot_ecg_plot_limits(ax, qrs_limit, colours, plot_sequence, linestyles)
 
     """ Add legend, title and axis labels """
     if legend[0] is not None:
@@ -167,18 +184,18 @@ def __plot_ecg_prep_axes(plot_sequence, single_fig=True):
     return fig, ax
 
 
-def __plot_ecg_plot_data(time_val, ecg_data, label, colour, ax, plot_sequence, linewidth):
+def __plot_ecg_plot_data(time_val, ecg_data, label, colour, ax, plot_sequence, linewidth, linestyle):
     for key in plot_sequence:
-        ax[key].plot(time_val, ecg_data[key], linewidth=linewidth, label=label, color=colour)
+        ax[key].plot(time_val, ecg_data[key], linewidth=linewidth, label=label, color=colour, linestyle=linestyle)
     return None
 
 
-def __plot_ecg_plot_limits(ax, limits, colours, plot_sequence):
+def __plot_ecg_plot_limits(ax, limits, colours, plot_sequence, linestyles):
     """ Plot limits to a given plot (e.g. add line marking start of QRS complex) """
     if not isinstance(limits, list):
         limits = [limits]
-    for (sim_limit, sim_colour) in zip(limits, colours):
+    for (sim_limit, sim_colour, sim_linestyle) in zip(limits, colours, linestyles):
         for key in plot_sequence:
-            ax[key].axvspan(sim_limit, sim_limit+0.1, color=sim_colour, alpha=0.5)
+            ax[key].axvline(sim_limit, color=sim_colour, alpha=0.5, linestyle=sim_linestyle)
 
     return None

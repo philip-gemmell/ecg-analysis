@@ -1069,4 +1069,4 @@ def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_la
     # ax.legend()
     # ax.set_xticklabels(index, metric_labels)
 
-    return fig, ax
+    return fig, axes

@@ -14,5 +14,6 @@ ecg-analysis/analysis_commands.txt
 ecg-analysis/figures
 ecg-analysis/*pkl
 ecg-analysis/gmon.out
+ecg-analysis/venv
 
 paper

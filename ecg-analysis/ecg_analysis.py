@@ -143,9 +143,10 @@ def plot_ecg_multilimits(ecg, qrs_limits, legend=None, dt=2, linewidth=2):
         line_handles = list()
         for i in range(len(qrs_limit)):
             line_handles.append(mlines.Line2D([], [], color=colours[i], label=legend[i]))
-            if i > 0:
-                if qrs_limit[i] <= qrs_limit[i - 1]:
-                    qrs_limit[i] += 0.1
+            # Add 'fudge factor' if multiple limits are meant to be plotted on top of each other, so that they're
+            # slightly offset
+            if qrs_limit[i] in qrs_limit[0:i]:
+                qrs_limit[i] += 0.1
             __plot_ecg_plot_limits(ax, qrs_limit, colours, plot_sequence)
 
     plt.rc('text', usetex=True)

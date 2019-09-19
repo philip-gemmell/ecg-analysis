@@ -13,7 +13,7 @@ import set_midwallFibrosis as smF
 __all__ = ['Axes3D']    # Workaround to prevent Axes3D import statement to be labelled as unused
 
 
-def plot_vcg_single(vcg, legend=None):
+def plot_vcg_single(vcg, dt=2, legend=None):
     """ Plot the 3 spatial components of VCG. If multiple VCGs given, will plot VCGs on separate figures"""
 
     if isinstance(vcg, np.ndarray):
@@ -23,27 +23,26 @@ def plot_vcg_single(vcg, legend=None):
 
     fig = list()
     ax = list()
-    i_sim = 0
-    for sim_vcg in vcg:
+    time = [i * dt for i in range(len(vcg[0]))]
+    for i_sim, sim_vcg in enumerate(vcg):
         fig.append(plt.figure())
         ax.append(fig[i_sim].add_subplot(111))
         """ Check data is presented in the correct manner (i.e. printing VCG time-course for x,y,z components, 
             rather than x,y,z elements at each point in the time course) """
         if sim_vcg.shape[0] < sim_vcg.shape[1]:
             for sim_vcg_xyz in sim_vcg:
-                ax[i_sim].plot(sim_vcg_xyz)
+                ax[i_sim].plot(time, sim_vcg_xyz)
         else:
             for sim_vcg_xyz in sim_vcg.T:
-                ax[i_sim].plot(sim_vcg_xyz)
+                ax[i_sim].plot(time, sim_vcg_xyz)
         plt.legend(['X', 'Y', 'Z'])
         if legend is not None:
             ax[i_sim].set_title(legend[i_sim])
-        i_sim += 1
 
     return fig, ax
 
 
-def plot_vcg_multiple(vcg, legend=None, layout=None, colours=None, linestyles=None):
+def plot_vcg_multiple(vcg, dt=2, legend=None, qrs_limits=None, layout=None, colours=None, linestyles=None):
     """ Plot multiple instances of VCGs. To avoid too much cross-talk, plot x,y,z components on separate sub-figures """
 
     """ Layout options:
@@ -53,7 +52,41 @@ def plot_vcg_multiple(vcg, legend=None, layout=None, colours=None, linestyles=No
         best        x,y,z plots are arranged to try and optimise space
         grid        x,y,z plots are arranged in a grid (like best, but more rigid grid) """
 
-    """ Check colour and linestyle inputs """
+    vcg, colours, linestyles, legend, layout = __plot_vcg_multiple_inputs(vcg, colours, linestyles, legend, layout)
+
+    fig, ax = __plot_vcg_multiple_figure_setup(layout)
+
+    """ Plot data and add legend if required """
+    xyz_label = ['x', 'y', 'z']
+    time = [i * dt for i in range(len(vcg[0]))]
+    for (sim_vcg, sim_legend, sim_colour, sim_linestyle) in zip(vcg, legend, colours, linestyles):
+        if sim_vcg.shape[0] < sim_vcg.shape[1]:
+            for (sim_vcg_xyz, xyz) in zip(sim_vcg, xyz_label):
+                ax[xyz].plot(time, sim_vcg_xyz, label=sim_legend, color=sim_colour, linestyle=sim_linestyle)
+        else:
+            for (sim_vcg_xyz, xyz) in zip(sim_vcg.T, xyz_label):
+                ax[xyz].plot(time, sim_vcg_xyz, label=sim_legend, color=sim_colour, linestyle=sim_linestyle)
+
+    if legend[0] is not None:
+        if layout == 'figures':
+            for xyz in xyz_label:
+                ax[xyz].legend()
+        else:
+            ax['x'].legend()
+
+    if qrs_limits is not None:
+        for qrs_limit in qrs_limits:
+            __plot_vcg_plot_limits(ax, qrs_limit, colours, linestyles)
+
+    return fig, ax
+
+
+def __plot_vcg_multiple_inputs(vcg, colours, linestyles, legend, layout):
+    """ Assess and adapt input arguments to plot_vcg_multiple. """
+
+    if not isinstance(vcg, list):
+        vcg = [vcg]
+
     if colours is None:
         colours = common_analysis.get_plot_colours(len(vcg))
     elif isinstance(colours, list):
@@ -73,11 +106,14 @@ def plot_vcg_multiple(vcg, legend=None, layout=None, colours=None, linestyles=No
         plt.rc('text', usetex=True)
     else:
         legend = [None for _ in vcg]
+
     if layout is None:
         layout = 'best'
-    if not isinstance(vcg, list):
-        vcg = [vcg]
 
+    return vcg, colours, linestyles, legend, layout
+
+
+def __plot_vcg_multiple_figure_setup(layout):
     """ Create and assign figure handles, including a dummy variable for the figure handles for cross-compatability """
     if layout == 'figures':
         fig = [plt.figure() for _ in range(3)]
@@ -122,26 +158,19 @@ def plot_vcg_multiple(vcg, legend=None, layout=None, colours=None, linestyles=No
         plt.setp(ax['x'].get_xticklabels(), visible=False)
         plt.setp(ax['y'].get_yticklabels(), visible=False)
         gs.update(wspace=0.025, hspace=0.05)
-
-    """ Plot data and add legend if required """
-    xyz_label = ['x', 'y', 'z']
-
-    for (sim_vcg, sim_legend, sim_colour, sim_linestyle) in zip(vcg, legend, colours, linestyles):
-        if sim_vcg.shape[0] < sim_vcg.shape[1]:
-            for (sim_vcg_xyz, xyz) in zip(sim_vcg, xyz_label):
-                ax[xyz].plot(sim_vcg_xyz, label=sim_legend, color=sim_colour, linestyle=sim_linestyle)
-        else:
-            for (sim_vcg_xyz, xyz) in zip(sim_vcg.T, xyz_label):
-                ax[xyz].plot(sim_vcg_xyz, label=sim_legend, color=sim_colour, linestyle=sim_linestyle)
-
-    if legend[0] is not None:
-        if layout == 'figures':
-            for xyz in xyz_label:
-                ax[xyz].legend()
-        else:
-            ax['x'].legend()
-
     return fig, ax
+
+
+def __plot_vcg_plot_limits(axes, limits, colours, linestyles):
+    """ Plot limits to a given plot (e.g. add line marking start of QRS complex) """
+    if not isinstance(limits, list):
+        limits = [limits]
+    for (sim_limit, sim_colour, sim_linestyle) in zip(limits, colours, linestyles):
+        for key in axes:
+            # print("sim_limit = {}".format(sim_limit))
+            # print("sim_colour = {}".format(sim_colour))
+            # print("sim_linestyle = {}".format(sim_linestyle))
+            axes[key].axvline(sim_limit, color=sim_colour, alpha=0.5, linestyle=sim_linestyle)
 
 
 def plot_xy_vcg(vcg_x, vcg_y, xlabel='VCG (x)', ylabel='VCG (y)', linestyle='-', axis_limits=None, fig=None):

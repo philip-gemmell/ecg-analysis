@@ -1,0 +1,14 @@
+1) Create image sequence in Meshalyzer
+2) Annotate movie with index:
+	./annotate_image.sh path/to/files/images*
+2) Combine images to form movie:
+	convert -quality 100 *png output.mpeg
+3) Do (1) and (2) again for other BCL data (stay in same Meshalyzer window to keep resolutions the same)
+3) Combine horizontally:
+	ffmpeg -i ../../../lv_phi1.5708-3.1416_rho0.1-0.9_z0.3-0.9_bcl300/ecg/vm_data/output.mpeg -i output.mpeg -filter_complex hstack combined.mpeg
+4) Check dimensions match:
+	mediainfo --Inform="Video;%Width%" $SEPT2100 && mediainfo --Inform="Video;%Height%" $SEPT2100
+5) Rescale to match dimensions:
+	ffmpeg -i $SEPT -vf scale=2100:-2 septum_phi-1.00-1.00_rho0.1-0.9_z0.3-0.9_bcl600/ecg/vm_data/combined_width2100.mpeg
+6) Combine to final:
+	ffmpeg -i $CONT2100 -i $LV -i $SEPT2100 -filter_complex "[0:v][1:v][2:v]vstack=inputs=3[v]" -map "[v]" cont_lv_sept.mpeg

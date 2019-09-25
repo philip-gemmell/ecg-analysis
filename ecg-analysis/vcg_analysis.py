@@ -49,7 +49,7 @@ def plot_vcg_multiple(vcg, dt=2, legend=None, qrs_limits=None, layout=None, colo
         figures     Each x,y,z plot is on a separate figure 
         row         x,y,z plots are arranged on a horizontal row in one figure
         column      x,y,z plots are arranged in a vertical column in one figure
-        best        x,y,z plots are arranged to try and optimise space
+        best        x,y,z plots are arranged to try and optimise space (nb: figures not equal sizes...)
         grid        x,y,z plots are arranged in a grid (like best, but more rigid grid) """
 
     vcg, colours, linestyles, legend, layout = __plot_vcg_multiple_inputs(vcg, colours, linestyles, legend, layout)
@@ -108,7 +108,7 @@ def __plot_vcg_multiple_inputs(vcg, colours, linestyles, legend, layout):
         legend = [None for _ in vcg]
 
     if layout is None:
-        layout = 'best'
+        layout = 'grid'
 
     return vcg, colours, linestyles, legend, layout
 
@@ -243,6 +243,69 @@ def plot_xyz_vcg(vcg_x, vcg_y, vcg_z, linestyle='-', fig=None):
     ax.set_zlabel('VCG (z)')
 
     return fig
+
+
+def plot_xyz_vcg_animate(vcg_x, vcg_y, vcg_z, limits=None, linestyle=None, output_file=None):
+    from matplotlib import animation
+
+    """ Extract limits """
+    if limits is None:
+        max_lim = max(max(vcg_x), max(vcg_y), max(vcg_z))
+        min_lim = min(min(vcg_x), min(vcg_y), min(vcg_z))
+        limits = [min_lim, max_lim]
+
+    """ Process inputs to ensure the correct formats are used. """
+    if not isinstance(vcg_x, list):
+        vcg_x = [vcg_x]
+        vcy_y = [vcg_y]
+        vcg_z = [vcg_z]
+    else:
+        assert len(vcg_x) == len(vcg_y)
+        assert len(vcg_x) == len(vcg_z)
+    if linestyle is None:
+        linestyle = ['-']
+    else:
+        assert len(linestyle) == len(vcg_x)
+
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    add_xyz_axes(ax, axis_limits=limits, symmetrical_axes=False, equal_limits=False, unit_axes=False)
+    line, = ax.plot([], [], lw=3)
+
+    # initialization function: plot the background of each frame
+    def init():
+        line.set_data([], [])
+        return line,
+
+    # animation function.  This is called sequentially
+    def animate(i):
+        """ Prepare line segments for plotting """
+        t = np.linspace(0, 1, vcg_x[0][:i].shape[0])  # "time" variable
+        points = np.array([vcg_x[:i], vcg_y[:i], vcg_z[:i]]).transpose().reshape(-1, 1, 3)
+        segs = np.concatenate([points[:-1], points[1:]], axis=1)
+        lc = Line3DCollection(segs, cmap=plt.get_cmap('viridis'), linestyle=linestyle)
+        lc.set_array(t)
+        ax.add_collection3d(lc)  # add the collection to the plot
+        # x = np.linspace(0, 2, 1000)
+        # y = np.sin(2 * np.pi * (x - 0.01 * i))
+        # line.set_data(x, y)
+        return line,
+
+    # call the animator.  blit=True means only re-draw the parts that have changed.
+    anim = animation.FuncAnimation(fig, animate, init_func=init,
+                                   frames=len(vcg_x), interval=20, blit=True)
+
+    # save the animation as an mp4.  This requires ffmpeg or mencoder to be
+    # installed.  The extra_args ensure that the x264 codec is used, so that
+    # the video can be embedded in html5.  You may need to adjust this for
+    # your system: for more information, see
+    # http://matplotlib.sourceforge.net/api/animation_api.html
+    if output_file is None:
+        output_file = 'vcg_xyz.mp4'
+    anim.save(output_file, fps=30, extra_args=['-vcodec', 'libx264'])
+
+    plt.show()
+    return None
 
 
 def plot_xyz_vector(vector=None, x=None, y=None, z=None, fig=None, linecolour='C0', linestyle='-'):
@@ -627,8 +690,10 @@ def plot_spatial_velocity(vcg, sv=None, qrs_limits=None, fig=None, legend=None, 
 
     """ Plot spatial velocity and VCG components"""
     i_colour = get_i_colour(ax_sv)
+    print("initial i_colour = {}".format(i_colour))
     x_vcg_data = list(range(0, t_end + dt, dt))
     for (sim_x, sim_vcg, sim_sv, sim_label) in zip(x_val, vcg, sv, legend):
+        print("data i_colour = {}".format(i_colour))
         __plot_spatial_velocity_plot_data(sim_x, sim_sv, x_vcg_data, sim_vcg, sim_label, colours[i_colour],
                                           ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z)
         i_colour += 1
@@ -637,11 +702,13 @@ def plot_spatial_velocity(vcg, sv=None, qrs_limits=None, fig=None, legend=None, 
     if qrs_limits is not None:
         # Cycle through each limit provided, e.g. QRS start, QRS end...
         for qrs_limit in qrs_limits:
+            print("initial limit i_colour = {}".format(i_colour))
             i_colour = get_i_colour(ax_sv)-len(vcg)
             assert len(qrs_limit) == len(vcg)
 
             # Plot limits for each given VCG
             for sim_qrs_limit in qrs_limit:
+                print("limit i_colour = {}".format(i_colour))
                 __plot_spatial_velocity_plot_limits(sim_qrs_limit, ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z,
                                                     colours[i_colour])
                 i_colour += 1

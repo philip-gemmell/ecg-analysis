@@ -257,7 +257,7 @@ def plot_xyz_vcg_animate(vcg_x, vcg_y, vcg_z, limits=None, linestyle=None, outpu
     """ Process inputs to ensure the correct formats are used. """
     if not isinstance(vcg_x, list):
         vcg_x = [vcg_x]
-        vcy_y = [vcg_y]
+        vcg_y = [vcg_y]
         vcg_z = [vcg_z]
     else:
         assert len(vcg_x) == len(vcg_y)
@@ -566,25 +566,26 @@ def convert_ecg_to_vcg(ecg):
     return vcg
 
 
-def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold_frac=0.15, filter_sv=True, t_end=200,
-                      matlab_match=False):
+def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold_frac_start=0.15,
+                      threshold_frac_end=0.15, filter_sv=True, t_end=200, matlab_match=False):
     """ Calculate the extent of the VCG QRS complex on the basis of max derivative """
 
-    # vcg                       List of VCG data to get QRS start and end points for
+    # vcg                           List of VCG data to get QRS start and end points for
 
-    # dt                2ms
-    # velocity_offset   2       Offset between values in VCG over which to calculate spatial velocity, i.e. 1 will
-    #                           use neighbouring values to calculate the gradient/velocity
-    # low_p             40      Low frequency for bandpass filter
-    # order             2       Order for Butterworth filter
-    # threshold_frac    0.2     Fraction of maximum spatial velocity to trigger QRS detection
-    # plot_sv           False   Plot the calculated spatial velocity and the original VCG, both showing derived QRS
-    #                           limits
-    # legend            None    Legend entries for spatial velocity plot
-    # fig               None    Fig of existing figure to plot results on (must have matching axes to figure produced
-    #                           using this function)
-    # t_end             200     End time of simulation
-    # matlab_math       False   Apply fudge factor to match Matlab results
+    # dt                    2ms
+    # velocity_offset       2       Offset between values in VCG over which to calculate spatial velocity, i.e. 1 will
+    #                               use neighbouring values to calculate the gradient/velocity
+    # low_p                 40      Low frequency for bandpass filter
+    # order                 2       Order for Butterworth filter
+    # threshold_frac_start  0.15    Fraction of maximum spatial velocity to trigger start of QRS detection
+    # threshold_frac_end    0.15    Fraction of maximum spatial velocity to trigger end of QRS detection
+    # plot_sv               False   Plot the calculated spatial velocity and the original VCG, both showing derived QRS
+    #                               limits
+    # legend                None    Legend entries for spatial velocity plot
+    # fig                   None    Fig of existing figure to plot results on (must have matching axes to figure
+    #                               produced using this function)
+    # t_end                 200     End time of simulation
+    # matlab_math           False   Apply fudge factor to match Matlab results
 
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
@@ -592,24 +593,27 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
     """ Create indices to track (1) which colour to plot, and (2) which of the current set of VCGs is currently under
         consideration """
     i_vcg = 0
-    x_val, sv, threshold = get_spatial_velocity(vcg=vcg, velocity_offset=velocity_offset, t_end=t_end, dt=dt,
-                                                threshold_frac=threshold_frac, matlab_match=matlab_match,
-                                                filter_sv=filter_sv, low_p=low_p, order=order)
+    x_val, sv, threshold_start, threshold_end = get_spatial_velocity(vcg=vcg, velocity_offset=velocity_offset,
+                                                                     t_end=t_end, dt=dt,
+                                                                     threshold_frac_start=threshold_frac_start,
+                                                                     threshold_frac_end=threshold_frac_end,
+                                                                     matlab_match=matlab_match, filter_sv=filter_sv,
+                                                                     low_p=low_p, order=order)
     qrs_start = list()
     qrs_end = list()
     qrs_duration = list()
-    for (sim_sv, sim_x, sim_threshold) in zip(sv, x_val, threshold):
+    for (sim_sv, sim_x, sim_threshold_start, sim_threshold_end) in zip(sv, x_val, threshold_start, threshold_end):
         if matlab_match:
-            i_qrs_start = np.where(sim_sv > sim_threshold)[0][0] + 2
+            i_qrs_start = np.where(sim_sv > sim_threshold_start)[0][0] + 2
         else:
-            i_qrs_start = np.where(sim_sv > sim_threshold)[0][0]
+            i_qrs_start = np.where(sim_sv > sim_threshold_start)[0][0]
 
         """ Find end of QRS complex where it reduces below threshold (searching backwards from end). Fudge factors 
             are added to ensure uniformity with Matlab results """
         # i_qrs_end = np.where(sv_filtered[i_qrs_start+1:] < threshold)[0][0]+(i_qrs_start+1)
-        i_qrs_end = len(sim_sv) - (np.where(np.flip(sim_sv) > sim_threshold)[0][0] - 1)
+        i_qrs_end = len(sim_sv) - (np.where(np.flip(sim_sv) > sim_threshold_end)[0][0] - 1)
         assert i_qrs_start < i_qrs_end
-        assert i_qrs_end < len(sim_sv)
+        assert i_qrs_end <= len(sim_sv)
 
         qrs_start_temp = sim_x[i_qrs_start]
         qrs_end_temp = sim_x[i_qrs_end]
@@ -623,8 +627,8 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
     return qrs_start, qrs_end, qrs_duration
 
 
-def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac=0.15, matlab_match=False,
-                         filter_sv=True, low_p=40, order=2):
+def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac_start=0.15, threshold_frac_end=0.15,
+                         matlab_match=False, filter_sv=True, low_p=40, order=2):
     """ Calculate spatial velocity """
 
     if isinstance(vcg, np.ndarray):
@@ -632,7 +636,8 @@ def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac
 
     sv = list()
     x_val = list()
-    threshold_full = list()
+    threshold_start_full = list()
+    threshold_end_full = list()
     for sim_vcg in vcg:
         """ Compute spatial velocity of VCG """
         dvcg = ((sim_vcg[velocity_offset:] - sim_vcg[:-velocity_offset]) / 2) * dt
@@ -649,33 +654,36 @@ def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac
             sim_x = list(range(velocity_offset, t_end, dt))[5:]
             if filter_sv:
                 sim_sv = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
-            threshold = max(sim_sv)*threshold_frac
+            threshold_start = max(sim_sv)*threshold_frac_start
+            threshold_end = max(sim_sv)*threshold_frac_end
         else:
             sim_x = list(range(velocity_offset, t_end, dt))
-            threshold = max(sim_sv)*threshold_frac
+            threshold_start = max(sim_sv)*threshold_frac_start
             if filter_sv:
                 sv_filtered = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
             else:
                 sv_filtered = sim_sv
-            i_qrs_start = np.where(sv_filtered > threshold)[0][0]
+            i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
             while i_qrs_start == 0:
                 sim_sv = sim_sv[1:]
                 sim_x = sim_x[1:]
-                threshold = max(sim_sv) * threshold_frac
+                threshold_start = max(sim_sv) * threshold_frac_start
 
                 if filter_sv:
                     sv_filtered = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
                 else:
                     sv_filtered = sim_sv
-                i_qrs_start = np.where(sv_filtered > threshold)[0][0]
+                i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
                 if sim_x[0] > 50:
-                    raise Exception('More than 50ms of trace removed - try changing threshold_frac')
+                    raise Exception('More than 50ms of trace removed - try changing threshold_frac_start')
+            threshold_end = max(sim_sv) * threshold_frac_end
             sim_sv = sv_filtered
         sv.append(sim_sv)
         x_val.append(sim_x)
-        threshold_full.append(threshold)
+        threshold_start_full.append(threshold_start)
+        threshold_end_full.append(threshold_end)
 
-    return x_val, sv, threshold_full
+    return x_val, sv, threshold_start_full, threshold_end_full
 
 
 def plot_spatial_velocity(vcg, sv=None, qrs_limits=None, fig=None, legend=None, t_end=200, dt=2, filter_sv=True):
@@ -684,17 +692,15 @@ def plot_spatial_velocity(vcg, sv=None, qrs_limits=None, fig=None, legend=None, 
         then spatial velocity must be calculated first and provided to the function.
     """
 
-    fig, ax, colours = __plot_spatial_velocity_prep_axes(vcg, fig)
     vcg, legend = __plot_spatial_velocity_preprocess_inputs(vcg, legend)
+    fig, ax, colours = __plot_spatial_velocity_prep_axes(vcg, fig)
     x_val, sv = __plot_spatial_velocity_get_plot_data(sv, vcg, t_end, dt, filter_sv)
 
     """ Plot spatial velocity and VCG components"""
     i_colour_init = get_i_colour(ax['sv'])
     i_colour = i_colour_init
-    print("initial i_colour = {}".format(i_colour))
     x_vcg_data = list(range(0, t_end + dt, dt))
     for (sim_x, sim_vcg, sim_sv, sim_label) in zip(x_val, vcg, sv, legend):
-        print("data i_colour = {}".format(i_colour))
         __plot_spatial_velocity_plot_data(sim_x, sim_sv, x_vcg_data, sim_vcg, sim_label, colours[i_colour], ax)
         i_colour += 1
 
@@ -702,21 +708,19 @@ def plot_spatial_velocity(vcg, sv=None, qrs_limits=None, fig=None, legend=None, 
     if qrs_limits is not None:
         # Cycle through each limit provided, e.g. QRS start, QRS end...
         for qrs_limit in qrs_limits:
-            print("initial limit i_colour = {}".format(i_colour))
-            # i_colour = get_i_colour(ax['sv'])-len(vcg)
             i_colour = i_colour_init
             assert len(qrs_limit) == len(vcg)
 
             # Plot limits for each given VCG
             for sim_qrs_limit in qrs_limit:
-                print("limit i_colour = {}".format(i_colour))
                 __plot_spatial_velocity_plot_limits(sim_qrs_limit, ax, colours[i_colour])
                 i_colour += 1
 
     """ Add legend (or legend for limits, if appropriate """
-    labels = [line.get_label() for line in ax['sv'].get_lines()]
-    plt.rc('text', usetex=True)
-    ax['sv'].legend(labels)
+    if legend[0] is not None:
+        labels = [line.get_label() for line in ax['sv'].get_lines()]
+        plt.rc('text', usetex=True)
+        ax['sv'].legend(labels)
 
     return fig, ax
 
@@ -761,7 +765,10 @@ def __plot_spatial_velocity_preprocess_inputs(vcg, legend):
     if isinstance(legend, str):
         legend = [legend]
     elif legend is None:
-        legend = [str(i) for i in range(len(vcg))]
+        if len(vcg) > 1:
+            legend = [str(i) for i in range(len(vcg))]
+        else:
+            legend = [None for _ in range(len(vcg))]
     return vcg, legend
 
 
@@ -810,7 +817,7 @@ def __plot_spatial_velocity_prep_axes(vcg, fig):
 def __plot_spatial_velocity_get_plot_data(sv, vcg, t_end, dt, filter_sv):
     """ Prepare spatial velocity """
     if sv is None:
-        x_val, sv, _ = get_spatial_velocity(vcg=vcg, t_end=t_end, dt=dt, filter_sv=filter_sv)
+        x_val, sv, _, _ = get_spatial_velocity(vcg=vcg, t_end=t_end, dt=dt, filter_sv=filter_sv)
     else:
         x_val = list()
         for sim_sv in sv:

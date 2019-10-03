@@ -1155,7 +1155,7 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
     return fig, ax
 
 
-def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_labels):
+def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_labels, layout=None):
     """ Plots a bar chart for the observed metrics. """
 
     """ Conduct initial checks, and set up values appropriate to plotting """
@@ -1163,11 +1163,18 @@ def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_la
     assert len(metrics_cont) == len(metrics_sept)
     assert len(metrics_cont) == len(metric_labels)
 
-    fig = plt.figure()
-    gs = gridspec.GridSpec(1, len(metrics_cont))
-    axes = list()
-    for i, metric_label in enumerate(metric_labels):
-        axes.append(fig.add_subplot(gs[i]))
+    if layout is None:
+        layout = 'combined'
+
+    if layout == 'combined':
+        fig = plt.figure()
+        gs = gridspec.GridSpec(1, len(metrics_cont))
+        axes = list()
+        for i, metric_label in enumerate(metric_labels):
+            axes.append(fig.add_subplot(gs[i]))
+    elif layout == 'fig':
+        fig = [plt.figure() for _ in range(len(metrics_cont))]
+        axes = [fig_i.add_subplot(1, 1, 1) for fig_i in fig]
     # fig, ax = plt.subplots()
 
     # index = np.arange(len(metrics_cont))

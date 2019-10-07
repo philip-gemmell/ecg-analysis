@@ -308,7 +308,7 @@ def plot_xyz_vcg_animate(vcg_x, vcg_y, vcg_z, limits=None, linestyle=None, outpu
     return None
 
 
-def plot_xyz_vector(vector=None, x=None, y=None, z=None, fig=None, linecolour='C0', linestyle='-'):
+def plot_xyz_vector(vector=None, x=None, y=None, z=None, fig=None, linecolour='C0', linestyle='-', linewidth=2):
     """ Plots a specific vector in 3D space (e.g. to reflect maximum dipole) """
     # draw a vector
     from matplotlib.patches import FancyArrowPatch
@@ -353,7 +353,7 @@ def plot_xyz_vector(vector=None, x=None, y=None, z=None, fig=None, linecolour='C
     else:
         warnings.warn('Unrecognised value for linestyle variable...')
 
-    a = Arrow3D([0, x], [0, y], [0, z], mutation_scale=20, lw=1, arrowstyle="-|>", color=linecolour,
+    a = Arrow3D([0, x], [0, y], [0, z], mutation_scale=20, lw=linewidth, arrowstyle="-|>", color=linecolour,
                 linestyle=linestyle)
     ax.add_artist(a)
 
@@ -1053,7 +1053,7 @@ def compare_dipole_angles(vcg1, vcg2, t_start1=0, t_end1=None, t_start2=0, t_end
 
 
 def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septum, metric_rho_lv, metric_rho_septum,
-                       metric_z_lv, metric_z_septum, metric_name):
+                       metric_z_lv, metric_z_septum, metric_name, layout=None):
     """ Function to plot all the various figures for trend analysis in one go. """
     plt.rc('text', usetex=True)
 
@@ -1105,18 +1105,25 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
     assert len(area_septum) == len(metric_septum)
 
     """ Set up figures and axes """
-    fig = plt.figure()
-    fig.suptitle(metric_name)
-    gs = gridspec.GridSpec(4, 3)
-    ax = dict()
-    ax['volume'] = fig.add_subplot(gs[:2, :2])
-    ax['area'] = fig.add_subplot(gs[2:, :2])
-    ax['phi_lv'] = fig.add_subplot(gs[0, 2])
-    ax['phi_septum'] = fig.add_subplot(gs[1, 2])
-    ax['rho'] = fig.add_subplot(gs[2, 2])
-    ax['z'] = fig.add_subplot(gs[3, 2])
-    # plt.setp(ax['y'].get_yticklabels(), visible=False)
-    gs.update(left=0.05, right=0.95, bottom=0.05, top=0.95, wspace=0.09, hspace=0.25)
+    if (layout is None) or (layout == 'combined'):
+        fig = plt.figure()
+        fig.suptitle(metric_name)
+        gs = gridspec.GridSpec(4, 3)
+        ax = dict()
+        ax['volume'] = fig.add_subplot(gs[:2, :2])
+        ax['area'] = fig.add_subplot(gs[2:, :2])
+        ax['phi_lv'] = fig.add_subplot(gs[0, 2])
+        ax['phi_septum'] = fig.add_subplot(gs[1, 2])
+        ax['rho'] = fig.add_subplot(gs[2, 2])
+        ax['z'] = fig.add_subplot(gs[3, 2])
+        # plt.setp(ax['y'].get_yticklabels(), visible=False)
+        gs.update(left=0.05, right=0.95, bottom=0.05, top=0.95, wspace=0.09, hspace=0.25)
+    elif layout == 'figures':
+        keys = ['volume', 'area', 'phi_lv', 'phi_septum', 'rho', 'z']
+        fig = {key: plt.figure() for key in keys}
+        ax = {key: fig[key].add_subplot(1, 1, 1) for key in keys}
+        for key in keys:
+            ax[key].set_ylabel(metric_name)
 
     """ Plot data on axes """
     ax['volume'].plot(volume_lv, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')

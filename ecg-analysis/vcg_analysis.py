@@ -1053,7 +1053,7 @@ def compare_dipole_angles(vcg1, vcg2, t_start1=0, t_end1=None, t_start2=0, t_end
 
 
 def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septum, metric_rho_lv, metric_rho_septum,
-                       metric_z_lv, metric_z_septum, metric_name, layout=None):
+                       metric_z_lv, metric_z_septum, metric_name, layout=None, axis_match=False):
     """ Function to plot all the various figures for trend analysis in one go. """
     plt.rc('text', usetex=True)
 
@@ -1105,6 +1105,7 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
     assert len(area_septum) == len(metric_septum)
 
     """ Set up figures and axes """
+    keys = ['volume', 'area', 'phi_lv', 'phi_septum', 'rho', 'z']
     if (layout is None) or (layout == 'combined'):
         fig = plt.figure()
         fig.suptitle(metric_name)
@@ -1119,7 +1120,6 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
         # plt.setp(ax['y'].get_yticklabels(), visible=False)
         gs.update(left=0.05, right=0.95, bottom=0.05, top=0.95, wspace=0.09, hspace=0.25)
     elif layout == 'figures':
-        keys = ['volume', 'area', 'phi_lv', 'phi_septum', 'rho', 'z']
         fig = {key: plt.figure() for key in keys}
         ax = {key: fig[key].add_subplot(1, 1, 1) for key in keys}
         for key in keys:
@@ -1158,6 +1158,11 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
     ax['z'].set_xlabel(r'$z$')
     ax['z'].set_xticks(list(range(len(legend_z))))
     ax['z'].set_xticklabels(legend_z)
+
+    if axis_match:
+        ax_limits = ax['volume'].get_ylim()
+        for key in keys:
+            ax[key].set_ylim(ax_limits)
 
     return fig, ax
 

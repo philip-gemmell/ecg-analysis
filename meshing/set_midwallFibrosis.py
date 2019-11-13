@@ -350,6 +350,8 @@ def set_scar_to_meshfile(file_uvc=None, file_elem=None, file_lon=None, lv_scar=T
 
     """ Reset scar in elem """
     elem = retag_elements(elem, orig_tag=200, new_tag=22)
+    elem = retag_elements(elem, orig_tag=201, new_tag=22)
+    elem = retag_elements(elem, orig_tag=202, new_tag=22)
 
     """ Determine centroid UVC model """
     centroid_uvc = get_centroid_uvc(uvc=uvc, elem=elem)

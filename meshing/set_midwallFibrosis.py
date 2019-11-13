@@ -9,6 +9,8 @@ import open_mesh
 def get_centroid_uvc(uvc, elem):
     """ Constructs centroid based UVC """
 
+    assert len(uvc.columns) == 4, "Make sure UVC parameters are passed to this function"
+
     elem_val = elem.values
 
     """ Remove region data, then reshape data """

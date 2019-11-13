@@ -79,13 +79,14 @@ def convert_electrodes_to_ecg(electrode_data):
 
 
 def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_limits=None, plot_sequence=None, single_fig=True, colours=None,
-             linestyles=None):
+             linestyles=None, fig=None, ax=None):
     """ Plots and labels the ECG data from simulation(s). Optional to add in QRS start/end boundaries for plotting """
 
     """ Prepare axes and inputs """
     if plot_sequence is None:
         plot_sequence = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'LI', 'LII', 'LIII', 'aVR', 'aVL', 'aVF']
-    fig, ax = __plot_ecg_prep_axes(plot_sequence, single_fig)
+    if fig is None and ax is None:
+        fig, ax = __plot_ecg_prep_axes(plot_sequence, single_fig)
     ecg, legend = __plot_ecg_preprocess_inputs(ecg, legend)
 
     """ Check colour and linestyle inputs """
@@ -157,7 +158,7 @@ def plot_ecg_multilimits(ecg, qrs_limits, legend=None, dt=2, linewidth=2):
 
 def __plot_ecg_preprocess_inputs(ecg, legend):
     """ Plot ECG data, potentially for several different simulations (ensure that ECG data is presented as a list,
-            as in the instance where several simulations are being plotted) """
+        as in the instance where several simulations are being plotted) """
     if not isinstance(ecg, list):
         ecg = [ecg]
     if legend is None:

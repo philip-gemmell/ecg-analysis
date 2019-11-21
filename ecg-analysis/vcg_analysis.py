@@ -379,10 +379,14 @@ def __set_axis_limits(data, ax, unit_min=True, axis_limits=None):
                 ax_min = -1
                 ax_max = 1
     else:
-        if axis_limits < 0:
-            axis_limits = -axis_limits
-        ax_min = -axis_limits
-        ax_max = axis_limits
+        if isinstance(axis_limits, list):
+            ax_min = axis_limits[0]
+            ax_max = axis_limits[1]
+        else:
+            if axis_limits < 0:
+                axis_limits = -axis_limits
+            ax_min = -axis_limits
+            ax_max = axis_limits
     ax.set_xlim(ax_min, ax_max)
     ax.set_ylim(ax_min, ax_max)
     if len(data) == 3:
@@ -429,7 +433,20 @@ def add_xyz_axes(ax, axis_limits=None, symmetrical_axes=False, equal_limits=Fals
         y_max = ax_max
         z_max = ax_max
     if axis_limits is not None:
-        if not isinstance(axis_limits[0], list):
+        if not isinstance(axis_limits, list):
+            if axis_limits < 0:
+                axis_limits = -axis_limits
+            if -axis_limits > min([x_min, y_min, z_min]):
+                warnings.warn('Lower limit provided greater than automatic.')
+            if axis_limits < max([x_max, y_max, z_max]):
+                warnings.warn('Upper limit provided less than automatic.')
+            x_min = -axis_limits
+            x_max = axis_limits
+            y_min = -axis_limits
+            y_max = axis_limits
+            z_min = -axis_limits
+            z_max = axis_limits
+        elif not isinstance(axis_limits[0], list):
             # If same axis limits applied to all 3 dimensions
             if axis_limits[0] > min([x_min, y_min, z_min]):
                 warnings.warn('Lower limit provided greater than automatic.')

@@ -23,7 +23,7 @@ def plot_vcg_single(vcg, dt=2, legend=None):
 
     fig = list()
     ax = list()
-    time = [i * dt for i in range(len(vcg[0]))]
+    time = [i*dt for i in range(len(vcg[0]))]
     for i_sim, sim_vcg in enumerate(vcg):
         fig.append(plt.figure())
         ax.append(fig[i_sim].add_subplot(111))
@@ -1159,19 +1159,19 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
     ax['phi_lv'].set_xticks(list(range(len(legend_phi_lv))))
     ax['phi_lv'].set_xticklabels(legend_phi_lv)
 
-    ax['phi_septum'].plot(metric_phi_septum, 'o-', label='LV', linewidth=3, color='C1')
+    ax['phi_septum'].plot(metric_phi_septum, 'o-', label='Septum', linewidth=3, color='C1')
     ax['phi_septum'].set_xlabel(r'$\phi$')
     ax['phi_septum'].set_xticks(list(range(len(legend_phi_septum))))
     ax['phi_septum'].set_xticklabels(legend_phi_septum)
 
     ax['rho'].plot(metric_rho_lv, 'o-', label='LV', linewidth=3, color='C0')
-    ax['rho'].plot(metric_rho_septum, 'o-', label='LV', linewidth=3, color='C1')
+    ax['rho'].plot(metric_rho_septum, 'o-', label='Septum', linewidth=3, color='C1')
     ax['rho'].set_xlabel(r'$\rho$')
     ax['rho'].set_xticks(list(range(len(legend_rho))))
     ax['rho'].set_xticklabels(legend_rho)
 
     ax['z'].plot(metric_z_lv, 'o-', label='LV', linewidth=3, color='C0')
-    ax['z'].plot(metric_z_septum, 'o-', label='LV', linewidth=3, color='C1')
+    ax['z'].plot(metric_z_septum, 'o-', label='Septum', linewidth=3, color='C1')
     ax['z'].set_xlabel(r'$z$')
     ax['z'].set_xticks(list(range(len(legend_z))))
     ax['z'].set_xticklabels(legend_z)
@@ -1231,3 +1231,27 @@ def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_la
     # ax.set_xticklabels(index, metric_labels)
 
     return fig, axes
+
+
+def plot_density_effect(metric_lv, metric_septum, metric_label, density_labels=None):
+    """ Plot the effect of density on metrics. """
+    plt.rc('text', usetex=True)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(metric_lv, 'o-', label='LV', linewidth=3)
+    ax.plot(metric_septum, 'o-', label='Septum', linewidth=3)
+
+    if density_labels is None:
+        density_labels = ['None',
+                          r'$p_\mathrm{low}=0.2$\\$p_\mathrm{BZ}=0.25$\\$p_\mathrm{dense}=0.3$',
+                          r'$p_\mathrm{low}=0.4$\\$p_\mathrm{BZ}=0.5$\\$p_\mathrm{dense}=0.6$',
+                          r'$p_\mathrm{low}=0.6$\\$p_\mathrm{BZ}=0.75$\\$p_\mathrm{dense}=0.9$']
+
+    """ Set axis labels and ticks """
+    ax.set_ylabel(metric_label)
+    ax.set_xticks(list(range(len(density_labels))))
+    ax.set_xticklabels(density_labels)
+    ax.legend()
+
+    return fig

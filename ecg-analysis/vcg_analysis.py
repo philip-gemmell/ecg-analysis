@@ -1233,23 +1233,65 @@ def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_la
     return fig, axes
 
 
-def plot_density_effect(metric_lv, metric_septum, metric_label, density_labels=None):
+def plot_density_effect(metrics, metric_name, metric_labels=None, density_labels=None, linestyles=None, colours=None,
+                        markers=None):
     """ Plot the effect of density on metrics. """
-    plt.rc('text', usetex=True)
+    preamble = {
+        'text.usetex': True,
+        'text.latex.preamble': [r'\usepackage{amsmath}']
+    }
+    plt.rcParams.update(preamble)
+    # plt.rc('text', usetex=True)
+
+    """ Process input arguments. """
+    if not isinstance(metrics[0], list):
+        metrics = [metrics]
+    if metric_labels is None:
+        if len(metrics) == 2:
+            warnings.warn("Assuming metrics passed in order [LV, Septum].")
+            metric_labels = ['LV', 'Septum']
+        else:
+            metric_labels = [None for _ in range(len(metrics))]
+    else:
+        assert len(metrics) == len(metric_labels)
+    if linestyles is None:
+        linestyles = ['-' for _ in range(len(metrics))]
+    else:
+        assert len(metrics) == len(linestyles)
+    if colours is None:
+        colours = common_analysis.get_plot_colours(len(metrics))
+    else:
+        assert len(metrics) == len(colours)
+    if markers is None:
+        markers = ['o' for _ in range(len(metrics))]
+    else:
+        assert len(metrics) == len(markers)
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(metric_lv, 'o-', label='LV', linewidth=3)
-    ax.plot(metric_septum, 'o-', label='Septum', linewidth=3)
+    for (metric, label, linestyle, colour, marker) in zip(metrics, metric_labels, linestyles, colours, markers):
+        ax.plot(metric, linestyle=linestyle, marker=marker, color=colour, label=label, linewidth=3)
 
     if density_labels is None:
         density_labels = ['None',
-                          r'$p_\mathrm{low}=0.2$\\$p_\mathrm{BZ}=0.25$\\$p_\mathrm{dense}=0.3$',
-                          r'$p_\mathrm{low}=0.4$\\$p_\mathrm{BZ}=0.5$\\$p_\mathrm{dense}=0.6$',
-                          r'$p_\mathrm{low}=0.6$\\$p_\mathrm{BZ}=0.75$\\$p_\mathrm{dense}=0.9$']
+                          r'\begin{align*}'
+                          r'p_\mathrm{low}&=0.2\\'
+                          r'p_\mathrm{BZ}&=0.25\\'
+                          r'p_\mathrm{dense}&=0.3'
+                          r'\end{align*}',
+                          r'\begin{align*}'
+                          r'p_\mathrm{low}&=0.4\\'
+                          r'p_\mathrm{BZ}&=0.5\\'
+                          r'p_\mathrm{dense}&=0.6'
+                          r'\end{align*}',
+                          r'\begin{align*}'
+                          r'p_\mathrm{low}&=0.6\\'
+                          r'p_\mathrm{BZ}&=0.75\\'
+                          r'p_\mathrm{dense}&=0.9'
+                          r'\end{align*}']
 
     """ Set axis labels and ticks """
-    ax.set_ylabel(metric_label)
+    ax.set_ylabel(metric_name)
     ax.set_xticks(list(range(len(density_labels))))
     ax.set_xticklabels(density_labels)
     ax.legend()

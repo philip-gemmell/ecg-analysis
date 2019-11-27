@@ -1070,7 +1070,7 @@ def compare_dipole_angles(vcg1, vcg2, t_start1=0, t_end1=None, t_start2=0, t_end
 
 
 def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septum, metric_rho_lv, metric_rho_septum,
-                       metric_z_lv, metric_z_septum, metric_name, layout=None, axis_match=False):
+                       metric_z_lv, metric_z_septum, metric_name, layout=None, axis_match=True, no_labels=False):
     """ Function to plot all the various figures for trend analysis in one go. """
     plt.rc('text', usetex=True)
 
@@ -1139,42 +1139,82 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
     elif layout == 'figures':
         fig = {key: plt.figure() for key in keys}
         ax = {key: fig[key].add_subplot(1, 1, 1) for key in keys}
-        for key in keys:
-            ax[key].set_ylabel(metric_name)
+        if not no_labels:
+            for key in keys:
+                ax[key].set_ylabel(metric_name)
+    else:
+        print("Unrecognised layout command.")
+        return None, None
 
     """ Plot data on axes """
+    # Volume
     ax['volume'].plot(volume_lv, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
     ax['volume'].plot(volume_septum, metric_septum, 'o', markersize=10, markeredgewidth=3, label='Septum',
                       markerfacecolor='none', color='C1')
-    ax['volume'].set_xlabel(r'Volume of scar (\% of mesh)')
-    ax['volume'].legend()
+    if no_labels:
+        plt.setp(ax['volume'].get_xticklabels(), visible=False)
+        plt.setp(ax['volume'].get_yticklabels(), visible=False)
+        ax['volume'].set_title(r'Volume of scar (\% of mesh)')
+    else:
+        ax['volume'].legend()
+        ax['volume'].set_xlabel(r'Volume of scar (\% of mesh)')
 
+    # Area
     ax['area'].plot(area_lv_norm, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
     ax['area'].plot(area_septum_norm, metric_septum, 'o', markersize=10, markeredgewidth=3, label='Septum',
                     markerfacecolor='none', color='C1')
-    ax['area'].set_xlabel(r'Surface Area of scar (normalised)')
+    if no_labels:
+        plt.setp(ax['area'].get_xticklabels(), visible=False)
+        plt.setp(ax['area'].get_yticklabels(), visible=False)
+        ax['area'].set_title(r'Surface Area of scar (normalised)')
+    else:
+        ax['area'].set_xlabel(r'Surface Area of scar (normalised)')
 
+    # Phi (LV)
     ax['phi_lv'].plot(metric_phi_lv, 'o-', label='LV', linewidth=3, color='C0')
-    ax['phi_lv'].set_xlabel(r'$\phi$')
     ax['phi_lv'].set_xticks(list(range(len(legend_phi_lv))))
-    ax['phi_lv'].set_xticklabels(legend_phi_lv)
+    if no_labels:
+        plt.setp(ax['phi_lv'].get_xticklabels(), visible=False)
+        plt.setp(ax['phi_lv'].get_yticklabels(), visible=False)
+        ax['phi_lv'].set_title(r'$\phi$')
+    else:
+        ax['phi_lv'].set_xticklabels(legend_phi_lv)
+        ax['phi_lv'].set_xlabel(r'$\phi$')
 
+    # Phi (septum)
     ax['phi_septum'].plot(metric_phi_septum, 'o-', label='Septum', linewidth=3, color='C1')
-    ax['phi_septum'].set_xlabel(r'$\phi$')
     ax['phi_septum'].set_xticks(list(range(len(legend_phi_septum))))
-    ax['phi_septum'].set_xticklabels(legend_phi_septum)
+    if no_labels:
+        plt.setp(ax['phi_septum'].get_xticklabels(), visible=False)
+        plt.setp(ax['phi_septum'].get_yticklabels(), visible=False)
+        ax['phi_septum'].set_title(r'$\phi$')
+    else:
+        ax['phi_septum'].set_xticklabels(legend_phi_septum)
+        ax['phi_septum'].set_xlabel(r'$\phi$')
 
+    # Rho
     ax['rho'].plot(metric_rho_lv, 'o-', label='LV', linewidth=3, color='C0')
     ax['rho'].plot(metric_rho_septum, 'o-', label='Septum', linewidth=3, color='C1')
-    ax['rho'].set_xlabel(r'$\rho$')
     ax['rho'].set_xticks(list(range(len(legend_rho))))
-    ax['rho'].set_xticklabels(legend_rho)
+    if no_labels:
+        plt.setp(ax['rho'].get_xticklabels(), visible=False)
+        plt.setp(ax['rho'].get_yticklabels(), visible=False)
+        ax['rho'].set_title(r'$\rho$')
+    else:
+        ax['rho'].set_xticklabels(legend_rho)
+        ax['rho'].set_xlabel(r'$\rho$')
 
+    # z
     ax['z'].plot(metric_z_lv, 'o-', label='LV', linewidth=3, color='C0')
     ax['z'].plot(metric_z_septum, 'o-', label='Septum', linewidth=3, color='C1')
-    ax['z'].set_xlabel(r'$z$')
     ax['z'].set_xticks(list(range(len(legend_z))))
-    ax['z'].set_xticklabels(legend_z)
+    if no_labels:
+        plt.setp(ax['z'].get_xticklabels(), visible=False)
+        plt.setp(ax['z'].get_yticklabels(), visible=False)
+        ax['z'].set_title(r'$z$')
+    else:
+        ax['z'].set_xticklabels(legend_z)
+        ax['z'].set_xlabel(r'$z$')
 
     if axis_match:
         ax_limits = ax['volume'].get_ylim()
@@ -1274,21 +1314,21 @@ def plot_density_effect(metrics, metric_name, metric_labels=None, density_labels
 
     if density_labels is None:
         density_labels = ['None',
-                          r'\begin{align*}'
+                          r'\begingroup\addtolength{\jot}{-2mm}\begin{align*}'
                           r'p_\mathrm{low}&=0.2\\'
                           r'p_\mathrm{BZ}&=0.25\\'
                           r'p_\mathrm{dense}&=0.3'
-                          r'\end{align*}',
-                          r'\begin{align*}'
+                          r'\end{align*}\endgroup',
+                          r'\begingroup\addtolength{\jot}{-2mm}\begin{align*}'
                           r'p_\mathrm{low}&=0.4\\'
                           r'p_\mathrm{BZ}&=0.5\\'
                           r'p_\mathrm{dense}&=0.6'
-                          r'\end{align*}',
-                          r'\begin{align*}'
+                          r'\end{align*}\endgroup',
+                          r'\begingroup\addtolength{\jot}{-2mm}\begin{align*}'
                           r'p_\mathrm{low}&=0.6\\'
                           r'p_\mathrm{BZ}&=0.75\\'
                           r'p_\mathrm{dense}&=0.9'
-                          r'\end{align*}']
+                          r'\end{align*}\endgroup']
 
     """ Set axis labels and ticks """
     ax.set_ylabel(metric_name)

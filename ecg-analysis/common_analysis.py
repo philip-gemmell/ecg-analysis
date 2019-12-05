@@ -1,5 +1,6 @@
 from scipy import signal
 import numpy as np
+import math
 # import matplotlib.pyplot as plt
 # import matplotlib.colors as mpl_colours
 import matplotlib.cm as cm
@@ -154,3 +155,39 @@ def load_workspace(shelf_name):
     my_shelf.close()
 
     return None
+
+
+def asin2(x, y):
+    """ Function to return the inverse sin function across the range (-pi, pi], rather than (-pi/2, pi/2] """
+    """ x: x coordinate of the point in 2D space
+        y: y coordinate of the point in 2D space
+    """
+    r = math.sqrt(x**2+y**2)
+    if x >= 0:
+        return math.asin(y/r)
+    else:
+        if y >= 0:
+            return math.pi-math.asin(y/r)
+        else:
+            return -math.pi-math.asin(y/r)
+
+
+def acos2(x, y):
+    """ Function to return the inverse cos function across the range (-pi, pi], rather than (0, pi] """
+    """ x: x coordinate of the point in 2D space
+        y: y coordinate of the point in 2D space
+    """
+    r = math.sqrt(x**2+y**2)
+    if y >= 0:
+        return math.acos(x/r)
+    else:
+        return -math.acos(x/r)
+
+
+def convert_to_plane(x, y):
+    """ Function to convert a given coordinate to a corresponding point in the coplanar system. """
+    r = math.sqrt(x**2+y**2)
+    if x >= 0:
+        return r
+    else:
+        return -r

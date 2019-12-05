@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
-from math import sin, cos, acos, atan
+from math import sin, cos, acos, atan2
 import math
 import warnings
 
@@ -926,7 +926,7 @@ def get_azimuth_elevation(vcg, t_start=None, t_end=None):
 
         phi = [acos(sim_vcg_t[1] / dipole_magnitude_t) for (sim_vcg_t, dipole_magnitude_t) in
                zip(sim_vcg, dipole_magnitude)]
-        theta = [atan(sim_vcg_t[2] / sim_vcg_t[0]) for (sim_vcg_t, dipole_magnitude_t) in
+        theta = [atan2(sim_vcg_t[2], sim_vcg_t[0]) for (sim_vcg_t, dipole_magnitude_t) in
                  zip(sim_vcg, dipole_magnitude)]
 
         azimuth.append(theta)
@@ -937,6 +937,8 @@ def get_azimuth_elevation(vcg, t_start=None, t_end=None):
 
 def get_weighted_dipole_angles(vcg, t_start=None, t_end=None, matlab_match=False):
     """ Calculates metrics relating to the angles of the weighted dipole of the VCG. Usually used with QRS limits. """
+    """ WAA (Weighted Angle Azimuth): Weighted average angle of azimuth
+        WAE (Weighted Angle Elevation: Weighted average angle of elevation, inclination above xy-plane. """
 
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
@@ -955,12 +957,13 @@ def get_weighted_dipole_angles(vcg, t_start=None, t_end=None, matlab_match=False
             sim_vcg = sim_vcg[i_start:i_end + 1]
         dipole_magnitude = np.linalg.norm(sim_vcg, axis=1)
 
-        # Weighted Elevation
+        # Weighted Azimuth
+        theta_weighted = [atan2(sim_vcg_t[2], sim_vcg_t[0]) * dipole_magnitude_t
+                          for (sim_vcg_t, dipole_magnitude_t) in zip(sim_vcg, dipole_magnitude)]
+        # Weighted Elevation (with azimuth defined over the range [-pi, pi], elevation is uniquely determined over
+        # the range [0, pi])
         phi_weighted = [acos(sim_vcg_t[1] / dipole_magnitude_t) * dipole_magnitude_t
                         for (sim_vcg_t, dipole_magnitude_t) in zip(sim_vcg, dipole_magnitude)]
-        # Weighted Azimuth
-        theta_weighted = [atan(sim_vcg_t[2] / sim_vcg_t[0]) * dipole_magnitude_t
-                          for (sim_vcg_t, dipole_magnitude_t) in zip(sim_vcg, dipole_magnitude)]
 
         wae = sum(phi_weighted) / sum(dipole_magnitude)
         waa = sum(theta_weighted) / sum(dipole_magnitude)
@@ -1029,7 +1032,7 @@ def calculate_delta_dipole_angle(azimuth1, elevation1, azimuth2, elevation2, con
 
 def compare_dipole_angles(vcg1, vcg2, t_start1=0, t_end1=None, t_start2=0, t_end2=None, n_compare=10,
                           convert_to_degrees=False, matlab_match=False):
-    """ Calculates the angular differences between two VCGs are multiple points during their evolution """
+    """ Calculates the angular differences between two VCGs at multiple points during their evolution """
 
     """ Calculate indices for the two VCG traces that correspond to the time points to be compared"""
     i_start1, i_end1 = common_analysis.convert_time_to_index(t_start1, t_end1)
@@ -1069,8 +1072,9 @@ def compare_dipole_angles(vcg1, vcg2, t_start1=0, t_end1=None, t_start2=0, t_end
         return dt
 
 
-def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septum, metric_rho_lv, metric_rho_septum,
-                       metric_z_lv, metric_z_septum, metric_name, layout=None, axis_match=True, no_labels=False):
+def plot_metric_change(metrics, metrics_phi, metrics_rho, metrics_z, metric_name, metrics_lv=None,
+                       labels=None, scattermarkers=None, linemarkers=None, colours=None, linestyles=None,
+                       layout=None, axis_match=True, no_labels=False):
     """ Function to plot all the various figures for trend analysis in one go. """
     plt.rc('text', usetex=True)
 
@@ -1118,8 +1122,37 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
     legend_z = ['None', r'0.5 \textrightarrow 0.7', r'0.4 \textrightarrow 0.8', r'0.3 \textrightarrow 0.9']
 
     """ Assert correct data has been passed (insofar that it is of the right length!) """
-    assert len(area_lv) == len(metric_lv)
-    assert len(area_septum) == len(metric_septum)
+    metrics = __set_metric_to_metrics(metrics)
+    metrics_phi = __set_metric_to_metrics(metrics_phi)
+    metrics_rho = __set_metric_to_metrics(metrics_rho)
+    metrics_z = __set_metric_to_metrics(metrics_z)
+
+    if metrics_lv is None:
+        metrics_lv = [True, False]
+    if labels is None:
+        labels = ['LV', 'Septum']
+    volumes = [volume_lv if metric_lv else volume_septum for metric_lv in metrics_lv]
+    for metric, volume in zip(metrics, volumes):
+        assert len(metric) == len(volume)
+    areas = [area_lv_norm if metric_lv else area_septum_norm for metric_lv in metrics_lv]
+    for metric, area in zip(metrics, areas):
+        assert len(metric) == len(area)
+
+    if scattermarkers is None:
+        scattermarkers = ['+', 'o', 'D', 'v', '^', 's', '*', 'x']
+    assert len(scattermarkers) >= len(metrics)
+    if linemarkers is None:
+        linemarkers = ['.' for _ in range(len(metrics_rho))]
+    else:
+        assert len(linemarkers) >= len(metrics_rho)
+    if linestyles is None:
+        linestyles = ['-' for _ in range(len(metrics_rho))]
+    else:
+        assert len(linestyles) >= len(metrics_rho)
+    if colours is None:
+        colours = common_analysis.get_plot_colours(len(metrics_rho))
+    else:
+        assert len(colours) >= len(metrics_rho)
 
     """ Set up figures and axes """
     keys = ['volume', 'area', 'phi_lv', 'phi_septum', 'rho', 'z']
@@ -1148,9 +1181,12 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
 
     """ Plot data on axes """
     # Volume
-    ax['volume'].plot(volume_lv, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
-    ax['volume'].plot(volume_septum, metric_septum, 'o', markersize=10, markeredgewidth=3, label='Septum',
-                      markerfacecolor='none', color='C1')
+    for (metric, volume, label, colour, scattermarker) in zip(metrics, volumes, labels, colours, scattermarkers):
+        ax['volume'].plot(volume, metric, label=label, linestyle='None', color=colour, marker=scattermarker,
+                          markersize=10, markeredgewidth=3, markerfacecolor='none')
+    # ax['volume'].plot(volume_lv, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
+    # ax['volume'].plot(volume_septum, metric_septum, 'o', markersize=10, markeredgewidth=3, label='Septum',
+    #                       markerfacecolor='none', color='C1')
     if no_labels:
         plt.setp(ax['volume'].get_xticklabels(), visible=False)
         plt.setp(ax['volume'].get_yticklabels(), visible=False)
@@ -1160,9 +1196,12 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
         ax['volume'].set_xlabel(r'Volume of scar (\% of mesh)')
 
     # Area
-    ax['area'].plot(area_lv_norm, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
-    ax['area'].plot(area_septum_norm, metric_septum, 'o', markersize=10, markeredgewidth=3, label='Septum',
-                    markerfacecolor='none', color='C1')
+    for (metric, area, label, colour, scattermarker) in zip(metrics, areas, labels, colours, scattermarkers):
+        ax['area'].plot(area, metric, label=label, linestyle='None', color=colour, marker=scattermarker,
+                          markersize=10, markeredgewidth=3, markerfacecolor='none')
+    # ax['area'].plot(area_lv_norm, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
+    # ax['area'].plot(area_septum_norm, metric_septum, 'o', markersize=10, markeredgewidth=3, label='Septum',
+    #                 markerfacecolor='none', color='C1')
     if no_labels:
         plt.setp(ax['area'].get_xticklabels(), visible=False)
         plt.setp(ax['area'].get_yticklabels(), visible=False)
@@ -1171,7 +1210,14 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
         ax['area'].set_xlabel(r'Surface Area of scar (normalised)')
 
     # Phi (LV)
-    ax['phi_lv'].plot(metric_phi_lv, 'o-', label='LV', linewidth=3, color='C0')
+    for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_phi, labels, colours, linemarkers,
+                                                                     linestyles, metrics_lv):
+        if metric_lv:
+            ax['phi_lv'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker, linewidth=3)
+        else:
+            ax['phi_septum'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker,
+                                  linewidth=3)
+    # ax['phi_lv'].plot(metric_phi_lv, 'o-', label='LV', linewidth=3, color='C0')
     ax['phi_lv'].set_xticks(list(range(len(legend_phi_lv))))
     if no_labels:
         plt.setp(ax['phi_lv'].get_xticklabels(), visible=False)
@@ -1182,7 +1228,7 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
         ax['phi_lv'].set_xlabel(r'$\phi$')
 
     # Phi (septum)
-    ax['phi_septum'].plot(metric_phi_septum, 'o-', label='Septum', linewidth=3, color='C1')
+    # ax['phi_septum'].plot(metric_phi_septum, 'o-', label='Septum', linewidth=3, color='C1')
     ax['phi_septum'].set_xticks(list(range(len(legend_phi_septum))))
     if no_labels:
         plt.setp(ax['phi_septum'].get_xticklabels(), visible=False)
@@ -1193,8 +1239,11 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
         ax['phi_septum'].set_xlabel(r'$\phi$')
 
     # Rho
-    ax['rho'].plot(metric_rho_lv, 'o-', label='LV', linewidth=3, color='C0')
-    ax['rho'].plot(metric_rho_septum, 'o-', label='Septum', linewidth=3, color='C1')
+    for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_rho, labels, colours, linemarkers,
+                                                                     linestyles, metrics_lv):
+        ax['rho'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker, linewidth=3)
+    # ax['rho'].plot(metric_rho_lv, 'o-', label='LV', linewidth=3, color='C0')
+    # ax['rho'].plot(metric_rho_septum, 'o-', label='Septum', linewidth=3, color='C1')
     ax['rho'].set_xticks(list(range(len(legend_rho))))
     if no_labels:
         plt.setp(ax['rho'].get_xticklabels(), visible=False)
@@ -1205,8 +1254,11 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
         ax['rho'].set_xlabel(r'$\rho$')
 
     # z
-    ax['z'].plot(metric_z_lv, 'o-', label='LV', linewidth=3, color='C0')
-    ax['z'].plot(metric_z_septum, 'o-', label='Septum', linewidth=3, color='C1')
+    for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_z, labels, colours, linemarkers,
+                                                                     linestyles, metrics_lv):
+        ax['z'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker, linewidth=3)
+    # ax['z'].plot(metric_z_lv, 'o-', label='LV', linewidth=3, color='C0')
+    # ax['z'].plot(metric_z_septum, 'o-', label='Septum', linewidth=3, color='C1')
     ax['z'].set_xticks(list(range(len(legend_z))))
     if no_labels:
         plt.setp(ax['z'].get_xticklabels(), visible=False)
@@ -1222,6 +1274,14 @@ def plot_metric_change(metric_lv, metric_septum, metric_phi_lv, metric_phi_septu
             ax[key].set_ylim(ax_limits)
 
     return fig, ax
+
+
+def __set_metric_to_metrics(metric):
+    """ Function to change single list of metrics to list of one entry if required (so loops work correctly) """
+    if not isinstance(metric[0], list):
+        return [metric]
+    else:
+        return metric
 
 
 def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_labels, layout=None):
@@ -1244,6 +1304,9 @@ def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_la
     elif layout == 'fig':
         fig = [plt.figure() for _ in range(len(metrics_cont))]
         axes = [fig_i.add_subplot(1, 1, 1) for fig_i in fig]
+    else:
+        print("Invalid argument given for layout")
+        return None, None
     # fig, ax = plt.subplots()
 
     # index = np.arange(len(metrics_cont))

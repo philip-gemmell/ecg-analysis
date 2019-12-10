@@ -920,14 +920,15 @@ def get_azimuth_elevation(vcg, t_start=None, t_end=None):
     azimuth = list()
     elevation = list()
     for (sim_vcg, sim_t_start, sim_t_end) in zip(vcg, t_start, t_end):
-        i_start, i_end = common_analysis.convert_time_to_index(sim_t_start, sim_t_end)
-        sim_vcg = sim_vcg[i_start:i_end + 1]
-        dipole_magnitude = np.linalg.norm(sim_vcg, axis=1)
-
-        phi = [acos(sim_vcg_t[1] / dipole_magnitude_t) for (sim_vcg_t, dipole_magnitude_t) in
-               zip(sim_vcg, dipole_magnitude)]
-        theta = [atan2(sim_vcg_t[2], sim_vcg_t[0]) for (sim_vcg_t, dipole_magnitude_t) in
-                 zip(sim_vcg, dipole_magnitude)]
+        # i_start, i_end = common_analysis.convert_time_to_index(sim_t_start, sim_t_end)
+        # sim_vcg = sim_vcg[i_start:i_end + 1]
+        # dipole_magnitude = np.linalg.norm(sim_vcg, axis=1)
+        #
+        # phi = [acos(sim_vcg_t[1] / dipole_magnitude_t) for (sim_vcg_t, dipole_magnitude_t) in
+        #        zip(sim_vcg, dipole_magnitude)]
+        # theta = [atan2(sim_vcg_t[2], sim_vcg_t[0]) for (sim_vcg_t, dipole_magnitude_t) in
+        #          zip(sim_vcg, dipole_magnitude)]
+        theta, phi, _ = get_simvcg_azimuth_elevation(sim_vcg, sim_t_start, sim_t_end, weighted=False)
 
         azimuth.append(theta)
         elevation.append(phi)
@@ -950,23 +951,24 @@ def get_weighted_dipole_angles(vcg, t_start=None, t_end=None, matlab_match=False
     unit_weighted_dipole = list()
     for (sim_vcg, sim_t_start, sim_t_end) in zip(vcg, t_start, t_end):
         """ Calculate dipole at all points """
-        i_start, i_end = common_analysis.convert_time_to_index(sim_t_start, sim_t_end)
-        if matlab_match:
-            sim_vcg = sim_vcg[i_start - 1:i_end]
-        else:
-            sim_vcg = sim_vcg[i_start:i_end + 1]
-        dipole_magnitude = np.linalg.norm(sim_vcg, axis=1)
+        # i_start, i_end = common_analysis.convert_time_to_index(sim_t_start, sim_t_end)
+        # if matlab_match:
+        #     sim_vcg = sim_vcg[i_start - 1:i_end]
+        # else:
+        #     sim_vcg = sim_vcg[i_start:i_end + 1]
+        # dipole_magnitude = np.linalg.norm(sim_vcg, axis=1)
+        #
+        # # Weighted Azimuth
+        # theta_weighted = [atan2(sim_vcg_t[2], sim_vcg_t[0]) * dipole_magnitude_t
+        #                   for (sim_vcg_t, dipole_magnitude_t) in zip(sim_vcg, dipole_magnitude)]
+        # # Weighted Elevation (with azimuth defined over the range [-pi, pi], elevation is uniquely determined over
+        # # the range [0, pi])
+        # phi_weighted = [acos(sim_vcg_t[1] / dipole_magnitude_t) * dipole_magnitude_t
+        #                 for (sim_vcg_t, dipole_magnitude_t) in zip(sim_vcg, dipole_magnitude)]
+        theta, phi, dipole_magnitude = get_simvcg_azimuth_elevation(sim_vcg, sim_t_start, sim_t_end, weighted=True)
 
-        # Weighted Azimuth
-        theta_weighted = [atan2(sim_vcg_t[2], sim_vcg_t[0]) * dipole_magnitude_t
-                          for (sim_vcg_t, dipole_magnitude_t) in zip(sim_vcg, dipole_magnitude)]
-        # Weighted Elevation (with azimuth defined over the range [-pi, pi], elevation is uniquely determined over
-        # the range [0, pi])
-        phi_weighted = [acos(sim_vcg_t[1] / dipole_magnitude_t) * dipole_magnitude_t
-                        for (sim_vcg_t, dipole_magnitude_t) in zip(sim_vcg, dipole_magnitude)]
-
-        wae = sum(phi_weighted) / sum(dipole_magnitude)
-        waa = sum(theta_weighted) / sum(dipole_magnitude)
+        wae = sum(phi) / sum(dipole_magnitude)
+        waa = sum(theta) / sum(dipole_magnitude)
 
         weighted_average_elev.append(wae)
         weighted_average_azimuth.append(waa)
@@ -975,7 +977,31 @@ def get_weighted_dipole_angles(vcg, t_start=None, t_end=None, matlab_match=False
     return weighted_average_azimuth, weighted_average_elev, unit_weighted_dipole
 
 
-def get_weighted_dipole_magnitudes(vcg, t_start=None, t_end=None, matlab_match=False):
+def get_simvcg_azimuth_elevation(vcg, t_start, t_end, weighted=True, matlab_match=False):
+    """ Helper function to get azimuth and elevation data for a single VCG trace. """
+    i_start, i_end = common_analysis.convert_time_to_index(t_start, t_end)
+    if matlab_match:
+        sim_vcg = vcg[i_start - 1:i_end]
+    else:
+        sim_vcg = vcg[i_start:i_end + 1]
+    dipole_magnitude = np.linalg.norm(sim_vcg, axis=1)
+
+    """ Calculate azimuth (theta, ranges (-pi,pi]) and elevation (phi, ranges (0, pi]), potentially weighted or not. """
+    if weighted:
+        theta = [atan2(sim_vcg_t[2], sim_vcg_t[0])*dipole_magnitude_t for (sim_vcg_t, dipole_magnitude_t) in
+                 zip(sim_vcg, dipole_magnitude)]
+        phi = [acos(sim_vcg_t[1]/dipole_magnitude_t)*dipole_magnitude_t for (sim_vcg_t, dipole_magnitude_t) in
+               zip(sim_vcg, dipole_magnitude)]
+    else:
+        theta = [atan2(sim_vcg_t[2], sim_vcg_t[0]) for (sim_vcg_t, dipole_magnitude_t) in
+                 zip(sim_vcg, dipole_magnitude)]
+        phi = [acos(sim_vcg_t[1]/dipole_magnitude_t) for (sim_vcg_t, dipole_magnitude_t) in
+               zip(sim_vcg, dipole_magnitude)]
+
+    return theta, phi, dipole_magnitude
+
+
+def get_dipole_magnitudes(vcg, t_start=None, t_end=None, matlab_match=False):
     """ Calculates metrics relating to the magnitude of the weighted dipole of the VCG: mean weighted dipole
         magnitude, maximum dipole magnitude and x,y.z components of the maximum dipole """
 
@@ -992,15 +1018,15 @@ def get_weighted_dipole_magnitudes(vcg, t_start=None, t_end=None, matlab_match=F
         """ Calculate dipole at all points """
         i_start, i_end = common_analysis.convert_time_to_index(sim_t_start, sim_t_end)
         if matlab_match:
-            sim_vcg_qrs = sim_vcg[i_start - 1:i_end]
+            sim_vcg_qrs = sim_vcg[i_start-1:i_end]
         else:
-            sim_vcg_qrs = sim_vcg[i_start:i_end + 1]
+            sim_vcg_qrs = sim_vcg[i_start:i_end+1]
         dipole_magnitude = np.linalg.norm(sim_vcg_qrs, axis=1)
 
-        weighted_magnitude.append(sum(dipole_magnitude) / len(sim_vcg_qrs))
+        weighted_magnitude.append(sum(dipole_magnitude)/len(sim_vcg_qrs))
         max_dipole_magnitude.append(max(dipole_magnitude))
         i_max = np.where(dipole_magnitude == max(dipole_magnitude))
-        max_dipole_components.append(sim_vcg[i_max])
+        max_dipole_components.append(sim_vcg_qrs[i_max])
         max_dipole_time.append(common_analysis.convert_index_to_time(i_max, sim_t_start, sim_t_end))
 
     return weighted_magnitude, max_dipole_magnitude, max_dipole_components, max_dipole_time
@@ -1017,6 +1043,7 @@ def calculate_delta_dipole_angle(azimuth1, elevation1, azimuth2, elevation2, con
                       (sin(ele1) * sin(az1) * sin(ele2) * sin(az2))
         if abs(dot_product) > 1:
             warnings.warn("abs(dot_product) > 1: dot_product = {}".format(dot_product))
+            assert abs(dot_product)-1 < 0.000001
             if dot_product > 1:
                 dot_product = 1
             else:
@@ -1025,7 +1052,7 @@ def calculate_delta_dipole_angle(azimuth1, elevation1, azimuth2, elevation2, con
         dt.append(acos(dot_product))
 
     if convert_to_degrees:
-        return [dt_i * 180 / math.pi for dt_i in dt]
+        return [dt_i*180/math.pi for dt_i in dt]
     else:
         return dt
 
@@ -1043,8 +1070,8 @@ def compare_dipole_angles(vcg1, vcg2, t_start1=0, t_end1=None, t_start2=0, t_end
         i_end1 -= 1
         i_start2 -= 1
         i_end2 -= 1
-        idx_list1 = [int(round(i_start1 + i * (i_end1 - i_start1) / 10)) for i in range(1, n_compare + 1)]
-        idx_list2 = [int(round(i_start2 + i * (i_end2 - i_start2) / 10)) for i in range(1, n_compare + 1)]
+        idx_list1 = [int(round(i_start1 + i*(i_end1-i_start1) / 10)) for i in range(1, n_compare+1)]
+        idx_list2 = [int(round(i_start2 + i*(i_end2-i_start2) / 10)) for i in range(1, n_compare+1)]
     else:
         idx_list1 = [int(round(i)) for i in np.linspace(start=i_start1, stop=i_end1, num=n_compare)]
         idx_list2 = [int(round(i)) for i in np.linspace(start=i_start2, stop=i_end2, num=n_compare)]
@@ -1067,7 +1094,7 @@ def compare_dipole_angles(vcg1, vcg2, t_start1=0, t_end1=None, t_start2=0, t_end
     dt = [acos(cosdt_i) for cosdt_i in cosdt]
 
     if convert_to_degrees:
-        return [dt_i * 180 / math.pi for dt_i in dt]
+        return [dt_i*180/math.pi for dt_i in dt]
     else:
         return dt
 

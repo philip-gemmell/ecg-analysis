@@ -191,3 +191,14 @@ def convert_to_plane(x, y):
         return r
     else:
         return -r
+
+
+def find_list_middle(input_list, interpolate=True):
+    middle = float(len(input_list))/2
+    if middle % 2 != 0:
+        return input_list[int(middle - .5)]
+    else:
+        if interpolate:
+            return np.mean((input_list[int(middle)], input_list[int(middle-1)]), axis=0)
+        else:
+            return input_list[int(middle)], input_list[int(middle-1)]

@@ -255,20 +255,24 @@ def plot_xyz_vcg_animate(vcg_x, vcg_y, vcg_z, limits=None, linestyle=None, outpu
         limits = [min_lim, max_lim]
 
     """ Process inputs to ensure the correct formats are used. """
-    if not isinstance(vcg_x, list):
-        vcg_x = [vcg_x]
-        vcg_y = [vcg_y]
-        vcg_z = [vcg_z]
-    else:
-        assert len(vcg_x) == len(vcg_y)
-        assert len(vcg_x) == len(vcg_z)
+    # if not isinstance(vcg_x, list):
+    #     vcg_x = [vcg_x]
+    #     vcg_y = [vcg_y]
+    #     vcg_z = [vcg_z]
+    # else:
+    #     assert len(vcg_x) == len(vcg_y)
+    #     assert len(vcg_x) == len(vcg_z)
+    # if linestyle is None:
+    #     linestyle = ['-']
+    # else:
+    #     assert len(linestyle) == len(vcg_x)
     if linestyle is None:
-        linestyle = ['-']
-    else:
-        assert len(linestyle) == len(vcg_x)
+        linestyle = '-'
 
+    """ Set up figure and axes """
     fig = plt.figure()
-    ax = plt.axes(projection='3d')
+    # ax = plt.axes(projection='3d')
+    ax = Axes3D(fig)
     add_xyz_axes(ax, axis_limits=limits, symmetrical_axes=False, equal_limits=False, unit_axes=False)
     line, = ax.plot([], [], lw=3)
 
@@ -280,12 +284,13 @@ def plot_xyz_vcg_animate(vcg_x, vcg_y, vcg_z, limits=None, linestyle=None, outpu
     # animation function.  This is called sequentially
     def animate(i):
         """ Prepare line segments for plotting """
-        t = np.linspace(0, 1, vcg_x[0][:i].shape[0])  # "time" variable
+        t = np.linspace(0, 1, vcg_x[:i].shape[0])  # "time" variable
         points = np.array([vcg_x[:i], vcg_y[:i], vcg_z[:i]]).transpose().reshape(-1, 1, 3)
         segs = np.concatenate([points[:-1], points[1:]], axis=1)
         lc = Line3DCollection(segs, cmap=plt.get_cmap('viridis'), linestyle=linestyle)
         lc.set_array(t)
         ax.add_collection3d(lc)  # add the collection to the plot
+
         # x = np.linspace(0, 2, 1000)
         # y = np.sin(2 * np.pi * (x - 0.01 * i))
         # line.set_data(x, y)
@@ -293,7 +298,7 @@ def plot_xyz_vcg_animate(vcg_x, vcg_y, vcg_z, limits=None, linestyle=None, outpu
 
     # call the animator.  blit=True means only re-draw the parts that have changed.
     anim = animation.FuncAnimation(fig, animate, init_func=init,
-                                   frames=len(vcg_x), interval=20, blit=True)
+                                   frames=len(vcg_x), interval=30, blit=True)
 
     # save the animation as an mp4.  This requires ffmpeg or mencoder to be
     # installed.  The extra_args ensure that the x264 codec is used, so that

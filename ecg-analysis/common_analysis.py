@@ -202,6 +202,10 @@ def find_list_fraction(input_list, fraction=0.5, interpolate=True):
         fraction_bounds /= 10
         fraction_idx = np.where((fraction_list >= fraction - fraction_bounds) &
                                 (fraction_list <= fraction + fraction_bounds))[0]
+        if len(fraction_idx) < 1:
+            fraction_bounds *= 2
+            fraction_idx = np.where((fraction_list >= fraction - fraction_bounds) &
+                                    (fraction_list <= fraction + fraction_bounds))[0]
 
     if len(fraction_idx) == 1:
         return input_list[fraction_idx[0]]

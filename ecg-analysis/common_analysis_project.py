@@ -1,25 +1,33 @@
 import numpy as np
 import math
+from typing import Optional, Tuple
 
 
-def convert_time_to_index(qrs_start=None, qrs_end=None, t_start=0, t_end=200, dt=2):
+def convert_time_to_index(qrs_start: Optional[float, int] = None, qrs_end: Optional[float, int] = None,
+                          t_start: Optional[float, int] = 0, t_end: Optional[float, int] = 200,
+                          dt: Optional[float, int] = 2) -> Tuple[int, int]:
     """
     Return indices of QRS start and end points. NB: indices returned match Matlab output
 
-    Input parameters:
-    -----------------
+    Parameters
+    ----------
+    qrs_start : float or int, optional
+        Start time to convert to index. If not given, will default to the same as the start time of the entire list
+    qrs_end : float or int, optional
+        End time to convert to index. If not given, will default to the same as the end time of the entire list
+    t_start : float or int, optional
+         Start time of overall data, default=0
+    t_end : float or int, optional
+        End time of overall data, default=200
+    dt : float or int, optional
+        Interval between time points, default=2
 
-    qrs_start   None    Start time to convert to index
-    qrs_end     None    End time to convert to index
-    t_start     0       Start time of overall data
-    t_end       200     End time of overall data
-    dt          2       Interval between time points
-
-    Output parameters:
-    ------------------
-
-    i_qrs_start         Index of start time
-    i_qrs_end           Index of end time
+    Returns
+    -------
+    i_qrs_start : int
+        Index of start time
+    i_qrs_end : int
+        Index of end time
 
     """
     if qrs_start is None:

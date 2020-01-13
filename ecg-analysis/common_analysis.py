@@ -1,31 +1,34 @@
 import numpy as np
 import matplotlib.cm as cm
 from scipy import signal
+from typing import Union, List
 
 
-def filter_egm(egm, sample_freq=500, freq_filter=40, order=2, filter_type='low'):
+def filter_egm(egm: list, sample_freq: Union[int, float] = 500, freq_filter: Union[int, float] = 40, order: int = 2,
+               filter_type: str = 'low') -> np.ndarray:
     """
     Filter EGM data (low pass)
 
     Filter a given set of EGM data using a Butterworth filter, designed to have a specific passband for desired
     frequencies.
 
-    Input parameters (required):
-    ----------------------------
+    Parameters
+    ----------
+    egm : list
+        Data to filter
+    sample_freq : int or float
+        Sampling rate of data (Hz), default=500
+    freq_filter : int or float
+        Cut-off frequency for filter, default=40
+    order : int
+        Order of the Butterworth filter, default=2
+    filter_type : {'low', 'high', 'band'}
+        Type of filter to use, default='low'
 
-    egm                     data to filter
-
-    Input parameters (optional):
-    ----------------------------
-
-    sample_rate     500     sampling rate of data (Hz)
-    freq_filter     40      cut-off frequency for filter
-    order           2       order of the Butterworth filter
-    filter_type     'low'   type of filter ('low', 'high', 'band')
-
-    Output parameters:
-    ------------------
-    filter_out              Output filtered data
+    Returns
+    -------
+    filter_out : np.ndarray
+        Output filtered data
     """
 
     # Define filter window (expressed as a fraction of the Nyquist frequency, which is half the sampling rate)
@@ -37,7 +40,7 @@ def filter_egm(egm, sample_freq=500, freq_filter=40, order=2, filter_type='low')
     return filter_out
 
 
-def get_plot_colours(n=10, colourmap=None):
+def get_plot_colours(n: int = 10, colourmap: str = None) -> list:
     """
     Return iterable list of RGB colour values that can be used for custom plotting functions
 
@@ -46,16 +49,17 @@ def get_plot_colours(n=10, colourmap=None):
     visibility. If n is too big, then the default setting is 'viridis', which should provide a gradation of colour from
     first to last.
 
-    Input parameters:
-    -----------------
+    Parameters
+    ----------
+    n : int, optional
+        Number of distinct colours required, default=10
+    colourmap : str
+        Matplotlib colourmap to base the end result on. Will default to 'tab10' if n<11, 'viridis' otherwise
 
-    n           10      Number of distinct colours required
-    colourmap   None    Matplotlib colourmap to base the end result on
-
-    Output parameters:
-    ------------------
-
-    List of RGB values
+    Returns
+    -------
+    list
+        List of RGB values
     """
     if colourmap is None:
         if n < 11:
@@ -71,7 +75,7 @@ def get_plot_colours(n=10, colourmap=None):
         return [cmap(i) for i in np.linspace(0, 1, n)]
 
 
-def recursive_len(item):
+def recursive_len(item: list):
     """ Return the total number of elements with a potentially nested list """
 
     if type(item) == list:

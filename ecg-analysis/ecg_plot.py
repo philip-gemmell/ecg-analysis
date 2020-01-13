@@ -1,42 +1,55 @@
 import matplotlib.pyplot as plt
+from typing import Union, Optional, List, Tuple
 
 import common_analysis as ca
 
 
-def plot(ecg, dt=2, legend=None, linewidth=3, qrs_limits=None, plot_sequence=None, single_fig=True, colours=None,
-         linestyles=None, fig=None, ax=None):
+def plot(ecg: Union[List[dict], dict], dt: Union[int, float] = 2, legend: Optional[List[str]] = None,
+         linewidth: float = 3, qrs_limits: Optional[list, float] = None, plot_sequence: Optional[List[str]] = None,
+         single_fig: bool = True, colours: Optional[list] = None, linestyles: Optional[List[str]] = None,
+         fig: Optional = None, ax: Optional = None) -> tuple:
     """
     Plot and label the ECG data from simulation(s). Optional to add in QRS start/end boundaries for plotting
 
-    Input parameters (required):
-    ----------------------------
+    Parameters
+    ----------
+    ecg : dict or list
+        Dictionary or list of dictionaries for ECG data, with dictionary keys corresponding to the trace name
+    dt : int or float, optional
+        Time interval at which data is recorded, default=2
+    legend : list of str, optional
+        List of names for each given set of ECG data e.g. ['BCL=300ms', 'BCL=600ms']
+    linewidth : float, optional
+        Width to use for plotting lines, default=3
+    qrs_limits : float or list of float, optional
+        Optional temporal limits (e.g. QRS limits) to add to ECG plots. Can add multiple limits, which will be
+        plotted identically on all axes
+    plot_sequence : list of str, optional
+        Sequence in which to plot the ECG traces. Will default to: V1, V2, V3, V4, V5, V6, LI, LII, LIII, aVR, aVL, aVF
+    single_fig : bool, optional
+        If true, will plot all axes on a single figure window. If false, will plot each axis on a separate figure
+        window. Default is True
+    colours : list, optional
+        Colours to be used to plot ECG traces. Will default to common_analysis.get_plot_colours()
+    linestyles : str or list, optional
+        Linestyles to be used to plot ECG traces. Will default to '-'
+    fig : optional
+        If given, will plot data on existing figure window
+    ax: optional
+        If given, will plot data using existing axis handles
 
-    ecg     Dictionary or list of dictionaries for ECG data, with dictionary keys corresponding to the trace name
+    Returns
+    -------
+    fig
+        Handle to output figure window, or dictionary to several handles if traces are all plotted in separate figure
+        windows (if single_fig=False)
+    ax : dict
+        Dictionary to axis handles for ECG traces
 
-    Input parameters (optional):
-    ----------------------------
-
-    dt              2       Time interval at which data is recorded
-    legend          None    List of names for each given set of ECG data e.g. ['BCL=300ms', 'BCL=600ms']
-    linewidth       3       Width to use for plotting lines
-    qrs_limits      None    Optional temporal limits (e.g. QRS limits) to add to ECG plots. Can add multiple limits,
-                            which will be plotted identically on all axes
-    plot_sequence   None    Sequence in which to plot the ECG traces.
-                            Will default to: V1, V2, V3, V4, V5, V6, LI, LII, LIII, aVR, aVL, aVF
-    single_fig      True    Boolean: if true, will plot all axes on a single figure window. If false, will plot each
-                            axis on a separate figure window
-    colours         None    Colours to be used to plot ECG traces. Will default to common_analysis.get_plot_colours()
-    linestyles      None    Linestyles to be used to plot ECG traces. Will default to '-'
-    fig             None    If given, will plot data on existing figure window
-    ax              None    If given, will plot data using existing axis handles
-
-    Output parameters:
-    ------------------
-
-    fig     Handle to output figure window, or dictionary to several handles if traces are all plotted in separate
-            figure windows (if single_fig=False)
-    ax      Dictionary to axis handles for ECG traces
-
+    Raises
+    ------
+    AssertionError
+        Checks that various list lengths are the same
     """
 
     # Prepare axes and inputs
@@ -51,14 +64,14 @@ def plot(ecg, dt=2, legend=None, linewidth=3, qrs_limits=None, plot_sequence=Non
     if colours is None:
         colours = ca.get_plot_colours(len(ecg))
     elif isinstance(colours, list):
-        assert len(colours) == len(ecg)
+        assert len(colours) == len(ecg), "Length of colour plotting list must be same as length of ECG data"
     else:
         colours = [colours for _ in ecg]
 
     if linestyles is None:
         linestyles = ['-' for _ in ecg]
     elif isinstance(linestyles, list):
-        assert len(linestyles) == len(ecg)
+        assert len(linestyles) == len(ecg), "Length of linestyle list must be same as length of ECG data"
     else:
         linestyles = [linestyles for _ in ecg]
 
@@ -81,7 +94,7 @@ def plot(ecg, dt=2, legend=None, linewidth=3, qrs_limits=None, plot_sequence=Non
     return fig, ax
 
 
-def __process_inputs(ecg, legend):
+def __process_inputs(ecg: Union[List[dict], dict], legend: Union[None, List[str]]) -> Tuple[List[dict], List[str]]:
     """
     Process input arguments
 
@@ -89,6 +102,25 @@ def __process_inputs(ecg, legend):
     list of traces to plot rather than just a single trace). Also processes the legend argument, to ensure that it is a
     list of equal length
 
+    Parameters
+    ----------
+    ecg : list of dict or dict
+        ECG data for plotting. Presented as either dict of ECG outputs, or as a list of similar dictionaries
+    legend : None or list
+        Legend to be used for plotting. If none, no legend entries will be plotted. If a list, it must be of the same
+        length as the list provided for ecg
+
+    Returns
+    -------
+    ecg : list
+        Correctly formatted list of ECG data
+    legend : list
+        Correctly formatted list of legend entries
+
+    Raises
+    ------
+    AssertionError
+        Check that list lengths are the same
     """
 
     if not isinstance(ecg, list):
@@ -96,12 +128,32 @@ def __process_inputs(ecg, legend):
     if legend is None:
         legend = [None for _ in range(len(ecg))]
     else:
-        assert len(legend) == len(ecg)
+        assert len(legend) == len(ecg), "Length of legend entries must be same as lenght of ECG entries"
     return ecg, legend
 
 
-def __init_axes(plot_sequence, single_fig=True):
-    """ Initialise figure and axis handles """
+def __init_axes(plot_sequence: List[str], single_fig: bool = True):
+    """
+    Initialise figure and axis handles
+
+    Based on the required plot_sequence (order in which to plot ECG leads), and whether or not it is required to have
+    all the plots on a single figure or on separate figures, will return the required figure and axis handles
+
+    Parameters
+    ----------
+    plot_sequence : list of str
+        Sequence in which to plot the ECG leads (only really important if plotted on single figure rather than
+        separate figures)
+    single_fig : bool, optional
+        Whether or not to plot all ECG data on a single figure, or whether to plot each lead data in a separate figure
+
+    Returns
+    -------
+    fig
+        Handle to figure window(s)
+    ax
+        Handle to axes
+    """
 
     if single_fig:
         fig = plt.figure()
@@ -121,7 +173,8 @@ def __init_axes(plot_sequence, single_fig=True):
     return fig, ax
 
 
-def __plot_data(time_val, ecg_data, label, colour, ax, plot_sequence, linewidth, linestyle):
+def __plot_data(time_val: list, ecg_data: dict, label: str, colour: List[float], ax, plot_sequence: List[str],
+                linewidth: float, linestyle: str) -> None:
     """ Plot ECG data for each trace on the appropriate axis """
 
     for key in plot_sequence:
@@ -129,7 +182,8 @@ def __plot_data(time_val, ecg_data, label, colour, ax, plot_sequence, linewidth,
     return None
 
 
-def __plot_limits(ax, limits, colours, plot_sequence, linestyles):
+def __plot_limits(ax, limits: Union[list, float], colours: List[float], plot_sequence: List[str],
+                  linestyles: List[str]) -> None:
     """ Add limit markers to a given plot (e.g. add line marking start of QRS complex) """
 
     if not isinstance(limits, list):

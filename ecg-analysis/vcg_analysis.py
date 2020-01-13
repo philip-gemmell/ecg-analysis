@@ -2,13 +2,26 @@ import numpy as np
 import math
 from math import sin, cos, acos, atan2
 import warnings
+from typing import Union, List, Tuple
 
 import common_analysis
 import set_midwallFibrosis as smF
 
 
-def convert_ecg_to_vcg(ecg):
-    """ Convert ECG data to vectorcardiogram (VCG) data using the Kors matrix method """
+def convert_ecg_to_vcg(ecg: Union[List[dict], dict]) -> List[np.ndarray]:
+    """
+    Convert ECG data to vectorcardiogram (VCG) data using the Kors matrix method
+
+    Parameters
+    ----------
+    ecg : list of dict or list
+        List of ECG dict data, or ECG dict data directly, with dict keys corresponding to ECG outputs
+
+    Returns
+    -------
+    vcg: list of np.ndarray
+        List of VCG output data
+    """
 
     kors = np.array([[0.38, -0.07, 0.11],
                      [-0.07, 0.93, -0.23],
@@ -31,8 +44,11 @@ def convert_ecg_to_vcg(ecg):
     return vcg
 
 
-def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold_frac_start=0.15,
-                      threshold_frac_end=0.15, filter_sv=True, t_end=200, matlab_match=False):
+def get_qrs_start_end(vcg: Union[list, np.ndarray], dt: float = 2, velocity_offset: int = 2, low_p: float = 40,
+                      order: int = 2, threshold_frac_start: float = 0.15, threshold_frac_end: float = 0.15,
+                      filter_sv: bool = True, t_end: float = 200, matlab_match: bool = False) -> Tuple[List[float],
+                                                                                                       List[float],
+                                                                                                       List[float]]:
     """
     Calculate the extent of the VCG QRS complex on the basis of max derivative
 
@@ -40,39 +56,44 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
     finding the time at which the spatial velocity of the VCG exceeds a threshold value (the start time), then searches
     backwards from the end of the VCG to find when this threshold is exceeded (the end time).
 
-    Required input parameters:
-    --------------------------
+    Parameters
+    ----------
+    vcg : list of np.ndarray
+        List of VCG data to get QRS start and end points for
+    dt : float, optional
+        Time interval between successive data points in the VCG data, default=2ms
+    velocity_offset : int, optional
+        Offset between values in VCG over which to calculate spatial velocity, i.e. 1 will use neighbouring values to
+        calculate the gradient/velocity. Default=2
+    low_p : float, optional
+        Low frequency for bandpass filter, default=40
+    order : int, optional
+        Order for Butterworth filter, default=2
+    threshold_frac_start : float, optional
+        Fraction of maximum spatial velocity to trigger start of QRS detection, default=0.15
+    threshold_frac_end : float, optional
+        Fraction of maximum spatial velocity to trigger end of QRS detection, default=0.15
+    filter_sv : bool, optional
+        Whether or not to apply filtering to spatial velocity prior to finding the start/end points for the threshold
+    t_end : float, optional
+        End time of simulation, default=200
+    matlab_match : bool, optional
+        Apply fudge factor to match Matlab results, default=False
 
-    vcg                           List of VCG data to get QRS start and end points for
-
-    Optional input parameters:
-    --------------------------
-
-    dt                    2ms
-    velocity_offset       2       Offset between values in VCG over which to calculate spatial velocity, i.e. 1 will
-                                  use neighbouring values to calculate the gradient/velocity
-    low_p                 40      Low frequency for bandpass filter
-    order                 2       Order for Butterworth filter
-    threshold_frac_start  0.15    Fraction of maximum spatial velocity to trigger start of QRS detection
-    threshold_frac_end    0.15    Fraction of maximum spatial velocity to trigger end of QRS detection
-    plot_sv               False   Plot the calculated spatial velocity and the original VCG, both showing derived QRS
-                                  limits
-    legend                None    Legend entries for spatial velocity plot
-    fig                   None    Fig of existing figure to plot results on (must have matching axes to figure
-                                  produced using this function)
-    t_end                 200     End time of simulation
-    matlab_math           False   Apply fudge factor to match Matlab results
-
-    Output parameters:
-    ------------------
-
-    qrs_start                     List of start time of QRS complexes of provided VCGs
-    qrs_end                       List of end time of QRS complex of provided VCGs
-    qrs_duration                  List of duration of QRS complex of provided VCGs
+    Returns
+    -------
+    qrs_start : list of float
+        List of start time of QRS complexes of provided VCGs
+    qrs_end : list of float
+        List of end time of QRS complex of provided VCGs
+    qrs_duration : list of float
+        List of duration of QRS complex of provided VCGs
     """
 
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
+    assert 0 < threshold_frac_start < 1, "threshold_frac_start must be between 0 and 1"
+    assert 0 < threshold_frac_end < 1, "threshold_frac_end must be between 0 and 1"
 
     # Create indices to track (1) which colour to plot, and (2) which of the current set of VCGs is currently under
     # consideration
@@ -110,11 +131,59 @@ def get_qrs_start_end(vcg, dt=2, velocity_offset=2, low_p=40, order=2, threshold
     return qrs_start, qrs_end, qrs_duration
 
 
-def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac_start=0.15, threshold_frac_end=0.15,
-                         matlab_match=False, filter_sv=True, low_p=40, order=2):
-    """ Calculate spatial velocity """
+def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray], velocity_offset: int = 2, t_end: float = 200,
+                         dt: float = 2, threshold_frac_start: float = 0.15, threshold_frac_end: float = 0.15,
+                         matlab_match: bool = False, filter_sv: bool = True, low_p: float = 40, order: int = 2) -> \
+        Tuple[List[float], List[List[float]], List[float], List[float]]:
+    """
+    Calculate spatial velocity
+
+    Calculate the spatial velocity of a VCG, in terms of calculating the gradient of the VCG in each of its x,
+    y and z components, before combining these components in a Euclidian norm. Will then find the point at which the
+    spatial velocity exceeds a threshold value, and the point at which it declines below another threshold value.
+
+    Parameters
+    ----------
+    vcg : list of np.ndarray or np.ndarray
+        VCG data to analyse
+    velocity_offset : int, optional
+        Offset between values in VCG over which to calculate spatial velocity, i.e. 1 will use neighbouring values to
+        calculate the gradient/velocity. Default=2
+    t_end : float, optional
+        End time of simulation, default=200
+    dt : float, optional
+        Time interval between successive data points in the VCG data, default=2ms
+    threshold_frac_start : float, optional
+        Fraction of maximum spatial velocity to trigger start of QRS detection, default=0.15
+    threshold_frac_end : float, optional
+        Fraction of maximum spatial velocity to trigger end of QRS detection, default=0.15
+    matlab_match : bool, optional
+        Apply fudge factor to match Matlab results, default=False
+    filter_sv : bool, optional
+        Whether or not to apply filtering to spatial velocity prior to finding the start/end points for the threshold
+    low_p : float, optional
+        Low frequency for bandpass filter, default=40
+    order : int, optional
+        Order for Butterworth filter, default=2
+
+    Returns
+    -------
+    x_val : list of float
+        x-values against which to measure the spatial velocity, i.e. corresponds to the time for the measurement of
+        the spatial velocity points
+    sv : list of list of float
+        Spatial velocity data, filtered according to input parameters
+    threshold_start_full: list of float
+        Absolute values for the threshold for a given spatial velocity trace, rather than the relative values
+        originally input
+    threshold_end_full: list of float
+        Absolute values for the threshold for a given spatial velocity trace, rather than the relative values
+        originally input
+    """
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
+    assert 0 < threshold_frac_start < 1, "threshold_frac_start must be between 0 and 1"
+    assert 0 < threshold_frac_end < 1, "threshold_frac_end must be between 0 and 1"
 
     sv = list()
     x_val = list()

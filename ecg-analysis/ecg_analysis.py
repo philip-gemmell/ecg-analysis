@@ -1,12 +1,13 @@
 import sys
 import numpy as np
+from typing import Union, List, Optional
 
-""" Add carputils functions """
+# Add carputils functions
 sys.path.append('/home/pg16/software/carputils/')
 from carputils.carpio import igb
 
 
-def get_ecg(phie_file, electrode_file=None):
+def get_ecg(phie_file: Union[List[str], str], electrode_file: Optional[str] = None) -> List[dict]:
     """
     Translate the phie.igb file(s) to 10-lead, 12-trace ECG data
 
@@ -14,22 +15,19 @@ def get_ecg(phie_file, electrode_file=None):
     are relevant to the 12-lead ECG, before converting to the ECG itself
     https://carpentry.medunigraz.at/carputils/generated/carputils.carpio.igb.IGBFile.html#carputils.carpio.igb.IGBFile
 
-    Input parameters (required):
-    ----------------------------
+    Parameters
+    ----------
+    phie_file : list or str
+        Filename for the phie.igb data to extract
+    electrode_file : str, optional
+        File which contains the node indices in the mesh that correspond to the placement of the leads for the
+        10-lead ECG
 
-    phie_file       Filename for the phie.igb data to extract
-
-    Input parameters (optional):
-    ----------------------------
-
-    electrode_file  None    File which contains the node indices in the mesh that correspond to the placement of the
-                            leads for the 10-lead ECG
-
-    Output parameters:
-    ------------------
-
-    ecg     Dictionary with Vm data for each of the labelled leads (the dictionary keys are the names of the leads)
-
+    Returns
+    -------
+    ecg : list(dict)
+        List of dictionaries with Vm data for each of the labelled leads (the dictionary keys are the names of the
+        leads)
     """
 
     if isinstance(phie_file, str):
@@ -43,27 +41,24 @@ def get_ecg(phie_file, electrode_file=None):
     return ecg
 
 
-def get_electrode_phie(phie_data, electrode_file=None):
+def get_electrode_phie(phie_data: np.ndarray, electrode_file: Optional[str] = None) -> dict:
     """
     Extract phi_e data corresponding to ECG electrode locations
 
-    Input parameters (required):
-    ----------------------------
+    Parameters
+    ----------
+    phie_data : np.ndarray
+        Numpy array that holds all phie data for all nodes in a given mesh
+    electrode_file : str, optional
+        File containing entries corresponding to the nodes of the mesh which determine the location of the 10 leads
+        for the ECG. Will default to very project specific location. The input text file has each node on a separate
+        line (zero-indexed), with the node locations given in order: V1, V2, V3, V4, V5, V6, RA, LA, RL,
+        LL. Will default to '/home/pg16/Documents/ecg-scar/ecg-analysis/12LeadElectrodes.dat'
 
-    phie_data   Numpy array that holds all phie data for all nodes in a given mesh
-
-    Input parameters (optional):
-    ----------------------------
-
-    electrode_file      None    File containing entries corresponding to the nodes of the mesh which determine the
-                                location of the 10 leads for the ECG. Will default to very project specific location.
-                                The input text file has each node on a separate line (zero-indexed), with the node
-                                locations given in order: V1, V2, V3, V4, V5, V6, RA, LA, RL, LL
-
-    Output parameters:
-    ------------------
-
-    electrode_data  Dictionary of phie data for each node, with the dictionary key labelling which node it is.
+    Returns
+    -------
+    electrode_data : dict
+        Dictionary of phie data for each node, with the dictionary key labelling which node it is.
 
     """
 
@@ -88,21 +83,21 @@ def get_electrode_phie(phie_data, electrode_file=None):
     return electrode_data
 
 
-def convert_electrodes_to_ecg(electrode_data):
+def convert_electrodes_to_ecg(electrode_data: dict) -> dict:
     """
     Converts electrode phi_e data to ECG lead data
 
     Takes dictionary of phi_e data for 10-lead ECG, and converts these data to standard ECG trace data
 
-    Input parameters:
-    -----------------
+    Parameters
+    ----------
+    electrode_data : dict
+        Dictionary with keys corresponding to lead locations
 
-    electrode_data  Dictionary with keys corresponding to lead locations
-
-    Output parameters:
-    ------------------
-
-    ecg     Dictionary with keys corresponding to the ECG traces
+    Returns
+    -------
+    ecg : dict
+        Dictionary with keys corresponding to the ECG traces
     """
 
     # Wilson Central Terminal

@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.cm as cm
 from scipy import signal
-from typing import Union, List
+from typing import Union, List, Tuple, Optional
 
 
 def filter_egm(egm: list, sample_freq: Union[int, float] = 500, freq_filter: Union[int, float] = 40, order: int = 2,
@@ -82,3 +82,41 @@ def recursive_len(item: list):
         return sum(recursive_len(subitem) for subitem in item)
     else:
         return 1
+
+
+def convert_time_to_index(qrs_start: Optional[float, int] = None, qrs_end: Optional[float, int] = None,
+                          t_start: Optional[float, int] = 0, t_end: Optional[float, int] = 200,
+                          dt: Optional[float, int] = 2) -> Tuple[int, int]:
+    """
+    Return indices of QRS start and end points. NB: indices returned match Matlab output
+
+    Parameters
+    ----------
+    qrs_start : float or int, optional
+        Start time to convert to index. If not given, will default to the same as the start time of the entire list
+    qrs_end : float or int, optional
+        End time to convert to index. If not given, will default to the same as the end time of the entire list
+    t_start : float or int, optional
+         Start time of overall data, default=0
+    t_end : float or int, optional
+        End time of overall data, default=200
+    dt : float or int, optional
+        Interval between time points, default=2
+
+    Returns
+    -------
+    i_qrs_start : int
+        Index of start time
+    i_qrs_end : int
+        Index of end time
+
+    """
+    if qrs_start is None:
+        qrs_start = t_start
+    if qrs_end is None:
+        qrs_end = t_end
+    x_val = np.array(range(t_start, t_end + dt, dt))
+    i_qrs_start = np.where(x_val >= qrs_start)[0][0]
+    i_qrs_end = np.where(x_val > qrs_end)[0][0]-1
+
+    return i_qrs_start, i_qrs_end

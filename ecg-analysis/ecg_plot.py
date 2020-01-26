@@ -78,13 +78,15 @@ def plot(ecg: Union[List[dict], dict], dt: Union[int, float] = 2, legend: Option
     # Plot data
     time = [i*dt for i in range(len(ecg[0]['V1']))]
     for (sim_ecg, sim_label, sim_colour, sim_linestyle) in zip(ecg, legend, colours, linestyles):
-        __plot_data(time, sim_ecg, sim_label, sim_colour, ax, plot_sequence, linewidth, sim_linestyle)
+        for key in plot_sequence:
+            ax[key].plot(time, sim_ecg[key], linewidth=linewidth, label=sim_label, color=sim_colour,
+                         linestyle=sim_linestyle)
 
     # Add QRS limits, if supplied
     if qrs_limits is not None:
         # Cycle through each limit provided, e.g. QRS start, QRS end...
         for qrs_limit in qrs_limits:
-            __plot_limits(ax, qrs_limit, colours, plot_sequence, linestyles)
+            __plot_limits(ax, qrs_limit, colours, linestyles)
 
     # Add legend, title and axis labels
     if legend[0] is not None:
@@ -173,23 +175,29 @@ def __init_axes(plot_sequence: List[str], single_fig: bool = True):
     return fig, ax
 
 
-def __plot_data(time_val: list, ecg_data: dict, label: str, colour: List[float], ax, plot_sequence: List[str],
-                linewidth: float, linestyle: str) -> None:
-    """ Plot ECG data for each trace on the appropriate axis """
+def __plot_limits(ax, limits: Union[List[float], float], colours: List[List[float]], linestyles: List[str]) -> None:
+    """
+    Add limit markers to a given plot (e.g. add line marking start of QRS complex)
 
-    for key in plot_sequence:
-        ax[key].plot(time_val, ecg_data[key], linewidth=linewidth, label=label, color=colour, linestyle=linestyle)
-    return None
-
-
-def __plot_limits(ax, limits: Union[list, float], colours: List[float], plot_sequence: List[str],
-                  linestyles: List[str]) -> None:
-    """ Add limit markers to a given plot (e.g. add line marking start of QRS complex) """
+    Parameters
+    ----------
+    ax
+        Handle to axis
+    limits: list of float or float
+        Limits to plot on the axis
+    colours : list of list of float
+        RGB values of colours for the individual limits to plot. For plotting n limits, then should be given as
+        [[R1, G1, B1], [R2, G2, B2], ... [Rn, Gn, Bn]]
+    linestyles : list of str
+        Linestyles to plot for each limit.
+    """
 
     if not isinstance(limits, list):
         limits = [limits]
+    assert len(limits) == len(colours), "Incompatible length of limits to plot and colours"
+    assert len(limits) == len(linestyles), "Incompatible length of limits to plot and linestyles"
     for (sim_limit, sim_colour, sim_linestyle) in zip(limits, colours, linestyles):
-        for key in plot_sequence:
+        for key in ax:
             ax[key].axvline(sim_limit, color=sim_colour, alpha=0.5, linestyle=sim_linestyle)
 
     return None

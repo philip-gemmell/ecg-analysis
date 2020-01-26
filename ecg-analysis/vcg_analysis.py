@@ -2,7 +2,7 @@ import numpy as np
 import math
 from math import sin, cos, acos, atan2
 import warnings
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Optional
 
 import common_analysis
 import set_midwallFibrosis as smF
@@ -54,7 +54,8 @@ def get_qrs_start_end(vcg: Union[list, np.ndarray], dt: float = 2, velocity_offs
 
     Calculate the start and end points, and hence duration, of the QRS complex of a list of VCGs. It does this by
     finding the time at which the spatial velocity of the VCG exceeds a threshold value (the start time), then searches
-    backwards from the end of the VCG to find when this threshold is exceeded (the end time).
+    backwards from the end of the VCG to find when this threshold is exceeded (the end time); the start and end
+    thresholds do not ncecessarily have to be the same.
 
     Parameters
     ----------
@@ -194,7 +195,7 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray], velocity_offs
         dvcg = ((sim_vcg[velocity_offset:] - sim_vcg[:-velocity_offset]) / 2) * dt
 
         # Calculates Euclidean distance based on spatial velocity in x, y and z directions
-        sim_sv = np.linalg.norm(dvcg, axis=1)
+        sim_sv = list(np.linalg.norm(dvcg, axis=1))
 
         # Determine threshold for QRS complex, then find start of QRS complex. Iteratively remove more of the plot if
         # the 'start' is found to be 0 (implies it is still getting confused by the preceding wave). Alternatively, just
@@ -202,13 +203,13 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray], velocity_offs
         sample_freq = 1000/dt
         if matlab_match:
             sim_sv = sim_sv[5:]
-            sim_x = list(range(velocity_offset, t_end, dt))[5:]
+            sim_x = list(np.arange(velocity_offset, t_end, dt))[5:]
             if filter_sv:
                 sim_sv = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
             threshold_start = max(sim_sv)*threshold_frac_start
             threshold_end = max(sim_sv)*threshold_frac_end
         else:
-            sim_x = list(range(velocity_offset, t_end, dt))
+            sim_x = list(np.arange(velocity_offset, t_end, dt))
             threshold_start = max(sim_sv)*threshold_frac_start
             if filter_sv:
                 sv_filtered = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
@@ -237,8 +238,44 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray], velocity_offs
     return x_val, sv, threshold_start_full, threshold_end_full
 
 
-def get_qrs_area(vcg, qrs_start=None, qrs_end=None, dt=2, t_end=200, matlab_match=False):
-    """ Calculate area under QRS complex on VCG. """
+def get_qrs_area(vcg: Union[List[np.ndarray], np.ndarray], qrs_start: Optional[List[float]] = None,
+                 qrs_end: Optional[List[float]] = None, dt: float = 2, t_end: float = 200, matlab_match: bool = False) \
+        -> Tuple[List[Union[float, int]], List[Union[float, np.ndarray]], List[float]]:
+    """
+    Calculate area under QRS complex on VCG.
+
+    Calculate the area under the VCG between two intervals (usually QRS start and QRS end). This is calculated in two
+    ways: a 'Pythagorean' method, wherein the area under each of the VCG(x), VCG(y) and VCG(z) curves are calculated,
+    then combined in a Euclidean norm, or a '3D' method, wherein the area of the arc traced in 3D space between
+    successive timepoints is calculated, then summed.
+
+    Parameters
+    ----------
+    vcg : np.ndarray or list of np.ndarray
+        VCG data from which to get area
+    qrs_start : list of float, optional
+        Start times (NOT INDICES) for where to calculate area under curve from, default=start
+    qrs_end : list of float, optional
+        End times (NOT INDICES) for where to calculate are under curve until, default=end
+    dt: float, optional
+        Time interval between recorded points, default=2
+    t_end : float, optional
+        End time of VCG data, default=200
+    matlab_match : bool, optional
+        Whether to alter the calculation for start and end indices to match the original Matlab output, from which this
+        module is based
+
+    Returns
+    -------
+    qrs_area_3d : list of float
+        Values for the area under the curve (as defined by the 3D method) between the provided limits for each of the
+        VCGs
+    qrs_area_pythag : list of float
+        Values for the area under the curve (as defined by the Pythagorean method) between the provided limits for each
+        of the VCGs
+    qrs_area_components : list of list of float
+        Areas under the individual x, y, z curves of the VCG, for each of the supplied VCGs
+    """
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
 
@@ -278,8 +315,23 @@ def get_qrs_area(vcg, qrs_start=None, qrs_end=None, dt=2, t_end=200, matlab_matc
     return qrs_area_3d, qrs_area_pythag, qrs_area_components
 
 
-def get_azimuth_elevation(vcg, t_start=None, t_end=None):
-    """ Calculate azimuth and elevation angles for a specified section of the VCG. """
+def get_azimuth_elevation(vcg: Union[List[np.ndarray], np.ndarray],
+                          t_start: Optional[List[float]] = None, t_end: Optional[List[float]] = None):
+    """
+    Calculate azimuth and elevation angles for a specified section of the VCG.
+
+    Will calculate the azimuth and elevation angles for the VCG at each recorded point, potentially within specified
+    limits (e.g. start/end of QRS)
+
+    Parameters
+    ----------
+    vcg : np.ndarray or list of np.ndarray
+        VCG data to calculate
+    t_start : list of float, optional
+        Start time from which to calculate the angles
+    t_end : list of float, optional
+        End time until which to calculate the angles
+    """
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
     assert len(vcg) == len(t_start)

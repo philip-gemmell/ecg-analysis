@@ -84,7 +84,8 @@ def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_limits=None, plot_sequence
 
     """ Prepare axes and inputs """
     if plot_sequence is None:
-        plot_sequence = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'LI', 'LII', 'LIII', 'aVR', 'aVL', 'aVF']
+        # plot_sequence = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'LI', 'LII', 'LIII', 'aVR', 'aVL', 'aVF']
+        plot_sequence = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'aVL', 'LI', 'aVR', 'LII', 'aVF', 'LIII']
     if fig is None and ax is None:
         fig, ax = __plot_ecg_prep_axes(plot_sequence, single_fig)
     ecg, legend = __plot_ecg_preprocess_inputs(ecg, legend)

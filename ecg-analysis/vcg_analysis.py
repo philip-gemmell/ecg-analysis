@@ -1308,6 +1308,217 @@ def plot_metric_change(metrics, metrics_phi, metrics_rho, metrics_z, metric_name
     return fig, ax
 
 
+def plot_metric_change_range(metrics, metrics_phi, metrics_rho, metrics_z, metric_name, metrics_lv=None,
+                             labels=None, scattermarkers=None, linemarkers=None, colours=None, linestyles=None,
+                             layout=None, axis_match=True, no_labels=False):
+    """ Function to plot all the various figures for trend analysis in one go. """
+    plt.rc('text', usetex=True)
+
+    """ Underlying constants (volumes, sizes, labels, etc.) """
+    # Create volume variables (nb: percent of whole mesh)
+    vol_lv_phi = [0.0, 2.657, 8.667, 14.808]
+    vol_lv_rho = [0.0, 3.602, 7.243, 10.964, 14.808]
+    vol_lv_z = [0.0, 6.183, 10.897, 14.808]
+    vol_lv_size = [0.0, 0.294, 4.062, 14.808]
+    vol_lv_other = [5.333]
+
+    vol_septum_phi = [0.0, 6.926, 11.771, 17.019, 21.139]
+    vol_septum_rho = [0.0, 5.105, 10.275, 15.586, 21.139]
+    vol_septum_z = [0.0, 8.840, 15.818, 21.139]
+    vol_septum_size = [0.0, 0.672, 6.531, 21.139]
+    vol_septum_other = [8.944]
+
+    volume_lv = vol_lv_phi + vol_lv_rho + vol_lv_z + vol_lv_size + vol_lv_other
+    volume_septum = vol_septum_phi + vol_septum_rho + vol_septum_z + vol_septum_size + vol_septum_other
+
+    # Create area variables (in cm^2)
+    area_lv_phi = [0.0, 37.365, 85.575, 129.895]
+    area_lv_rho = [0.0, 109.697, 115.906, 122.457, 129.895]
+    area_lv_z = [0.0, 57.847, 97.439, 129.895]
+    area_lv_size = [0.0, 10.140, 57.898, 129.895]
+    area_lv_other = [76.501]
+
+    area_septum_phi = [0.0, 56.066, 88.603, 122.337, 149.588]
+    area_septum_rho = [0.0, 126.344, 133.363, 141.091, 149.588]
+    area_septum_z = [0.0, 72.398, 114.937, 149.588]
+    area_septum_size = [0.0, 17.053, 72.104, 149.588]
+    area_septum_other = [97.174]
+
+    area_lv = area_lv_phi + area_lv_rho + area_lv_z + area_lv_size + area_lv_other
+    area_septum = area_septum_phi + area_septum_rho + area_septum_z + area_septum_size + area_septum_other
+    area_lv_norm = [i/area_septum_phi[-1] for i in area_lv]
+    area_septum_norm = [i/area_septum_phi[-1] for i in area_septum]
+
+    range_phi_lv = [0.0, 0.1 * math.pi, 0.3 * math.pi, 0.5 * math.pi]
+    range_phi_septum = [0.0, 0.5, 1.0, 1.5, 2.0]
+    range_rho = [0.0, 0.2, 0.4, 0.6, 0.8]
+    range_z = [0.0, 0.2, 0.4, 0.6]
+
+    """ Assert correct data has been passed (insofar that it is of the right length!) """
+    metrics = __set_metric_to_metrics(metrics)
+    metrics_phi = __set_metric_to_metrics(metrics_phi)
+    metrics_rho = __set_metric_to_metrics(metrics_rho)
+    metrics_z = __set_metric_to_metrics(metrics_z)
+
+    if metrics_lv is None:
+        metrics_lv = [True, False]
+    if labels is None:
+        labels = ['LV', 'Septum']
+    volumes = [volume_lv if metric_lv else volume_septum for metric_lv in metrics_lv]
+    for metric, volume in zip(metrics, volumes):
+        assert len(metric) == len(volume)
+    areas = [area_lv_norm if metric_lv else area_septum_norm for metric_lv in metrics_lv]
+    for metric, area in zip(metrics, areas):
+        assert len(metric) == len(area)
+
+    if scattermarkers is None:
+        scattermarkers = ['+', 'o', 'D', 'v', '^', 's', '*', 'x']
+    assert len(scattermarkers) >= len(metrics)
+    if linemarkers is None:
+        linemarkers = ['.' for _ in range(len(metrics_rho))]
+    else:
+        assert len(linemarkers) >= len(metrics_rho)
+    if linestyles is None:
+        linestyles = ['-' for _ in range(len(metrics_rho))]
+    else:
+        assert len(linestyles) >= len(metrics_rho)
+    if colours is None:
+        colours = common_analysis.get_plot_colours(len(metrics_rho))
+    else:
+        assert len(colours) >= len(metrics_rho)
+
+    """ Set up figures and axes """
+    if (layout is None) or (layout == 'combined'):
+        keys = ['volume', 'area', 'phi_lv', 'phi_septum', 'rho', 'z']
+        fig = plt.figure()
+        fig.suptitle(metric_name)
+        gs = gridspec.GridSpec(4, 3)
+        ax = dict()
+        ax['volume'] = fig.add_subplot(gs[:2, :2])
+        ax['area'] = fig.add_subplot(gs[2:, :2])
+        ax['phi_lv'] = fig.add_subplot(gs[0, 2])
+        ax['phi_septum'] = fig.add_subplot(gs[1, 2])
+        ax['rho'] = fig.add_subplot(gs[2, 2])
+        ax['z'] = fig.add_subplot(gs[3, 2])
+        # plt.setp(ax['y'].get_yticklabels(), visible=False)
+        gs.update(left=0.05, right=0.95, bottom=0.05, top=0.95, wspace=0.09, hspace=0.25)
+    elif layout == 'figures':
+        keys = ['volume', 'area', 'phi', 'rho', 'z']
+        fig = {key: plt.figure() for key in keys}
+        ax = {key: fig[key].add_subplot(1, 1, 1) for key in keys}
+        if not no_labels:
+            for key in keys:
+                ax[key].set_ylabel(metric_name)
+    else:
+        print("Unrecognised layout command.")
+        return None, None
+
+    """ Plot data on axes """
+    # Volume
+    for (metric, volume, label, colour, scattermarker) in zip(metrics, volumes, labels, colours, scattermarkers):
+        ax['volume'].plot(volume, metric, label=label, linestyle='None', color=colour, marker=scattermarker,
+                          markersize=10, markeredgewidth=3, markerfacecolor='none')
+    # ax['volume'].plot(volume_lv, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
+    # ax['volume'].plot(volume_septum, metric_septum, 'o', markersize=10, markeredgewidth=3, label='Septum',
+    #                       markerfacecolor='none', color='C1')
+    if no_labels:
+        plt.setp(ax['volume'].get_xticklabels(), visible=False)
+        plt.setp(ax['volume'].get_yticklabels(), visible=False)
+        ax['volume'].set_title(r'Volume of scar (\% of mesh)')
+    else:
+        ax['volume'].legend()
+        ax['volume'].set_xlabel(r'Volume of scar (\% of mesh)')
+
+    # Area
+    for (metric, area, label, colour, scattermarker) in zip(metrics, areas, labels, colours, scattermarkers):
+        ax['area'].plot(area, metric, label=label, linestyle='None', color=colour, marker=scattermarker,
+                        markersize=10, markeredgewidth=3, markerfacecolor='none')
+    # ax['area'].plot(area_lv_norm, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
+    # ax['area'].plot(area_septum_norm, metric_septum, 'o', markersize=10, markeredgewidth=3, label='Septum',
+    #                 markerfacecolor='none', color='C1')
+    if no_labels:
+        plt.setp(ax['area'].get_xticklabels(), visible=False)
+        plt.setp(ax['area'].get_yticklabels(), visible=False)
+        ax['area'].set_title(r'Surface Area of scar (normalised)')
+    else:
+        ax['area'].set_xlabel(r'Surface Area of scar (normalised)')
+
+    # Phi (LV)
+    if (layout is None) or (layout == 'combined'):
+        warnings.warn("Not coded!")
+        for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_phi, labels, colours, linemarkers,
+                                                                         linestyles, metrics_lv):
+            if metric_lv:
+                ax['phi_lv'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker, linewidth=3)
+            else:
+                ax['phi_septum'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker,
+                                      linewidth=3)
+        # ax['phi_lv'].plot(metric_phi_lv, 'o-', label='LV', linewidth=3, color='C0')
+        # ax['phi_lv'].set_xticks(list(range(len(legend_phi_lv))))
+        if no_labels:
+            plt.setp(ax['phi_lv'].get_xticklabels(), visible=False)
+            plt.setp(ax['phi_lv'].get_yticklabels(), visible=False)
+            ax['phi_lv'].set_title(r'$\phi$')
+        else:
+            # ax['phi_lv'].set_xticklabels(legend_phi_lv)
+            ax['phi_lv'].set_xlabel(r'$\phi$')
+
+        # Phi (septum)
+        # ax['phi_septum'].plot(metric_phi_septum, 'o-', label='Septum', linewidth=3, color='C1')
+        # ax['phi_septum'].set_xticks(list(range(len(legend_phi_septum))))
+        if no_labels:
+            plt.setp(ax['phi_septum'].get_xticklabels(), visible=False)
+            plt.setp(ax['phi_septum'].get_yticklabels(), visible=False)
+            ax['phi_septum'].set_title(r'$\phi$')
+        else:
+            # ax['phi_septum'].set_xticklabels(legend_phi_septum)
+            ax['phi_septum'].set_xlabel(r'$\phi$')
+    else:
+        for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_phi, labels, colours, linemarkers,
+                                                                         linestyles, metrics_lv):
+            if metric_lv:
+                ax['phi'].plot(range_phi_lv, metric, label=label, linestyle=linestyle, color=colour, marker=marker,
+                               linewidth=3)
+            else:
+                ax['phi'].plot(range_phi_septum, metric, label=label, linestyle=linestyle, color=colour, marker=marker,
+                               linewidth=3)
+        if no_labels:
+            plt.setp(ax['phi'].get_xticklabels(), visible=False)
+            plt.setp(ax['phi'].get_yticklabels(), visible=False)
+            ax['phi'].set_title(r'$\phi$')
+        else:
+            ax['phi'].set_xlabel(r'$\phi$')
+
+    # Rho
+    for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_rho, labels, colours, linemarkers,
+                                                                     linestyles, metrics_lv):
+        ax['rho'].plot(range_rho, metric, label=label, linestyle=linestyle, color=colour, marker=marker, linewidth=3)
+    if no_labels:
+        plt.setp(ax['rho'].get_xticklabels(), visible=False)
+        plt.setp(ax['rho'].get_yticklabels(), visible=False)
+        ax['rho'].set_title(r'$\rho$')
+    else:
+        ax['rho'].set_xlabel(r'$\rho$')
+
+    # z
+    for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_z, labels, colours, linemarkers,
+                                                                     linestyles, metrics_lv):
+        ax['z'].plot(range_z, metric, label=label, linestyle=linestyle, color=colour, marker=marker, linewidth=3)
+    if no_labels:
+        plt.setp(ax['z'].get_xticklabels(), visible=False)
+        plt.setp(ax['z'].get_yticklabels(), visible=False)
+        ax['z'].set_title(r'$z$')
+    else:
+        ax['z'].set_xlabel(r'$z$')
+
+    if axis_match:
+        ax_limits = ax['volume'].get_ylim()
+        for key in keys:
+            ax[key].set_ylim(ax_limits)
+
+    return fig, ax
+
+
 def __set_metric_to_metrics(metric):
     """ Function to change single list of metrics to list of one entry if required (so loops work correctly) """
     if not isinstance(metric[0], list):

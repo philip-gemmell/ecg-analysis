@@ -74,7 +74,6 @@ def plot_xyz_components(vcg: Union[np.ndarray, List[np.ndarray]], dt: float = 2,
     """
 
     qrs_limits = __set_metric_to_metrics(qrs_limits)
-    n_limits = common_analysis.recursive_len(qrs_limits)
     vcg, colours, linestyles, legend, layout, qrs_limits, limit_colours, limit_linestyles = \
         __process_inputs_plot_xyz_components(vcg, colours, linestyles, legend, layout, qrs_limits, limit_colours,
                                              limit_linestyles)
@@ -114,8 +113,9 @@ def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray], colours: 
                  List[str],
                  List[Optional[str]],
                  str,
-                 Union[List[tuple], List[List[float]], List[str]],
-                 List[str]]:
+                 Optional[List[List[float]]],
+                 Union[List[tuple], List[List[float]], List[str], None],
+                 Optional[List[str]]]:
     """
     Assess and adapt input arguments to plot_xyz_components, ensuring data presented as expected
 
@@ -132,13 +132,13 @@ def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray], colours: 
         Labels for each VCG plot, default=None
     layout : str, optional
         Assigned figure layout (used to determine the number of different colours/linestyles to be required)
+    qrs_limits : list[list[float]] or None
+        Limits to plot on the eventual plot, presented in form
+        [[start_limit1, start_limit2, ...], [end_limit1, end_limit2, ...], ...]
     limit_colours : list[list[float]] or list[str], optional
         Colours to be used to plot QRS limits
     limit_linestyles : list[str], optional
         Linestyles to be used to plot QRS limits
-    n_limits : tuple[int], optional
-        (total number of limits to plot, number of each limit to plot)
-        e.g. plotting 3 different QRS start/end values -> (6, 3)
 
     Returns
     -------
@@ -155,9 +155,9 @@ def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray], colours: 
     qrs_limits : list[list[float]] or None
         Limits to plot on the eventual plot, presented in form
         [[start_limit1, start_limit2, ...], [end_limit1, end_limit2, ...], ...]
-    limit_colours : list of tuple or list of list of float or list of str
+    limit_colours : list of tuple or list of list of float or list of str or None
         Colours to be used to plot QRS limits
-    limit_linestyles : list of str
+    limit_linestyles : list of str or None
         Linestyles to be used to plot QRS limits
     """
 
@@ -194,6 +194,12 @@ def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray], colours: 
         linestyles = [linestyles for _ in range(n_colours)]
 
     if qrs_limits is not None:
+        # Confirm qrs_limits data are presented correctly
+        for qrs_limit in qrs_limits:
+            assert len(qrs_limit) == len(qrs_limits[0])
+
+        # Extract correct colours - different colour for each limit e.g. start1, start2, ...
+        n_limits = len(qrs_limits[0])
         if limit_colours is None:
             limit_colours = common_analysis.get_plot_colours(n_limits)
         elif isinstance(limit_colours, list):
@@ -201,14 +207,17 @@ def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray], colours: 
         else:
             limit_colours = [limit_colours for _ in range(n_limits)]
 
+        # Extract correct limits - different linestyle for each type of limit, e.g. start, end, ...
+        n_types = len(qrs_limits)
         if limit_linestyles is None:
-            limit_linestyles = ['-' for _ in range(n_limits)]
+            limit_linestyles = ['-' for _ in range(n_types)]
         elif isinstance(limit_linestyles, list):
-            assert len(limit_linestyles) == n_limits
+            assert len(limit_linestyles) == n_types
         else:
-            limit_linestyles = [limit_linestyles for _ in range(n_limits)]
+            limit_linestyles = [limit_linestyles for _ in range(n_types)]
     else:
-        
+        limit_colours = None
+        limit_linestyles = None
 
     return vcg, colours, linestyles, legend, layout, qrs_limits, limit_colours, limit_linestyles
 
@@ -271,12 +280,10 @@ def __plot_limits(axes, limits, colours, linestyles):
 
     if not isinstance(limits, list):
         limits = [limits]
-    i = 0
-    for sim_limit in limits:
-        for sim_limit_startEnd in sim_limit:
+    for sim_limit, linestyle in zip(limits, linestyles):
+        for sim_limit_startEnd, colour in zip(sim_limit, colours):
             for key in axes:
-                axes[key].axvline(sim_limit_startEnd, color=colours[i], alpha=0.5, linestyle=linestyles[i])
-            i += 1
+                axes[key].axvline(sim_limit_startEnd, color=colour, alpha=0.5, linestyle=linestyle)
     return None
 
 

@@ -5,7 +5,7 @@ import common_analysis as ca
 
 
 def plot(ecg: Union[List[dict], dict], dt: Union[int, float] = 2, legend: Optional[List[str]] = None,
-         linewidth: float = 3, qrs_limits: Optional[list, float] = None, plot_sequence: Optional[List[str]] = None,
+         linewidth: float = 3, qrs_limits: Union[list, float, None] = None, plot_sequence: Optional[List[str]] = None,
          single_fig: bool = True, colours: Optional[list] = None, linestyles: Optional[List[str]] = None,
          fig: Optional = None, ax: Optional = None) -> tuple:
     """

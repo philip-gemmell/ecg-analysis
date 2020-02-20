@@ -1,11 +1,11 @@
 import numpy as np
 import matplotlib.cm as cm
 from scipy import signal
-from typing import Union, List, Tuple, Optional
+from typing import List, Tuple, Optional
 
 
-def filter_egm(egm: list, sample_freq: Union[int, float] = 500, freq_filter: Union[int, float] = 40, order: int = 2,
-               filter_type: str = 'low') -> np.ndarray:
+def filter_egm(egm: list, sample_freq: float = 500, freq_filter: float = 40, order: int = 2, filter_type: str = 'low')\
+        -> np.ndarray:
     """
     Filter EGM data (low pass)
 
@@ -40,7 +40,7 @@ def filter_egm(egm: list, sample_freq: Union[int, float] = 500, freq_filter: Uni
     return filter_out
 
 
-def get_plot_colours(n: int = 10, colourmap: str = None) -> list:
+def get_plot_colours(n: int = 10, colourmap: Optional[str] = None) -> List[tuple]:
     """
     Return iterable list of RGB colour values that can be used for custom plotting functions
 
@@ -58,7 +58,7 @@ def get_plot_colours(n: int = 10, colourmap: str = None) -> list:
 
     Returns
     -------
-    list
+    cmap : list of tuple
         List of RGB values
     """
     if colourmap is None:
@@ -84,9 +84,8 @@ def recursive_len(item: list):
         return 1
 
 
-def convert_time_to_index(qrs_start: Optional[float, int] = None, qrs_end: Optional[float, int] = None,
-                          t_start: Optional[float, int] = 0, t_end: Optional[float, int] = 200,
-                          dt: Optional[float, int] = 2) -> Tuple[int, int]:
+def convert_time_to_index(qrs_start: Optional[float] = None, qrs_end: Optional[float] = None,
+                          t_start: float = 0, t_end: float = 200, dt: float = 2) -> Tuple[int, int]:
     """
     Return indices of QRS start and end points. NB: indices returned match Matlab output
 
@@ -115,8 +114,33 @@ def convert_time_to_index(qrs_start: Optional[float, int] = None, qrs_end: Optio
         qrs_start = t_start
     if qrs_end is None:
         qrs_end = t_end
-    x_val = np.array(range(t_start, t_end + dt, dt))
+    x_val = np.array(np.arange(t_start, t_end + dt, dt))
     i_qrs_start = np.where(x_val >= qrs_start)[0][0]
     i_qrs_end = np.where(x_val > qrs_end)[0][0]-1
 
     return i_qrs_start, i_qrs_end
+
+
+def convert_index_to_time(idx: int, t_start: float = 0, t_end: float = 200, dt: float = 2) -> float:
+    """
+    Return 'real' time for a given index
+
+    Parameters
+    ----------
+    idx : int
+        Index to convert
+    t_start : float, optional
+        Start time for overall data, default=0
+    t_end : float, optional
+        End time for overall data, default=200
+    dt : float, optional
+        Interval between time points, default=2
+
+    Returns
+    -------
+    time : float
+        The time value that corresponds to the given index
+    """
+    x_val = np.array(np.arange(t_start, t_end+dt, dt))
+    return x_val[idx]
+

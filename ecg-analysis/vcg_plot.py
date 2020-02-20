@@ -7,6 +7,7 @@ from matplotlib.collections import LineCollection
 import numpy as np
 from math import sin, cos, acos, atan2
 import warnings
+from typing import List, Tuple, Optional, Union
 
 import common_analysis
 import vcg_analysis
@@ -14,37 +15,53 @@ import vcg_analysis
 __all__ = ['Axes3D']    # Workaround to prevent Axes3D import statement to be labelled as unused
 
 
-def plot_xyz_components(vcg, dt=2, legend=None, qrs_limits=None, layout=None, colours=None, linestyles=None,
-                        limit_colours=None, limit_linestyles=None):
+def plot_xyz_components(vcg: Union[np.ndarray, List[np.ndarray]], dt: float = 2, legend: Optional[List[str]] = None,
+                        qrs_limits: Optional[List[List[float]]] = None, layout: Optional[str] = None,
+                        colours: Optional[List[List[float]]] = None, linestyles: Optional[List[str]] = None,
+                        limit_colours: Optional[List[List[float]]] = None,
+                        limit_linestyles: Optional[List[str]] = None) -> tuple:
     """
     Plot x, y, z components of VCG data
 
     Multiple options given for layout of resulting plot
 
-    Input parameters (required):
-    ----------------------------
+    Parameters
+    ----------
+    vcg : list of np.ndarray or np.ndarray
+        List of vcg data: [vcg_data1, vcg_data2, ...]
+    dt : float, optional
+        Time interval for data, default=2
+    legend : list of str, optional
+        Legend names for each VCG trace, default=None
+    qrs_limits: list of list of float, optional
+        QRS limits to plot on axes, default=None
+        To be presented in form [[qrs_start1, qrs_starts, ...], [qrs_end1, qrs_end2, ...], ...]
+    layout : {'grid', 'figures', 'combined', 'row', 'column', 'best'}, optional
+        Layout of resulting plot
+            grid        x,y,z plots are arranged in a grid (like best, but more rigid grid)
+            figures     Each x,y,z plot is on a separate figure
+            combined    x,y,z plots are combined on a single set of axes
+            row         x,y,z plots are arranged on a horizontal row in one figure
+            column      x,y,z plots are arranged in a vertical column in one figure
+            best        x,y,z plots are arranged to try and optimise space (nb: figures not equal sizes...)
+    colours : list of list of float or list of str, optional
+        Colours to use for plotting, default=common_analysis.get_plot_colours
+    linestyles : list of str, optional
+        Linestyles to use for plotting, default='-'
+    limit_colours : list of list of float or list of str, optional
+        Colours to use when plotting limits, default=common_analysis.get_plot_colours
+    limit_linestyles : list of str, optional
+        Linestyles to use when plotting limits, default='-'
 
-    vcg     List of vcg data: [vcg_data1, vcg_data2, ...]
+    Returns
+    -------
+    fig
+        Handle for resulting figure(s)
+    ax
+        Handle for resulting axis/axes
 
-    Input parameters (optional):
-    ----------------------------
-    dt                  2       Time interval for data
-    legend              None    Legend names for each VCG trace
-    qrs_limits          None    QRS limits to plot on axes
-                                To be presented in form [[qrs_start1, qrs_starts, ...], [qrs_end1, qrs_end2, ...], ...]
-    layout              None    Layout of resulting plot
-                                figures     Each x,y,z plot is on a separate figure
-                                combined    x,y,z plots are combined on a single set of axes
-                                row         x,y,z plots are arranged on a horizontal row in one figure
-                                column      x,y,z plots are arranged in a vertical column in one figure
-                                best        x,y,z plots are arranged to try and optimise space
-                                            (nb: figures not equal sizes...)
-                                *grid       x,y,z plots are arranged in a grid (like best, but more rigid grid)
-    colours             None    Colours to use for plotting
-    linestyles          None    Linestyles to use for plotting
-    limit_colours       None    Colours to use when plotting limits
-    limit_linestyles    None    Linestyles to use when plotting limits
-
+    Notes
+    -----
     if layout != 'combined':
         len(colours) == len(linestyles) == len(vcg)
     else:
@@ -54,19 +71,13 @@ def plot_xyz_components(vcg, dt=2, legend=None, qrs_limits=None, layout=None, co
     If no values passed, will default to same colour and linestyle for corresponding start/end limits, with linestyle
     and colour both varying between limits1, limits2, etc.
 
-    Output parameters:
-    ------------------
-
-    fig     Handle for resulting figure(s)
-    ax      Handle for resulting axis/axes
-
     """
 
     qrs_limits = __set_metric_to_metrics(qrs_limits)
     n_limits = common_analysis.recursive_len(qrs_limits)
-    vcg, colours, linestyles, legend, layout, limit_colours, limit_linestyles = \
-        __process_inputs(vcg, colours, linestyles, legend, layout, limit_colours, limit_linestyles,
-                         (n_limits, len(qrs_limits[0])))
+    vcg, colours, linestyles, legend, layout, qrs_limits, limit_colours, limit_linestyles = \
+        __process_inputs_plot_xyz_components(vcg, colours, linestyles, legend, layout, qrs_limits, limit_colours,
+                                             limit_linestyles)
     fig, ax = __init_axes(layout)
 
     # Plot data and add legend if required
@@ -93,26 +104,61 @@ def plot_xyz_components(vcg, dt=2, legend=None, qrs_limits=None, layout=None, co
     return fig, ax
 
 
-def __process_inputs(vcg, colours, linestyles, legend, layout, limit_colours, limit_linestyles, n_limits):
+def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray], colours: Optional[list] = None,
+                                         linestyles: Optional[List[str]] = None, legend: Optional[List[str]] = None,
+                                         layout: Optional[str] = None, qrs_limits: Optional[List[List[float]]] = None,
+                                         limit_colours: Optional[list] = None,
+                                         limit_linestyles: Optional[List[str]] = None) \
+        -> Tuple[List[np.ndarray],
+                 Union[List[tuple], List[List[float]], List[str]],
+                 List[str],
+                 List[Optional[str]],
+                 str,
+                 Union[List[tuple], List[List[float]], List[str]],
+                 List[str]]:
     """
-    Assess and adapt input arguments to plot_vcg_multiple.
+    Assess and adapt input arguments to plot_xyz_components, ensuring data presented as expected
 
-    Input parameters:
-    -----------------
+    Parameters
+    ----------
+    vcg : list[np.ndarray] or np.ndarray
+        VCG data
+    colours: list[list[float]] or list[str], optional
+        Colours to be used to plot. If given, either as ['b', 'k', ...] or [[r1,g1,b1], [r2,g2,b2], ...].
+        Default=common_analysis.get_plot_colours
+    linestyles : list[str], optional
+        Linestyles to be used to plot data, default='-'
+    legend : list[str], optional
+        Labels for each VCG plot, default=None
+    layout : str, optional
+        Assigned figure layout (used to determine the number of different colours/linestyles to be required)
+    limit_colours : list[list[float]] or list[str], optional
+        Colours to be used to plot QRS limits
+    limit_linestyles : list[str], optional
+        Linestyles to be used to plot QRS limits
+    n_limits : tuple[int], optional
+        (total number of limits to plot, number of each limit to plot)
+        e.g. plotting 3 different QRS start/end values -> (6, 3)
 
-    vcg                 VCG data
-                        [vcg1, vcg2, ...]
-    colours             Colours to be used to plot
-                        [colour1, colour2, ...]
-    linestyles          Linestyles to be used to plot data
-                        [linestyle1, linestyle2, ...]
-    legend              Labels for each VCG plot
-    layout              Assigned figure layout (used to determine the number of different colours/linestyles to be
-                        required)
-    limit_colours       Colours to be used to plot QRS limits
-    limit_linestyles    Linestyles to be used to plot QRS limits
-    n_limits            (total number of limits to plot, number of each limit to plot)
-                        e.g. plotting 3 different QRS start/end values -> (6, 3)
+    Returns
+    -------
+    vcg : list[np.ndarray]
+        VCG data
+    colours : list of tuple or list of list of float or list of str
+        Colours to use to plot the VCG data
+    linestyles : list[str]
+        Linestyles to be used to plot data
+    legend : list[str] or list[None]
+        Labels for each VCG plot, default=None
+    layout : str
+        Assigned figure layout (used to determine the number of different colours/linestyles to be required)
+    qrs_limits : list[list[float]] or None
+        Limits to plot on the eventual plot, presented in form
+        [[start_limit1, start_limit2, ...], [end_limit1, end_limit2, ...], ...]
+    limit_colours : list of tuple or list of list of float or list of str
+        Colours to be used to plot QRS limits
+    limit_linestyles : list of str
+        Linestyles to be used to plot QRS limits
     """
 
     if not isinstance(vcg, list):
@@ -147,21 +193,24 @@ def __process_inputs(vcg, colours, linestyles, legend, layout, limit_colours, li
     else:
         linestyles = [linestyles for _ in range(n_colours)]
 
-    if limit_colours is None:
-        limit_colours = common_analysis.get_plot_colours(n_limits)
-    elif isinstance(limit_colours, list):
-        assert len(limit_colours) == n_limits
-    else:
-        limit_colours = [limit_colours for _ in range(n_limits)]
+    if qrs_limits is not None:
+        if limit_colours is None:
+            limit_colours = common_analysis.get_plot_colours(n_limits)
+        elif isinstance(limit_colours, list):
+            assert len(limit_colours) == n_limits
+        else:
+            limit_colours = [limit_colours for _ in range(n_limits)]
 
-    if limit_linestyles is None:
-        limit_linestyles = ['-' for _ in range(n_limits)]
-    elif isinstance(limit_linestyles, list):
-        assert len(limit_linestyles) == n_limits
+        if limit_linestyles is None:
+            limit_linestyles = ['-' for _ in range(n_limits)]
+        elif isinstance(limit_linestyles, list):
+            assert len(limit_linestyles) == n_limits
+        else:
+            limit_linestyles = [limit_linestyles for _ in range(n_limits)]
     else:
-        limit_linestyles = [limit_linestyles for _ in range(n_limits)]
+        
 
-    return vcg, colours, linestyles, legend, layout, limit_colours, limit_linestyles
+    return vcg, colours, linestyles, legend, layout, qrs_limits, limit_colours, limit_linestyles
 
 
 def __init_axes(layout):

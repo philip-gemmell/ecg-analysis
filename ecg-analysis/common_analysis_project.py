@@ -1,26 +1,6 @@
 import numpy as np
 import math
-from typing import Optional, Tuple
-
-
-def convert_index_to_time(idx, t_start=0, t_end=200, dt=2):
-    """
-    Return 'real' time for a given index
-
-    Required input parameters:
-    --------------------------
-
-    idx     Index to convert
-
-    Optional input parameters:
-    --------------------------
-
-    t_start     0       Start time for overall data
-    t_end       200     End time for overall data
-    dt          2       Interval between time points
-    """
-    x_val = np.array(range(t_start, t_end+dt, dt))
-    return x_val[idx]
+import common_analysis as ca
 
 
 def write_colourmap_to_xml(start_data, end_data, start_highlight, end_highlight, opacity_data=1, opacity_highlight=1,
@@ -52,7 +32,7 @@ def write_colourmap_to_xml(start_data, end_data, start_highlight, end_highlight,
     None
     """
 
-    cmap = get_plot_colours(n_tags, colourmap=colourmap)
+    cmap = ca.get_plot_colours(n_tags, colourmap=colourmap)
 
     # Get values for x, depending on start and end values
     x_offset = 0.2      # Value to provide safespace round x values

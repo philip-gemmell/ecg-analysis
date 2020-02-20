@@ -2,7 +2,7 @@ import numpy as np
 import math
 from math import sin, cos, acos, atan2
 import warnings
-from typing import Union, List, Tuple, Optional
+from typing import Union, List, Tuple, Optional, Iterable
 
 import common_analysis
 import set_midwallFibrosis as smF
@@ -21,6 +21,13 @@ def convert_ecg_to_vcg(ecg: Union[List[dict], dict]) -> List[np.ndarray]:
     -------
     vcg: list of np.ndarray
         List of VCG output data
+
+    References
+    ----------
+    Kors JA, van Herpen G, Sittig AC, van Bemmel JH.
+        Reconstruction of the Frank vectorcardiogram from standard electrocardiographic leads: diagnostic comparison
+        of different methods
+        Eur Heart J. 1990 Dec;11(12):1083-92.
     """
 
     kors = np.array([[0.38, -0.07, 0.11],
@@ -180,6 +187,19 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray], velocity_offs
     threshold_end_full: list of float
         Absolute values for the threshold for a given spatial velocity trace, rather than the relative values
         originally input
+
+    References
+    ----------
+    Calculation of spatial velocity based on:
+    Kors JA, van Herpen G.
+        Methodology of QT-interval measurement in the modular ECG analysis system (MEANS)
+        Ann Noninvasive Electrocardiol. 2009 Jan;14 Suppl 1:S48-53. doi: 10.1111/j.1542-474X.2008.00261.x.
+    Xue JQ
+        Robust QT Interval Estimation—From Algorithm to Validation
+        Ann Noninvasive Electrocardiol. 2009 Jan;14 Suppl 1:S35-41. doi: 10.1111/j.1542-474X.2008.00264.x.
+    Sörnmo L
+        A model-based approach to QRS delineation
+        Comput Biomed Res. 1987 Dec;20(6):526-42.
     """
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
@@ -263,7 +283,7 @@ def get_qrs_area(vcg: Union[List[np.ndarray], np.ndarray], qrs_start: Optional[L
         End time of VCG data, default=200
     matlab_match : bool, optional
         Whether to alter the calculation for start and end indices to match the original Matlab output, from which this
-        module is based
+        module is based, default=False
 
     Returns
     -------
@@ -316,7 +336,8 @@ def get_qrs_area(vcg: Union[List[np.ndarray], np.ndarray], qrs_start: Optional[L
 
 
 def get_azimuth_elevation(vcg: Union[List[np.ndarray], np.ndarray],
-                          t_start: Optional[List[float]] = None, t_end: Optional[List[float]] = None):
+                          t_start: Optional[List[float]] = None, t_end: Optional[List[float]] = None)\
+        -> Tuple[List[Iterable[float]], List[Iterable[float]]]:
     """
     Calculate azimuth and elevation angles for a specified section of the VCG.
 
@@ -328,9 +349,18 @@ def get_azimuth_elevation(vcg: Union[List[np.ndarray], np.ndarray],
     vcg : np.ndarray or list of np.ndarray
         VCG data to calculate
     t_start : list of float, optional
-        Start time from which to calculate the angles
+        Start time from which to calculate the angles, default=0
     t_end : list of float, optional
-        End time until which to calculate the angles
+        End time until which to calculate the angles, default=end
+
+    Returns
+    -------
+    azimuth : list of list of float
+        List (one entry for each passed VCG) of azimuth angles (in radians) for the dipole for every time point during
+        the specified range
+    elevation : list of list of float
+        List (one entry for each passed VCG) of elevation angles (in radians) for the dipole for every time point during
+        the specified range
     """
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
@@ -340,7 +370,7 @@ def get_azimuth_elevation(vcg: Union[List[np.ndarray], np.ndarray],
     azimuth = list()
     elevation = list()
     for (sim_vcg, sim_t_start, sim_t_end) in zip(vcg, t_start, t_end):
-        theta, phi, _ = get_simvcg_azimuth_elevation(sim_vcg, sim_t_start, sim_t_end, weighted=False)
+        theta, phi, _ = get_single_vcg_azimuth_elevation(sim_vcg, sim_t_start, sim_t_end, weighted=False)
 
         azimuth.append(theta)
         elevation.append(phi)
@@ -348,10 +378,34 @@ def get_azimuth_elevation(vcg: Union[List[np.ndarray], np.ndarray],
     return azimuth, elevation
 
 
-def get_weighted_dipole_angles(vcg, t_start=None, t_end=None):
-    """ Calculate metrics relating to the angles of the weighted dipole of the VCG. Usually used with QRS limits. """
-    # WAA (Weighted Angle Azimuth): Weighted average angle of azimuth
-    # WAE (Weighted Angle Elevation: Weighted average angle of elevation, inclination above xy-plane.
+def get_weighted_dipole_angles(vcg: Union[List[np.ndarray], np.ndarray], t_start: Optional[List[float]] = None,
+                               t_end: Optional[List[float]] = None) \
+        -> Tuple[List[float], List[float], List[List[float]]]:
+    """
+    Calculate metrics relating to the angles of the weighted dipole of the VCG. Usually used with QRS limits.
+
+    Calculates the weighted averages of both the azimuth and the elevation (inclination above the xy-plane) for a
+    given section of the VCG. Based on these weighted averages of the angles, the unit weighted dipole for that
+    section of the VCG is returned as well.
+
+    Parameters
+    ----------
+    vcg : np.ndarray or list of np.ndarray
+        VCG data to calculate
+    t_start : list of float, optional
+        Start time from which to calculate the angles, default=0
+    t_end : list of float, optional
+        End time until which to calculate the angles, default=end
+
+    Returns
+    -------
+    waa : list of float
+        List of Weighted Average Azimuth angles (in radians) for each given VCG
+    wae : list of float
+        List of Weighted Average Elevation (above xy-plane) angles (in radians) for each given VCG
+    uwd : list of list of float
+        x, y, z coordinates for the unit mean weighted dipole for the given (section of) VCGs
+    """
 
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
@@ -363,7 +417,7 @@ def get_weighted_dipole_angles(vcg, t_start=None, t_end=None):
     unit_weighted_dipole = list()
     for (sim_vcg, sim_t_start, sim_t_end) in zip(vcg, t_start, t_end):
         # Calculate dipole at all points
-        theta, phi, dipole_magnitude = get_simvcg_azimuth_elevation(sim_vcg, sim_t_start, sim_t_end, weighted=True)
+        theta, phi, dipole_magnitude = get_single_vcg_azimuth_elevation(sim_vcg, sim_t_start, sim_t_end, weighted=True)
 
         wae = sum(phi) / sum(dipole_magnitude)
         waa = sum(theta) / sum(dipole_magnitude)
@@ -375,8 +429,41 @@ def get_weighted_dipole_angles(vcg, t_start=None, t_end=None):
     return weighted_average_azimuth, weighted_average_elev, unit_weighted_dipole
 
 
-def get_simvcg_azimuth_elevation(vcg, t_start, t_end, weighted=True, matlab_match=False):
-    """ Helper function to get azimuth and elevation data for a single VCG trace. """
+def get_single_vcg_azimuth_elevation(vcg: np.ndarray, t_start: float, t_end: float, weighted: bool = True,
+                                     matlab_match: bool = False) \
+        -> Tuple[List[float], List[float], np.ndarray]:
+    """
+    Get the azimuth and elevation data for a single VCG trace, along with the average dipole magnitude.
+
+    Returns the azimuth and elevation angles for a single given VCG trace. Can analyse only a segment of the
+    VCG if required, and can weight the angles according to the dipole magnitude. Primarily designed as a helper
+    function for get_azimuth_elevation and get_weighted_dipole_angles.
+
+    Parameters
+    ----------
+    vcg : np.ndarray or list of np.ndarray
+        VCG data to calculate
+    t_start : float
+        Start time from which to calculate the angles
+    t_end : float
+        End time until which to calculate the angles
+    weighted : bool, optional
+        Whether or not to weight the returned angles by the magnitude of the dipole at the same moment, default=True
+    matlab_match : bool, optional
+        Whether or not to match the original Matlab function's output, regarding how the section of the VCG is
+        extracted, default=False
+
+    Returns
+    -------
+    theta : list of float
+        List of the azimuth angles for the VCG dipole, potentially weighted according to the dipole magnitude at the
+        associated time
+    phi : list of float
+        List of the elevation above xy-plane angles for the VCG dipole, potentially weighted according to the dipole
+        magnitude at the associated time
+    dipole_magnitude : np.ndarray
+        Array containing the dipole magnitude at all points throughout the VCG
+    """
     i_start, i_end = common_analysis.convert_time_to_index(t_start, t_end)
     if matlab_match:
         sim_vcg = vcg[i_start - 1:i_end]
@@ -399,14 +486,49 @@ def get_simvcg_azimuth_elevation(vcg, t_start, t_end, weighted=True, matlab_matc
     return theta, phi, dipole_magnitude
 
 
-def get_dipole_magnitudes(vcg, t_start=None, t_end=None, matlab_match=False):
-    """ Calculates metrics relating to the magnitude of the weighted dipole of the VCG: mean weighted dipole
-        magnitude, maximum dipole magnitude and x,y.z components of the maximum dipole """
+def get_dipole_magnitudes(vcg: Union[List[np.ndarray], np.ndarray], t_start: Optional[List[float]] = None,
+                          t_end: Optional[List[float]] = None, matlab_match: bool = False) \
+        -> Tuple[List[float], List[float], List[List[float]], List]:
+    """
+    Calculates metrics relating to the magnitude of the weighted dipole of the VCG
+
+    Returns the mean weighted dipole, maximum dipole magnitude,(x,y.z) components of the maximum dipole and the time
+    at which the maximum dipole occurs
+
+    Parameters
+    ----------
+    vcg : np.ndarray or list of np.ndarray
+        VCG data to calculate
+    t_start : list of float, optional
+        Start time from which to calculate the magnitude, default=0
+    t_end : list of float, optional
+        End time until which to calculate the magnitudes, default=end
+    matlab_match : bool, optional
+        Whether or not to match the original Matlab function's output, regarding how the section of the VCG is
+        extracted, default=False
+
+    Returns
+    -------
+    weighted_magnitude : list of float
+        Mean magnitude of the VCG
+    max_dipole_magnitude : list of float
+        Maximum magnitude of the VCG
+    max_dipole_components : list of list of float
+        x, y, z components of the dipole at is maximum value
+    max_dipole_time : list of float
+        Time at which the maximum magnitude of the VCG occurs
+    """
 
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
-    assert len(vcg) == len(t_start)
-    assert len(vcg) == len(t_end)
+    if t_start is not None:
+        assert len(vcg) == len(t_start)
+    else:
+        t_start = [None for _ in range(len(vcg))]
+    if t_end is not None:
+        assert len(vcg) == len(t_end)
+    else:
+        t_end = [None for _ in range(len(vcg))]
 
     weighted_magnitude = list()
     max_dipole_magnitude = list()
@@ -424,15 +546,39 @@ def get_dipole_magnitudes(vcg, t_start=None, t_end=None, matlab_match=False):
         weighted_magnitude.append(sum(dipole_magnitude)/len(sim_vcg_qrs))
         max_dipole_magnitude.append(max(dipole_magnitude))
         i_max = np.where(dipole_magnitude == max(dipole_magnitude))
-        max_dipole_components.append(sim_vcg_qrs[i_max])
-        max_dipole_time.append(common_analysis.convert_index_to_time(i_max, sim_t_start, sim_t_end))
+        assert len(i_max) == 1
+        max_dipole_components.append(sim_vcg_qrs[i_max[0]])
+        max_dipole_time.append(common_analysis.convert_index_to_time(i_max[0], sim_t_start, sim_t_end))
 
     return weighted_magnitude, max_dipole_magnitude, max_dipole_components, max_dipole_time
 
 
-def calculate_delta_dipole_angle(azimuth1, elevation1, azimuth2, elevation2, convert_to_degrees=False):
-    """ Calculates the angular difference between two VCGs based on difference in azimuthal and elevation angles.
-        Useful for calculating difference between weighted averages. """
+def calculate_delta_dipole_angle(azimuth1: List[float], elevation1: List[float],
+                                 azimuth2: List[float], elevation2: List[float],
+                                 convert_to_degrees: bool = False) -> List[float]:
+    """
+    Calculates the angular difference between two VCGs based on difference in azimuthal and elevation angles.
+
+    Useful for calculating difference between weighted averages.
+
+    Parameters
+    ----------
+    azimuth1 : list of float
+        Azimuth angles for the first dipole
+    elevation1 : list of float
+        Elevation angles for the first dipole
+    azimuth2 : list of float
+        Azimuth angles for the second dipole
+    elevation2 : list of float
+        Elevation angles for the second dipole
+    convert_to_degrees : bool, optional
+        Whether to convert the angle from radians to degrees, default=False
+
+    Returns
+    -------
+    dt : list of float
+        List of angles between a series of dipoles, either in radians (default) or degrees depending on input argument
+    """
 
     dt = list()
     for az1, ele1, az2, ele2 in zip(azimuth1, elevation1, azimuth2, elevation2):
@@ -455,24 +601,62 @@ def calculate_delta_dipole_angle(azimuth1, elevation1, azimuth2, elevation2, con
         return dt
 
 
-def compare_dipole_angles(vcg1, vcg2, t_start1=0, t_end1=None, t_start2=0, t_end2=None, n_compare=10,
-                          convert_to_degrees=False, matlab_match=False):
-    """ Calculates the angular differences between two VCGs at multiple points during their evolution """
+def compare_dipole_angles(vcg1: np.ndarray, vcg2: np.ndarray, t_start1: float = 0, t_end1: Optional[float] = None,
+                          t_start2: float = 0, t_end2: Optional[float] = None, n_compare: int = 10,
+                          convert_to_degrees: bool = False, matlab_match: bool = False) -> List[float]:
+    """
+    Calculates the angular differences between two VCGs at multiple points during their evolution
+
+    To compensate for the fact that the two VCG traces may not be of the same length, the comparison does not occur
+    at every moment of the VCG; rather, the dipoles are calculated for certain fractional points during the VCG.
+
+    Parameters
+    ----------
+    vcg1 : np.ndarray
+        First VCG trace to consider
+    vcg2 : np.ndarray
+        Second VCG trace to consider
+    t_start1 : float, optional
+        Time from which to consider the data from the first VCG trace, default=0
+    t_end1 : float, optional
+        Time until which to consider the data from the first VCG trace, default=end
+    t_start2 : float, optional
+        Time from which to consider the data from the second VCG trace, default=0
+    t_end2 : float, optional
+        Time until which to consider the data from the second VCG trace, default=end
+    n_compare : int, optional
+        Number of points during the VCGs at which to calculate the dipole angle. If set to -1, will calculate at
+        every point during the VCG, but requires VCG traces to be the same length, default=10
+    convert_to_degrees : bool, optional
+        Whether to convert the angles from radians to degrees, default=False
+    matlab_match : bool, optional
+        Whether to extract the data segment to match Matlab output or to use simpler Python, default=False
+
+    Returns
+    -------
+    dt : list of float
+        Angle between two given VCGs at n points during the VCG, where n is given as input
+    """
 
     # Calculate indices for the two VCG traces that correspond to the time points to be compared
     i_start1, i_end1 = common_analysis.convert_time_to_index(t_start1, t_end1)
     i_start2, i_end2 = common_analysis.convert_time_to_index(t_start2, t_end2)
 
-    if matlab_match:
-        i_start1 -= 1
-        i_end1 -= 1
-        i_start2 -= 1
-        i_end2 -= 1
-        idx_list1 = [int(round(i_start1 + i*(i_end1-i_start1) / 10)) for i in range(1, n_compare+1)]
-        idx_list2 = [int(round(i_start2 + i*(i_end2-i_start2) / 10)) for i in range(1, n_compare+1)]
+    if n_compare == -1:
+        assert len(vcg1) == len(vcg2)
+        idx_list1 = range(len(vcg1))
+        idx_list2 = range(len(vcg2))
     else:
-        idx_list1 = [int(round(i)) for i in np.linspace(start=i_start1, stop=i_end1, num=n_compare)]
-        idx_list2 = [int(round(i)) for i in np.linspace(start=i_start2, stop=i_end2, num=n_compare)]
+        if matlab_match:
+            i_start1 -= 1
+            i_end1 -= 1
+            i_start2 -= 1
+            i_end2 -= 1
+            idx_list1 = [int(round(i_start1 + i*(i_end1-i_start1) / 10)) for i in range(1, n_compare+1)]
+            idx_list2 = [int(round(i_start2 + i*(i_end2-i_start2) / 10)) for i in range(1, n_compare+1)]
+        else:
+            idx_list1 = [int(round(i)) for i in np.linspace(start=i_start1, stop=i_end1, num=n_compare)]
+            idx_list2 = [int(round(i)) for i in np.linspace(start=i_start2, stop=i_end2, num=n_compare)]
 
     # Calculate the dot product and magnitudes of vectors. If the fraction of the two is slightly greater than 1 or less
     # than -1, give a warning and correct accordingly.

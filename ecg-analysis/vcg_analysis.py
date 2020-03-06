@@ -1378,6 +1378,7 @@ def plot_metric_change_range(metrics, metrics_phi, metrics_rho, metrics_z, metri
         linemarkers = ['.' for _ in range(len(metrics_rho))]
     else:
         assert len(linemarkers) >= len(metrics_rho)
+    linemarker_size = 12
     if linestyles is None:
         linestyles = ['-' for _ in range(len(metrics_rho))]
     else:
@@ -1449,10 +1450,11 @@ def plot_metric_change_range(metrics, metrics_phi, metrics_rho, metrics_z, metri
         for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_phi, labels, colours, linemarkers,
                                                                          linestyles, metrics_lv):
             if metric_lv:
-                ax['phi_lv'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker, linewidth=3)
+                ax['phi_lv'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker,
+                                  markersize=linemarker_size, linewidth=3)
             else:
                 ax['phi_septum'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker,
-                                      linewidth=3)
+                                      markersize=linemarker_size, linewidth=3)
         # ax['phi_lv'].plot(metric_phi_lv, 'o-', label='LV', linewidth=3, color='C0')
         # ax['phi_lv'].set_xticks(list(range(len(legend_phi_lv))))
         if no_labels:
@@ -1478,10 +1480,10 @@ def plot_metric_change_range(metrics, metrics_phi, metrics_rho, metrics_z, metri
                                                                          linestyles, metrics_lv):
             if metric_lv:
                 ax['phi'].plot(range_phi_lv, metric, label=label, linestyle=linestyle, color=colour, marker=marker,
-                               linewidth=3)
+                               markersize=linemarker_size, linewidth=3)
             else:
                 ax['phi'].plot(range_phi_septum, metric, label=label, linestyle=linestyle, color=colour, marker=marker,
-                               linewidth=3)
+                               markersize=linemarker_size, linewidth=3)
         if no_labels:
             plt.setp(ax['phi'].get_xticklabels(), visible=False)
             plt.setp(ax['phi'].get_yticklabels(), visible=False)
@@ -1492,7 +1494,8 @@ def plot_metric_change_range(metrics, metrics_phi, metrics_rho, metrics_z, metri
     # Rho
     for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_rho, labels, colours, linemarkers,
                                                                      linestyles, metrics_lv):
-        ax['rho'].plot(range_rho, metric, label=label, linestyle=linestyle, color=colour, marker=marker, linewidth=3)
+        ax['rho'].plot(range_rho, metric, label=label, linestyle=linestyle, color=colour, marker=marker,
+                       markersize=linemarker_size, linewidth=3)
     if no_labels:
         plt.setp(ax['rho'].get_xticklabels(), visible=False)
         plt.setp(ax['rho'].get_yticklabels(), visible=False)
@@ -1503,7 +1506,8 @@ def plot_metric_change_range(metrics, metrics_phi, metrics_rho, metrics_z, metri
     # z
     for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_z, labels, colours, linemarkers,
                                                                      linestyles, metrics_lv):
-        ax['z'].plot(range_z, metric, label=label, linestyle=linestyle, color=colour, marker=marker, linewidth=3)
+        ax['z'].plot(range_z, metric, label=label, linestyle=linestyle, color=colour, marker=marker,
+                     markersize=linemarker_size, linewidth=3)
     if no_labels:
         plt.setp(ax['z'].get_xticklabels(), visible=False)
         plt.setp(ax['z'].get_yticklabels(), visible=False)

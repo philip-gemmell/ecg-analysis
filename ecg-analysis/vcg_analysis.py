@@ -1531,7 +1531,7 @@ def __set_metric_to_metrics(metric):
         return metric
 
 
-def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_labels, layout=None):
+def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_labels, layout=None, plot_absolute=False):
     """ Plots a bar chart for the observed metrics. """
 
     """ Conduct initial checks, and set up values appropriate to plotting """
@@ -1563,6 +1563,10 @@ def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_la
 
     for ax, metric_cont, metric_lv, metric_sept, label in zip(axes, metrics_cont, metrics_lv, metrics_sept,
                                                               metric_labels):
+        if plot_absolute:
+            metric_cont = abs(metric_cont)
+            metric_lv = abs(metric_lv)
+            metric_sept = abs(metric_sept)
         ax.bar(index[0], metric_cont, label='Control', alpha=opacity, color='C2', width=bar_width)
         ax.bar(index[1], metric_lv, label='LV Scar', alpha=opacity, color='C0', width=bar_width)
         ax.bar(index[2], metric_sept, label='Septum Scar', alpha=opacity, color='C1', width=bar_width)

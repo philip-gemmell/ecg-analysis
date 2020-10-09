@@ -79,7 +79,7 @@ def convert_electrodes_to_ecg(electrode_data):
 
 
 def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_limits=None, plot_sequence=None, single_fig=True, colours=None,
-             linestyles=None, fig=None, ax=None):
+             linestyles=None, ylim_match=False, fig=None, ax=None):
     """ Plots and labels the ECG data from simulation(s). Optional to add in QRS start/end boundaries for plotting """
 
     """ Prepare axes and inputs """
@@ -108,7 +108,8 @@ def plot_ecg(ecg, dt=2, legend=None, linewidth=3, qrs_limits=None, plot_sequence
     """ Plot data """
     time = [i*dt for i in range(len(ecg[0]['V1']))]
     for (sim_ecg, sim_label, sim_colour, sim_linestyle) in zip(ecg, legend, colours, linestyles):
-        __plot_ecg_plot_data(time, sim_ecg, sim_label, sim_colour, ax, plot_sequence, linewidth, sim_linestyle)
+        __plot_ecg_plot_data(time, sim_ecg, sim_label, sim_colour, ax, plot_sequence, linewidth, sim_linestyle,
+                             ylim_match)
 
     """ Add QRS limits, if supplied. """
     if qrs_limits is not None:
@@ -187,9 +188,21 @@ def __plot_ecg_prep_axes(plot_sequence, single_fig=True):
     return fig, ax
 
 
-def __plot_ecg_plot_data(time_val, ecg_data, label, colour, ax, plot_sequence, linewidth, linestyle):
+def __plot_ecg_plot_data(time_val, ecg_data, label, colour, ax, plot_sequence, linewidth, linestyle, ylim_match):
     for key in plot_sequence:
         ax[key].plot(time_val, ecg_data[key], linewidth=linewidth, label=label, color=colour, linestyle=linestyle)
+
+    if ylim_match:
+        ymin = 1000
+        ymax = -1000
+        for key in plot_sequence:
+            ylim = ax[key].get_ylim()
+            if ylim[0] < ymin:
+                ymin = ylim[0]
+            if ylim[1] > ymax:
+                ymax = ylim[1]
+        for key in plot_sequence:
+            ax[key].set_ylim([ymin, ymax])
     return None
 
 

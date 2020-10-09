@@ -218,14 +218,14 @@ def plot_xy_vcg(vcg_x, vcg_y, xlabel='VCG (x)', ylabel='VCG (y)', linestyle='-',
     return fig
 
 
-def plot_xyz_vcg(vcg_x, vcg_y, vcg_z, linestyle='-', fig=None):
+def plot_xyz_vcg(vcg_x, vcg_y, vcg_z, linestyle='-', linewidth=None, fig=None):
     """ Plot the evolution of VCG in 3D space """
 
     """ Prepare line segments for plotting """
     t = np.linspace(0, 1, vcg_x.shape[0])  # "time" variable
     points = np.array([vcg_x, vcg_y, vcg_z]).transpose().reshape(-1, 1, 3)
     segs = np.concatenate([points[:-1], points[1:]], axis=1)
-    lc = Line3DCollection(segs, cmap=plt.get_cmap('viridis'), linestyle=linestyle)
+    lc = Line3DCollection(segs, cmap=plt.get_cmap('viridis'), linestyle=linestyle, linewidths=linewidth)
     lc.set_array(t)
 
     if fig is None:
@@ -1533,6 +1533,12 @@ def __set_metric_to_metrics(metric):
 
 def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_labels, layout=None, plot_absolute=False):
     """ Plots a bar chart for the observed metrics. """
+
+    preamble = {
+        'text.usetex': True,
+        'text.latex.preamble': [r'\usepackage{amsmath}']
+    }
+    plt.rcParams.update(preamble)
 
     """ Conduct initial checks, and set up values appropriate to plotting """
     assert len(metrics_cont) == len(metrics_lv)

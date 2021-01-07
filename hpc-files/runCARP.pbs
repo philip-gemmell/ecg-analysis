@@ -1,0 +1,60 @@
+#!/bin/bash
+#PBS -V
+#PBS -l select=1:ncpus=128:mpiprocs=128:mem=1000gbi
+#PBS -l place=scatter:excl
+#PBS -l walltime=100:00:00
+#PBS -N lvScar_600
+#PBS -o ./
+#PBS -e ./
+#PBS -l place=free:shared
+# Change to the directory that the job was submitted from 
+
+#module purge
+module load mpt
+
+NPROCS=$(cat $PBS_NODEFILE | wc -l)
+
+cd $PBS_O_WORKDIR
+
+# Define variables
+ROOTDIR=/scratch/pg16/ecg ;
+#MESH=ScarLV_phi1.5708-3.1416_rho0.1-0.9_z0.3-0.9_plow0.4_pbz0.5_pdense0.6 ;
+MESH=ScarSeptum_phi-0.625-0.625_rho0.25-0.75_z0.4-0.8 ;
+#MESH=Control
+BCL=300
+T_PREC=$(( $BCL*5 ))
+T_ECG=$(( $BCL*5 + 200 ))
+PARFILE_PREC=$ROOTDIR/sinusMWFRapid${BCL}ms.par ;
+PARFILE_ECG=$ROOTDIR/sinusMWFRapid${BCL}msECG.par ;
+#OUTFOLDER=$ROOTDIR/lv_phi1.5708-3.1416_rho0.1-0.9_z0.3-0.9_plow0.4_pbz0.5_pdense0.6_bcl$BCL ;
+OUTFOLDER=$ROOTDIR/septum_phi-0.625-0.625_rho0.25-0.75_z0.4-0.8_bcl$BCL ;
+#OUTFOLDER=$ROOTDIR/control_bcl$BCL ;
+
+# Create symbolic link to .pts file (same across the simulations, so no need to repeat!)
+ln -s torso_final_ref_smooth_noAir.pts $MESH.pts
+
+mpiexec_mpt -np $NPROCS /home/cc14/carp.petsc.pt \
++F $PARFILE_PREC \
+-meshname $ROOTDIR/$MESH \
+-bidomain 0 \
+-tend $T_PREC \
+-num_tsav 1 -tsav[0] $T_PREC \
+-dt 25.0 \
+-parab_options_file $HOME/CARP/opts/ilu_opts_p \
+-ellip_options_file $HOME/CARP/opts/amg_opts_new \
+-timedt 20.0 \
+-spacedt 20.0 \
+-simID $OUTFOLDER/
+
+mpiexec_mpt -np $NPROCS /home/cc14/carp.petsc.pt \
++F $PARFILE_ECG \
+-meshname $ROOTDIR/$MESH \
+-bidomain 2 \
+-tend $T_ECG \
+-start_statef $OUTFOLDER/state.$T_PREC.0 \
+-dt 25.0 \
+-parab_options_file $HOME/CARP/opts/ilu_opts_p \
+-ellip_options_file $HOME/CARP/opts/amg_opts_new \
+-timedt 2.0 \
+-spacedt 2.0 \
+-simID $OUTFOLDER/ecg/

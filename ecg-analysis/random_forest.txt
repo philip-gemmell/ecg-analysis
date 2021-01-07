@@ -1,0 +1,389 @@
+# Conduct random forest analysis - need data from analysis_commands.txt to be able to run
+
+from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.metrics import precision_score, recall_score, roc_auc_score, roc_curve
+import numpy as np
+import pandas as pd
+import itertools
+import matplotlib.pyplot as plt
+from prettytable import PrettyTable
+
+RSEED = 42
+
+
+def plot_confusion_matrix(cm_data, class_names, normalize=False, title='Confusion matrix', cmap=plt.cm.Oranges):
+    """
+	This function prints and plots the confusion matrix.
+	Normalization can be applied by setting `normalize=True`.
+	Source: http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
+	"""
+
+	if normalize:
+        cm_data = cm_data.astype('float') / cm_data.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix, without normalization')
+
+    print(cm_data)
+
+    plt.figure(figsize=(10, 10))
+    plt.imshow(cm_data, interpolation='nearest', cmap=cmap)
+    plt.title(title, size=24)
+    plt.colorbar(aspect=4)
+    tick_marks = np.arange(len(class_names))
+    plt.xticks(tick_marks, class_names, rotation=45, size=14)
+    plt.yticks(tick_marks, class_names, size=14)
+
+    fmt = '.2f' if normalize else 'd'
+    thresh_cm = cm_data.max() / 2.
+
+    # Labeling the plot
+    for j, k in itertools.product(range(cm_data.shape[0]), range(cm_data.shape[1])):
+        plt.text(k, j, format(cm_data[j, k], fmt), fontsize=20, horizontalalignment="center", color="white" if
+        cm_data[j, k] > thresh_cm else "black")
+
+    plt.grid(None)
+    plt.tight_layout()
+    plt.ylabel('True label', size=18)
+    plt.xlabel('Predicted label', size=18)
+
+
+def evaluate_model(predictions_, probs, train_predictions_, train_probs, test_labels_, train_labels_, title):
+    """Compare machine learning model to baseline performance.
+	Computes statistics and shows ROC curve."""
+
+    baseline = dict()
+    baseline['recall'] = recall_score(test_labels_, [1 for _ in range(len(test_labels_))])
+    baseline['precision'] = precision_score(test_labels_, [1 for _ in range(len(test_labels_))])
+    baseline['roc'] = 0.5
+
+    results = dict()
+    results['recall'] = recall_score(test_labels_, predictions_)
+    results['precision'] = precision_score(test_labels_, predictions_)
+    results['roc'] = roc_auc_score(test_labels_, probs)
+
+    train_results = dict()
+    train_results['recall'] = recall_score(train_labels_, train_predictions_)
+    train_results['precision'] = precision_score(train_labels_, train_predictions_)
+    train_results['roc'] = roc_auc_score(train_labels_, train_probs)
+
+    for metric in ['recall', 'precision', 'roc']:
+        print('{} Baseline: {} Test: {} Train: {}'.format(metric.capitalize(), round(baseline[metric], 2),
+                                                          round(results[metric], 2), round(train_results[metric], 2)))
+
+    # Calculate false positive rates and true positive rates
+    base_fpr, base_tpr, _ = roc_curve(test_labels_, [1 for _ in range(len(test_labels_))])
+    model_fpr, model_tpr, _ = roc_curve(test_labels_, probs)
+
+    plt.figure(figsize=(8, 6))
+    plt.rcParams['font.size'] = 16
+
+    # Plot both curves
+    plt.plot(base_fpr, base_tpr, 'b', label='baseline')
+    plt.plot(model_fpr, model_tpr, 'r', label='model')
+    plt.legend()
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title(title + ' ROC Curves')
+
+
+# # Construct series of simulated VCGs by adding noise
+# n_noise = 100
+# temp=list()
+# for vcg in vcg_lv_phi_300:
+# 	for i in range(n_noise):
+# 		temp.append(vcg+np.random.normal(0, 0.05, vcg.shape)
+# vcg_lv_phi_300 = temp[:]
+# temp=list()
+# for vcg in vcg_lv_phi_600:
+# 	for i in range(n_noise):
+# 		temp.append(vcg+np.random.normal(0, 0.05, vcg.shape)
+# vcg_lv_phi_600 = temp[:]
+# temp=list()
+# for vcg in vcg_lv_rho_300:
+# 	for i in range(n_noise):
+# 		temp.append(vcg+np.random.normal(0, 0.05, vcg.shape)
+# vcg_lv_rho_300 = temp[:]
+# temp=list()
+# for vcg in vcg_lv_rho_600:
+# 	for i in range(n_noise):
+# 		temp.append(vcg+np.random.normal(0, 0.05, vcg.shape)
+# vcg_lv_rho_600 = temp[:]
+# temp=list()
+# for vcg in vcg_lv_z_300:
+# 	for i in range(n_noise):
+# 		temp.append(vcg+np.random.normal(0, 0.05, vcg.shape)
+# vcg_lv_z_300 = temp[:]
+# temp=list()
+# for vcg in vcg_lv_z_600:
+# 	for i in range(n_noise):
+# 		temp.append(vcg+np.random.normal(0, 0.05, vcg.shape)
+# vcg_lv_z_600 = temp[:]
+# temp=list()
+# for vcg in vcg_lv_size_300:
+# 	for i in range(n_noise):
+# 		temp.append(vcg+np.random.normal(0, 0.05, vcg.shape)
+# vcg_lv_size_600 = temp[:]
+# temp=list()
+# for vcg in vcg_lv_z_600:
+# 	for i in range(n_noise):
+# 		temp.append(vcg+np.random.normal(0, 0.05, vcg.shape)
+# vcg_lv_size_600 = temp[:]
+# temp=list()
+# for vcg in vcg_lv_other_300:
+# 	for i in range(n_noise):
+# 		temp.append(vcg+np.random.normal(0, 0.05, vcg.shape)
+# vcg_lv_other_300 = temp[:]
+# temp=list()
+# for vcg in vcg_lv_other_600:
+# 	for i in range(n_noise):
+# 		temp.append(vcg+np.random.normal(0, 0.05, vcg.shape)
+# vcg_lv_other_600 = temp[:]
+#
+#
+# vcg_septum_phi_300 = vcg_analysis.convert_ecg_to_vcg(ecg_septum_phi_300)
+# vcg_septum_phi_600 = vcg_analysis.convert_ecg_to_vcg(ecg_septum_phi_600)
+# vcg_septum_rho_300 = vcg_analysis.convert_ecg_to_vcg(ecg_septum_rho_300)
+# vcg_septum_rho_600 = vcg_analysis.convert_ecg_to_vcg(ecg_septum_rho_600)
+# vcg_septum_z_300 = vcg_analysis.convert_ecg_to_vcg(ecg_septum_z_300)
+# vcg_septum_z_600 = vcg_analysis.convert_ecg_to_vcg(ecg_septum_z_600)
+# vcg_septum_size_300 = vcg_analysis.convert_ecg_to_vcg(ecg_septum_size_300)
+# vcg_septum_size_600 = vcg_analysis.convert_ecg_to_vcg(ecg_septum_size_600)
+# vcg_septum_other_300 = vcg_analysis.convert_ecg_to_vcg(ecg_septum_other_300)
+# vcg_septum_other_600 = vcg_analysis.convert_ecg_to_vcg(ecg_septum_other_600)
+
+# Collate data for input parameters (the values we want to be able to predict!)
+parameters = ['lv', 'septum', 'volume', 'area', 'phi', 'rho', 'z']
+params_classify = ['lv', 'septum']
+df_params = pd.DataFrame(columns=parameters)
+df_params[parameters[0]] = [1 for _ in range(len(area_lv))] + [0 for _ in range(len(area_septum))]
+df_params[parameters[1]] = [0 for _ in range(len(area_lv))] + [1 for _ in range(len(area_septum))]
+df_params[parameters[2]] = volume_complete
+# Need to adjust lv/septum variables for when there is no scar i.e. control case
+for i in range(len(volume_complete)):
+    if volume_complete[i] == 0.0:
+        df_params.loc[i, parameters[0]] = 0
+        df_params.loc[i, parameters[1]] = 0
+df_params[parameters[3]] = area_complete_norm
+df_params[parameters[4]] = rangePhi_complete
+df_params[parameters[5]] = rangeRho_complete
+df_params[parameters[6]] = rangeZ_complete
+
+# Collate the output data metrics
+metrics = ['qrs_duration', 'qrs_area_pythag', 'qrs_area_3d', 'waa', 'wae', 'weightMag', 'maxMag', 'maxMagTime',
+           'dTuwd', 'dTmax', 'dTqrs000', 'dTqrs050', 'dTqrs075', 'dTqrs100']
+df_metrics = pd.DataFrame(columns=metrics)
+df_metrics[metrics[0]] = delta_qrs_complete
+df_metrics[metrics[1]] = delta_qrs_area_frac_pythag_complete
+df_metrics[metrics[2]] = delta_qrs_area_frac_3d_complete
+df_metrics[metrics[3]] = delta_waaAngle_complete
+df_metrics[metrics[4]] = delta_waeAngle_complete
+df_metrics[metrics[5]] = delta_weightMag_frac_complete
+df_metrics[metrics[6]] = delta_maxMag_frac_complete
+df_metrics[metrics[7]] = delta_maxMagTime_complete
+df_metrics[metrics[8]] = dtAngle_complete
+df_metrics[metrics[9]] = dtMaxAngle_complete
+df_metrics[metrics[10]] = dtQRS000Angle_complete
+df_metrics[metrics[11]] = dtQRS050Angle_complete
+df_metrics[metrics[12]] = dtQRS075Angle_complete
+df_metrics[metrics[13]] = dtQRS100Angle_complete
+
+# Drop repeats of the control case (no scar)
+noscar = df_params.index[df_params['volume'] == 0].to_list()[1:]
+df_params.drop(noscar, inplace=True)
+df_metrics.drop(noscar, inplace=True)
+
+np_metrics = np.array(df_metrics)
+
+# Construct random forests, and generate predictions for test data
+train_features = dict.fromkeys(parameters)
+test_features = dict.fromkeys(parameters)
+train_labels = dict.fromkeys(parameters)
+test_labels = dict.fromkeys(parameters)
+rf = dict.fromkeys(parameters)
+predictions = dict.fromkeys(parameters)
+probabilities = dict.fromkeys(params_classify)
+train_predictions = dict.fromkeys(parameters)
+train_probabilities = dict.fromkeys(params_classify)
+for key in df_params:
+    train_features[key], test_features[key], train_labels[key], test_labels[key] = \
+        train_test_split(np_metrics, np.array(df_params[key]), test_size=0.3, random_state=42)
+    if key in params_classify:
+        rf[key] = RandomForestClassifier(n_estimators=1000, random_state=RSEED, n_jobs=-4, oob_score=True)
+    else:
+        rf[key] = RandomForestRegressor(n_estimators=1000, random_state=RSEED, n_jobs=-4, oob_score=True)
+    rf[key].fit(train_features[key], train_labels[key])
+
+    # Calculate predictions of model, and probabilities of these predictions (along with check on
+    # the predictions and probabilities of the training data, to check for overfitting
+    predictions[key] = rf[key].predict(test_features[key])
+    train_predictions[key] = rf[key].predict(train_features[key])
+    if key in params_classify:
+        probabilities[key] = rf[key].predict_proba(test_features[key])[:, 1]
+        train_probabilities[key] = rf[key].predict_proba(train_features[key])[:, 1]
+
+# Check out-of-bag errors against number of trees in the forest to assess required size
+rf_size = dict.fromkeys(parameters)
+oob_error = dict.fromkeys(parameters)
+accuracy_size = dict.fromkeys(parameters)
+min_estimators = 5
+max_estimators = 15
+for key in parameters:
+    if key in params_classify:
+        rf_size[key] = RandomForestClassifier(random_state=RSEED, n_jobs=-2, oob_score=True)
+    else:
+        rf_size[key] = RandomForestRegressor(random_state=RSEED, n_jobs=-2, oob_score=True)
+    oob_error[key] = list()
+    for i in range(min_estimators, max_estimators + 1):
+        rf_size[key].set_params(n_estimators=i)
+        rf_size[key].fit(np_metrics, np.array(df_params[key]))
+        oob_error[key].append((i, 1 - rf[key].oob_score_))
+for label, clf_err in oob_error.items():
+    xs, ys = zip(*clf_err)
+    plt.plot(xs, ys, label=label)
+
+plt.xlim(min_estimators, max_estimators)
+plt.xlabel("n_estimators")
+plt.ylabel("OOB error rate")
+plt.legend()
+plt.show()
+
+# Conduct cross-validation using k-fold cross-validation
+from sklearn.model_selection import cross_val_score
+
+cv_scores = dict.fromkeys(parameters)
+for key in parameters:
+    cv_scores[key] = cross_val_score(rf[key], np_metrics, np.array(df_params[key]), cv=5)
+
+# Extract details for the mean depth of the trees, etc.
+n_nodes = dict.fromkeys(parameters)
+depth = dict.fromkeys(parameters)
+for key in rf:
+    n_nodes[key] = list()
+    depth[key] = list()
+    for tree in rf[key].estimators_:
+        n_nodes[key].append(tree.tree_.node_count)
+        depth[key].append(tree.tree_.max_depth)
+
+# Calculate errors, and from that the accuracy
+errors = dict.fromkeys(parameters)
+accuracy = dict.fromkeys(parameters)
+for key in parameters:
+    errors[key] = abs(predictions[key] - test_labels[key])
+    if key in params_classify:
+        accuracy[key] = 100 - sum(errors[key]) / len(errors[key]) * 100
+    else:
+        accuracy[key] = 100 - np.mean(
+            100 * (errors[key] / test_labels[key]))  # Calculate mean absolute percentage error (MAPE)
+
+# Check ROC AUC scores (including for training predictions), and plot curves
+train_roc_auc = dict.fromkeys(parameters)
+test_roc_auc = dict.fromkeys(parameters)
+fpr = dict.fromkeys(params_classify)  # False positive rate
+tpr = dict.fromkeys(params_classify)  # True positive rate
+thresh = dict.fromkeys(params_classify)  # Thresholds used to compute fpr and tpr
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# linestyle = {'lv': '-', 'septum': '--'}
+cm = dict.fromkeys(params_classify)
+classes = {'lv': ['Septum', 'LV'], 'septum': ['LV', 'Septum']}
+for key in params_classify:
+    evaluate_model(predictions[key], probabilities[key], train_predictions[key], train_probabilities[key],
+                   test_labels[key], train_labels[key], key)
+    cm[key] = confusion_matrix(test_labels[key], predictions[key])
+    plot_confusion_matrix(cm[key], class_names=classes[key], title=key + ' Scar Classification')
+    train_roc_auc[key] = roc_auc_score(train_labels[key], train_probabilities[key])
+    test_roc_auc[key] = roc_auc_score(test_labels[key], probabilities[key])
+    fpr[key], tpr[key], thresh[key] = roc_curve(test_labels[key], probabilities[key])
+#	ax.plot(fpr[key], tpr[key], label=key, linestyle=linestyle[key])
+# ax.legend()
+# ax.set_xlabel('False Positive Rate')
+# ax.set_ylabel('True Positive Rate')
+
+# Calculate relative importances of metrics in decision trees
+# feature_importances = dict.fromkeys(parameters)
+feature_importances = pd.DataFrame(index=parameters, columns=metrics)
+feature_std = pd.DataFrame(index=parameters, columns=metrics)
+for key in parameters:
+    importances = list(rf[key].feature_importances_)
+    std = np.std([tree.feature_importances_ for tree in rf[key].estimators_], axis=0)
+    i_metric = 0
+    for met_key in metrics:
+        feature_importances.loc[key, met_key] = round(importances[i_metric], 2)
+        feature_std.loc[key, met_key] = round(std[i_metric], 2)
+        i_metric += 1
+# feature_importances[key] = [[feature, round(importance, 2), round(std, 2)] for feature, importance, std in zip(df_metrics.columns, importances, std)]
+# Sort the feature importances by most important first
+# feature_importances[key] = sorted(feature_importances[key], key = lambda x: x[1], reverse = True)
+
+# Print table of summary data re: accuracy
+t = PrettyTable(['Output', 'n_nodes', 'depth', 'Accuracy (%)', 'Train ROC AUC', 'Test ROC AUC'])
+for key in parameters:
+    t.add_row([key, np.mean(n_nodes[key]), np.mean(depth[key]), accuracy[key], train_roc_auc[key], test_roc_auc[key]])
+print(t)
+
+# Print table of relative importance of each metric for each parameter
+from tabulate import tabulate
+
+print(tabulate(feature_importances, headers='keys', tablefmt='psql'))
+
+# Plot a series of bar graphs to demonstrate the relative importances of metrics (potentially only the important ones!)
+params_predict = ['lv', 'septum', 'rho', 'area']
+importances_predict = feature_importances.loc[params_predict, :].astype(float)
+mean_val = importances_predict.describe().loc['mean', :]
+import_order = mean_val.sort_values().index
+ave_import = list()
+# for key in parameters:
+# [x for _,x in sorted(zip(Y,X))]
+fig, ax = plt.subplots()
+x = np.arange(len(metrics))
+bar_width = 0.9 / len(parameters)
+start_x = x - (bar_width * (len(parameters) / 2))
+xmin = min(start_x)
+# for key in parameters:
+for key in params_predict:
+    # importances = np.array(feature_importances[key])
+    # ax.bar(start_x, importances[:,1], bar_width, label=key, align='edge')
+    ax.bar(np.array(importances_predict.loc[key, import_order]), bar_width, label=key, align='edge')
+    start_x += bar_width
+xmax = max(start_x)
+ax.set_ylabel('Relative importance')
+ax.set_xticks(x)
+# ax.set_xticklabels(metrics, rotation=45)
+ax.set_xticklabels(import_order, rotation=45)
+ax.set_xlim([xmin, xmax])
+ax.legend()
+fig.tight_layout()
+
+# Print details of LV/septum predictions in more detail
+t = PrettyTable(['LV prob', 'Sept prob', 'Predicted', 'Actual'])
+for i in range(len(test_labels['lv'])):
+    if predictions['lv'][i] == 1:
+        pred_text = 'lv'
+    else:
+        pred_text = 'septum'
+    if test_labels['lv'][i] == 1:
+        act_text = 'lv'
+    else:
+        act_text = 'septum'
+    t.add_row([probabilities['lv'][i], probabilities['septum'][i], pred_text, act_text])
+print(t)
+
+# Conduct visualisations
+from sklearn.tree import export_graphviz
+import pydot
+
+for key in parameters:
+    # Pull out one tree from the forest
+    # tree = rf[key].estimators_[5] # Pull out one tree from the forest
+    for i, tree in enumerate(rf[key].estimators_):
+        # Export the image to a dot file
+        export_graphviz(tree, out_file='tree.dot', rounded=True, filled=True, precision=2, feature_names=metrics)
+        # Use dot file to create a graph
+        (graph,) = pydot.graph_from_dot_file('tree.dot')
+        # Write graph to a png file
+        graph.write_png('tree' + str(key) + '_' + str(i) + '.png')
+        if i > 10:
+            break

@@ -15,9 +15,13 @@ import vcg_analysis
 __all__ = ['Axes3D']    # Workaround to prevent Axes3D import statement to be labelled as unused
 
 
-def plot_xyz_components(vcg: Union[np.ndarray, List[np.ndarray]], dt: float = 2, legend: Optional[List[str]] = None,
-                        qrs_limits: Optional[List[List[float]]] = None, layout: Optional[str] = None,
-                        colours: Optional[List[List[float]]] = None, linestyles: Optional[List[str]] = None,
+def plot_xyz_components(vcg: Union[np.ndarray, List[np.ndarray]],
+                        dt: float = 2,
+                        legend: Optional[List[str]] = None,
+                        qrs_limits: Optional[List[List[float]]] = None,
+                        layout: Optional[str] = None,
+                        colours: Optional[List[List[float]]] = None,
+                        linestyles: Optional[List[str]] = None,
                         limit_colours: Optional[List[List[float]]] = None,
                         limit_linestyles: Optional[List[str]] = None) -> tuple:
     """
@@ -103,9 +107,12 @@ def plot_xyz_components(vcg: Union[np.ndarray, List[np.ndarray]], dt: float = 2,
     return fig, ax
 
 
-def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray], colours: Optional[list] = None,
-                                         linestyles: Optional[List[str]] = None, legend: Optional[List[str]] = None,
-                                         layout: Optional[str] = None, qrs_limits: Optional[List[List[float]]] = None,
+def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray],
+                                         colours: Optional[list] = None,
+                                         linestyles: Optional[List[str]] = None,
+                                         legend: Optional[List[str]] = None,
+                                         layout: Optional[str] = None,
+                                         qrs_limits: Optional[List[List[float]]] = None,
                                          limit_colours: Optional[list] = None,
                                          limit_linestyles: Optional[List[str]] = None) \
         -> Tuple[List[np.ndarray],
@@ -146,9 +153,9 @@ def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray], colours: 
         VCG data
     colours : list of tuple or list of list of float or list of str
         Colours to use to plot the VCG data
-    linestyles : list[str]
+    linestyles : list of str
         Linestyles to be used to plot data
-    legend : list[str] or list[None]
+    legend : list of str or list of None
         Labels for each VCG plot, default=None
     layout : str
         Assigned figure layout (used to determine the number of different colours/linestyles to be required)
@@ -222,8 +229,27 @@ def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray], colours: 
     return vcg, colours, linestyles, legend, layout, qrs_limits, limit_colours, limit_linestyles
 
 
-def __init_axes(layout):
-    """ Create and assign figure handles, including a dummy variable for the figure handles for cross-compatability """
+def __init_axes(layout: str) -> Tuple[Union[List[plt.figure], plt.figure], dict]:
+    """ Create and assign figure handles, including a dummy variable for the figure handles for cross-compatability
+
+    Parameters
+    ----------
+    layout : {'grid', 'figures', 'combined', 'row', 'column', 'best'}, str
+        Layout of resulting plot
+            grid        x,y,z plots are arranged in a grid (like best, but more rigid grid)
+            figures     Each x,y,z plot is on a separate figure
+            combined    x,y,z plots are combined on a single set of axes
+            row         x,y,z plots are arranged on a horizontal row in one figure
+            column      x,y,z plots are arranged in a vertical column in one figure
+            best        x,y,z plots are arranged to try and optimise space (nb: figures not equal sizes...)
+
+    Returns
+    -------
+    fig : List or plt.figure
+        Handles to the figures for plotting
+    ax : dict of plt.subplot
+        Handles to the axes for plotting
+    """
 
     if layout == 'figures':
         fig = [plt.figure() for _ in range(3)]
@@ -275,8 +301,23 @@ def __init_axes(layout):
     return fig, ax
 
 
-def __plot_limits(axes, limits, colours, linestyles):
-    """ Plot limits to a given plot (e.g. add line marking start of QRS complex) """
+def __plot_limits(axes: dict,
+                  limits: List[List[float]],
+                  colours: Union[List[tuple], List[List[float]], List[str]],
+                  linestyles: List[str]) -> None:
+    """ Add limits to a given plot (e.g. add line marking start of QRS complex)
+
+    Parameters
+    ----------
+    axes : dict
+        Handles to the axes to plot the limits to
+    limits : list of list of float
+        Limits to plot
+    colours : list of tuple or list of list of float or list of str
+        Colours to use to plot the VCG data
+    linestyles : list of str
+        Linestyles to be used to plot data
+    """
 
     if not isinstance(limits, list):
         limits = [limits]
@@ -287,35 +328,46 @@ def __plot_limits(axes, limits, colours, linestyles):
     return None
 
 
-def plot_2d(vcg_x, vcg_y, xlabel='VCG (x)', ylabel='VCG (y)', linestyle='-', colourmap='viridis', linewidth=3,
-            axis_limits=None, time_limits=None, fig=None):
+def plot_2d(vcg_x: np.ndarray,
+            vcg_y: np.ndarray,
+            xlabel: str = 'VCG (x)',
+            ylabel: str = 'VCG (y)',
+            linestyle: str = '-',
+            colourmap: str = 'viridis',
+            linewidth: float = 3,
+            axis_limits: Optional[Union[List[float], float]] = None,
+            time_limits: Optional[List[float]] = None,
+            fig: Optional[plt.figure] = None) -> plt.figure():
     """
     Plot x vs y (or y vs z, or other combination) for VCG trace, with line colour shifting to show time progression.
 
     Plot a colour-varying course of a VCG in 2D space
 
-    Input parameters (required):
-    ----------------------------
+    Parameters
+    ----------
+    vcg_x : list of float
+        VCG data to be plotted along the x-axis of the output
+    vcg_y : list of float
+        VCG data to be plotted along the y-axis of the output
+    xlabel, ylabel : str, optional
+        Label to apply to the x/y-axis, default='VCG (x)'/'VCG (y)'
+    linestyle : str, optional
+        Linestyle to apply to the plot, default='-'
+    colourmap : str, optional
+        Colourmap to use for the line, default='viridis'
+    linewidth : float, optional
+        Linewidth to use, default=3
+    axis_limits : list of float or float, optional
+        Limits to apply to the axes, default=None
+    time_limits : list of float, optional
+        Start and end time of data. If given, will add a colourbar to the plot, default=None
+    fig : plt.figure, optional
+        Handle to pre-existing figure (if present) on which to plot data, default=None
 
-    vcg_x       VCG data to be plotted along the x-axis of the output
-    vcg_y       VCG data to be plotted along the y-axis of the output
-
-    Input parameters (optional):
-    ----------------------------
-
-    xlabel          'VCG (x)'   Label to apply to the x-axis
-    ylabel          'VCG (y)'   Label to apply to the y-axis
-    linestyle       '-'         Linestyle to apply to the plot
-    colourmap       'viridis'   Colourmap to use for the line
-    linewidth       3           Linewidth to use
-    axis_limits     None        Limits to apply to the axes
-    time_limits     None        Start and end time of data. If given, will add a colourbar to the plot
-    fig             None        Handle to pre-existing figure (if present) on which to plot data
-
-    Output parameters:
-    ------------------
-
-    fig         Handle to output figure window
+    Returns
+    -------
+    fig : plt.figure
+        Handle to output figure window
 
     """
 
@@ -362,29 +414,37 @@ def plot_2d(vcg_x, vcg_y, xlabel='VCG (x)', ylabel='VCG (y)', linestyle='-', col
     return fig
 
 
-def plot_3d(vcg, linestyle='-', colourmap='viridis', linewidth=3, axis_limits=None, time_limits=None, fig=None):
+def plot_3d(vcg: np.ndarray,
+            linestyle: str = '-',
+            colourmap: str = 'viridis',
+            linewidth: float = 3,
+            axis_limits: Optional[Union[List[float], float]] = None,
+            time_limits: Optional[List[float]] = None,
+            fig: Optional[plt.figure] = None) -> plt.figure():
     """
     Plot the evolution of VCG in 3D space
 
-    Input parameters (required):
-    ----------------------------
+    Parameters
+    ----------
+    vcg : np.ndarray
+        VCG data
+    linestyle : str, optional
+        Linestyle to plot data, default='-'
+    colourmap : str, optional
+        Colourmap to use when plotting data, default='viridis'
+    linewidth : float, optional
+        Linewidth to use, default=3
+    axis_limits : list of float or float, optional
+        Limits to apply to the axes
+    time_limits : list of float, optional
+        Start and end time of data. If given, will add a colourbar to the plot
+    fig : plt.figure, optional
+        Handle to existing figure (if exists)
 
-    vcg     VCG data
-
-    Input parameters (optional):
-    ----------------------------
-
-    linestyle       '-'         Linestyle to plot data
-    colourmap       'viridis'   Colourmap to use when plotting data
-    linewidth       3           Linewidth to use
-    axis_limits     None        Limits to apply to the axes
-    time_limits     None        Start and end time of data. If given, will add a colourbar to the plot
-    fig             None        Handle to existing figure (if exists)
-
-    Output parameters:
-    ------------------
-
-    fig     Figure handle
+    Returns
+    -------
+    fig : plt.figure
+        Figure handle
     """
 
     vcg_x, vcg_y, vcg_z = __get_xyz_from_vcg(vcg)
@@ -418,26 +478,32 @@ def plot_3d(vcg, linestyle='-', colourmap='viridis', linewidth=3, axis_limits=No
     return fig
 
 
-def animate_3d(vcg, limits=None, linestyle='-', output_file='vcg_xyz.mp4'):
+def animate_3d(vcg: np.ndarray,
+               limits: Optional[Union[float, List[float], List[List[float]]]] = None,
+               linestyle: Optional[str] = '-',
+               colourmap: Optional[str] = 'viridis',
+               linewidth: Optional[float] = 3,
+               output_file: Optional[str] = 'vcg_xyz.mp4') -> None:
     """
     Animate the evolution of the VCG in 3D space, saving that animation to a file.
 
-    Input parameters (required):
-    ----------------------------
-
-    vcg         VCG data
-
-    Input parameters (optional):
-    ----------------------------
-
-    limits          None            Limits for the axes. If none, will set to the min/max values of the provided data
-    linestyle       '-'             Linestyle for the data
-    output_file     'vcg_xyz.mp4'   Name of the file to save the animation to
-
-    Output parameters:
-    ------------------
-
-    None
+    Parameters
+    ----------
+    vcg : np.ndarray
+        VCG data
+    limits : float or list of float or list of list of floats, optional
+        Limits for the axes. If none, will set to the min/max values of the provided data. Can provide either as:
+         1) a single value (+/- of that value applied to all axes)
+         2) [min, max] to be applied to all axes
+         3) [[xmin, xmax], [ymin, ymax], [zmin, zmax]]
+    linestyle : str, optional
+        Linestyle for the data, default='-'
+    colourmap : str, optional
+        Colourmap to use when plotting, default='viridis'
+    linewidth : float, optional
+        Linewidth when used to plot VCG, default=3
+    output_file : str, optional
+        Name of the file to save the animation to, default='vcg_xyz.mp4'
     """
 
     from matplotlib import animation
@@ -488,8 +554,20 @@ def animate_3d(vcg, limits=None, linestyle='-', output_file='vcg_xyz.mp4'):
     return None
 
 
-def __add_colourbar(limits, colourmap, n_elements):
-    """ Add arbitrary colourbar to a figure. """
+def __add_colourbar(limits: List[float],
+                    colourmap: str,
+                    n_elements: int) -> None:
+    """ Add arbitrary colourbar to a figure.
+
+    Parameters
+    ----------
+    limits : list of float
+        Numerical limits to apply
+    colourmap : str
+        Colourmap to be used
+    n_elements : int
+        Number of entries to be made in the colourmap index
+    """
 
     cmap = plt.get_cmap(colourmap, n_elements)
     norm = mpl.colors.Normalize(vmin=limits[0], vmax=limits[1])
@@ -499,7 +577,7 @@ def __add_colourbar(limits, colourmap, n_elements):
     return None
 
 
-def __get_xyz_from_vcg(vcg):
+def __get_xyz_from_vcg(vcg: np.ndarray) -> Tuple[list, list, list]:
     """ Extract individual elements of VCG (x, y, z). """
 
     if vcg.shape[0] == 3:
@@ -514,8 +592,45 @@ def __get_xyz_from_vcg(vcg):
     return vcg_x, vcg_y, vcg_z
 
 
-def plot_xyz_vector(vector=None, x=None, y=None, z=None, fig=None, linecolour='C0', linestyle='-', linewidth=2):
-    """ Plots a specific vector in 3D space (e.g. to reflect maximum dipole) """
+def plot_xyz_vector(vector: Optional[List[float]] = None,
+                    x: float = None,
+                    y: float = None,
+                    z: float = None,
+                    fig: plt.figure = None,
+                    linecolour: str = 'C0',
+                    linestyle: str = '-',
+                    linewidth: float = 2):
+    """ Plots a specific vector in 3D space (e.g. to reflect maximum dipole)
+
+    Parameters
+    ----------
+    vector : list of float
+        [x, y, z] values of vector to plot, alternatively given as separate x, y, z variables
+    x, y, z : float
+        [x, y, z] values of vector to plot, alternatively given as vector variable
+    fig : plt.figure, optional
+        Existing figure handle, if desired to plot the vector onto an extant plot
+    linecolour : str, optional
+        Colour to plot the vector as
+    linestyle : str, optional
+        Linestyle to use to plot the body of the arrow
+    linewidth : float, optional
+        Width to plot the body of the arrow
+
+    Returns
+    -------
+    fig : plt.figure
+        Figure handle
+
+    Raises
+    ------
+    ValueError
+        Exactly one of vertices and x,y,z must be given
+
+    Notes
+    -----
+    Must provide either vector or [x,y,z]
+    """
     # draw a vector
     from matplotlib.patches import FancyArrowPatch
     from mpl_toolkits.mplot3d import proj3d
@@ -571,8 +686,24 @@ def plot_xyz_vector(vector=None, x=None, y=None, z=None, fig=None, linecolour='C
     return fig
 
 
-def __set_axis_limits(data, ax, unit_min=True, axis_limits=None):
-    """ Set axis limits (not automatic for line collections) """
+def __set_axis_limits(data: List[np.ndarray],
+                      ax,
+                      unit_min: bool = True,
+                      axis_limits: Optional[Union[List[float], float]] = None) -> None:
+    """ Set axis limits (not automatic for line collections, so needs to be done manually)
+
+    Parameters
+    ----------
+    data : list of np.ndarray
+        Data that has been plotted
+    ax
+        Handles to the axes that need to be adjusted
+    unit_min : bool, optional
+        Whether to have the axes set to, as a minimum, unit length
+    axis_limits : list of float or float, optional
+        Min/max values for axes, either as one value (i.e. min=-max), or two separate values. Same axis limits will
+        be applied to all dimensions
+    """
     if axis_limits is None:
         ax_min = min([i.min() for i in data])
         ax_max = max([i.max() for i in data])
@@ -601,8 +732,14 @@ def __set_axis_limits(data, ax, unit_min=True, axis_limits=None):
     return None
 
 
-def add_unit_sphere(ax):
-    """ Add a unit sphere to a 3D plot"""
+def add_unit_sphere(ax) -> None:
+    """ Add a unit sphere to a 3D plot
+
+    Parameters
+    ----------
+    ax
+        Handles to axes
+    """
     u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
     x = np.cos(u) * np.sin(v)
     y = np.sin(u) * np.sin(v)
@@ -611,12 +748,26 @@ def add_unit_sphere(ax):
     return None
 
 
-def add_xyz_axes(ax, axis_limits=None, symmetrical_axes=False, equal_limits=False, unit_axes=False):
+def add_xyz_axes(ax,
+                 axis_limits: Optional[Union[float, List[float], List[List[float]]]] = None,
+                 symmetrical_axes: bool = False,
+                 equal_limits: bool = False,
+                 unit_axes: bool = False) -> None:
     """ Plot dummy axes (can't move splines in 3D plots)
-        ax                  Axis handles
-        symmetrical_axes    Boolean: apply same limits to x, y and z axes
-        equal_limits        Boolean: set axis minimum to minus axis maximum (or vice versa)
-        unit_axes           Boolean: apply minimum of -1 -> 1 for axis limits
+
+    Parameters
+    ----------
+    ax
+        Axis handles
+    axis_limits : float or list of float or list of list of float, optional
+        Axis limits, either same for all dimensions (min=-max), or individual limits ([min, max]), or individual limits
+        for each dimension
+    symmetrical_axes : bool, optional
+        Apply same limits to x, y and z axes
+    equal_limits : bool, optional
+        Set axis minimum to minus axis maximum (or vice versa)
+    unit_axes : bool, optional
+        Apply minimum of -1 -> 1 for axis limits
     """
 
     """ Construct dummy 3D axes - make sure they're equal sizes """
@@ -718,7 +869,25 @@ def add_xyz_axes(ax, axis_limits=None, symmetrical_axes=False, equal_limits=Fals
     return None
 
 
-def __set_symmetrical_axis_limits(ax_min, ax_max, unit_axes=False):
+def __set_symmetrical_axis_limits(ax_min: float,
+                                  ax_max: float,
+                                  unit_axes: bool = False) -> Tuple[float, float]:
+    """Sets symmetrical limits for a series of axes
+
+    Parameters
+    ----------
+    ax_min : float
+        Minimum value for axes
+    ax_max : float
+        Maximum value for axes
+    unit_axes : bool, optional
+        Whether to apply a minimum axis range of [-1,1]
+
+    Returns
+    -------
+    ax_min, ax_max : float
+        Symmetrical axis limits, where ax_min=-ax_max
+    """
     if abs(ax_min) > abs(ax_max):
         ax_max = -ax_min
     else:
@@ -731,8 +900,31 @@ def __set_symmetrical_axis_limits(ax_min, ax_max, unit_axes=False):
     return ax_min, ax_max
 
 
-def plot_arc3d(vector1, vector2, radius=0.2, fig=None, colour='C0'):
-    """ Plot arc between two given vectors in 3D space. """
+def plot_arc3d(vector1: List[float],
+               vector2: List[float],
+               radius: float = 0.2,
+               fig: plt.figure = None,
+               colour: str = 'C0') -> plt.figure:
+    """ Plot arc between two given vectors in 3D space.
+
+    Parameters
+    ----------
+    vector1 : list of float
+        First vector
+    vector2 : list of float
+        Second vector
+    radius : float, optional
+        Radius of arc to plot on figure
+    fig : plt.figure, optional
+        Handle of figure on which to plot the arc. If not given, will produce new figure
+    colour : str, optional
+        Colour in which to display the arc
+
+    Returns
+    -------
+    fig : plt.figure
+        Handle for figure on which arc has been plotted
+    """
 
     """ Confirm correct input arguments """
     assert len(vector1) == 3
@@ -765,13 +957,51 @@ def plot_arc3d(vector1, vector2, radius=0.2, fig=None, colour='C0'):
     return fig
 
 
-def plot_spatial_velocity(vcg, sv=None, qrs_limits=None, fig=None, legend=None, t_end=200, dt=2, filter_sv=True):
-    """ Plot the spatial velocity and VCG elements, with limits (e.g. QRS limits) if provided. Note that if spatial
-        velocity is not provided, default values will be used to calculate it - if anything else is desired,
-        then spatial velocity must be calculated first and provided to the function.
+def plot_spatial_velocity(vcg: np.ndarray,
+                          sv: Optional[List[List[float]]] = None,
+                          qrs_limits: Optional[List[List[float]]] = None,
+                          fig: plt.figure = None,
+                          legend_vcg: Optional[List[str], str] = None,
+                          t_end: int = 200,
+                          dt: int = 2,
+                          filter_sv: bool = True) -> Tuple:
+    """ Plot the spatial velocity for given VCG data
+
+    Plot the spatial velocity and VCG elements, with limits (e.g. QRS limits) if provided. Note that if spatial
+    velocity is not provided, default values will be used to calculate it - if anything else is desired, then spatial
+    velocity must be calculated first and provided to the function.
+
+    Parameters
+    ----------
+    vcg : np.ndarray
+        VCG data
+    sv : list of list of float, optional
+        Spatial velocity data. Only required to be given here if special parameters wish to be given, otherwise it
+        will be calculated using default paramters (default)
+    qrs_limits : list of list of float, optional
+        A series of 'limits' to be plotted on the figure with the VCG and spatial plot. Presented as a list of the
+        same length of the VCG data, with the required limits within:
+            e.g. [[QRS_start1, QRS_end1, ...], [QRS_start2, QRS_end, ...], ...]
+        Default=None
+    fig : plt.figure, optional
+        Handle to existing figure, if data is wished to be plotted on existing plot, default=None
+    legend_vcg : str or list of str, optional
+        Labels to apply to the VCG/SV data, default=None
+    t_end : int, optional
+        Duration of the data, default=200
+    dt : int, optional
+        Time step between successive data points, default=2
+    filter_sv : bool, optional
+        Whether or not to apply filtering to spatial velocity prior to finding the start/end points for the
+        threshold, default=True
+
+    Returns
+    -------
+    fig
+    ax
     """
 
-    vcg, legend = __plot_spatial_velocity_preprocess_inputs(vcg, legend)
+    vcg, legend_vcg = __plot_spatial_velocity_preprocess_inputs(vcg, legend_vcg)
     fig, ax, colours = __plot_spatial_velocity_prep_axes(vcg, fig)
     x_val, sv = __plot_spatial_velocity_get_plot_data(sv, vcg, t_end, dt, filter_sv)
 
@@ -779,7 +1009,7 @@ def plot_spatial_velocity(vcg, sv=None, qrs_limits=None, fig=None, legend=None, 
     i_colour_init = get_i_colour(ax['sv'])
     i_colour = i_colour_init
     x_vcg_data = list(range(0, t_end + dt, dt))
-    for (sim_x, sim_vcg, sim_sv, sim_label) in zip(x_val, vcg, sv, legend):
+    for (sim_x, sim_vcg, sim_sv, sim_label) in zip(x_val, vcg, sv, legend_vcg):
         __plot_spatial_velocity_plot_data(sim_x, sim_sv, x_vcg_data, sim_vcg, sim_label, colours[i_colour], ax)
         i_colour += 1
 
@@ -795,8 +1025,8 @@ def plot_spatial_velocity(vcg, sv=None, qrs_limits=None, fig=None, legend=None, 
                 __plot_spatial_velocity_plot_limits(sim_qrs_limit, ax, colours[i_colour])
                 i_colour += 1
 
-    """ Add legend (or legend for limits, if appropriate """
-    if legend[0] is not None:
+    """ Add legend_vcg (or legend_vcg for limits, if appropriate """
+    if legend_vcg[0] is not None:
         labels = [line.get_label() for line in ax['sv'].get_lines()]
         plt.rc('text', usetex=True)
         ax['sv'].legend(labels)
@@ -804,9 +1034,42 @@ def plot_spatial_velocity(vcg, sv=None, qrs_limits=None, fig=None, legend=None, 
     return fig, ax
 
 
-def plot_spatial_velocity_multilimit(vcg, sv=None, qrs_limits=None, fig=None, legend=None, t_end=200, dt=2,
-                                     filter_sv=True):
-    """ Plot a single instance of a spatial velocity curve, but with multiple limits for QRS """
+def plot_spatial_velocity_multilimit(vcg: np.ndarray,
+                                     sv: Optional[List[List[float]]] = None,
+                                     qrs_limits: Optional[List[List[float]]] = None,
+                                     fig: plt.figure = None,
+                                     legend: Optional[List[str], str] = None,
+                                     t_end: int = 200,
+                                     dt: int = 2,
+                                     filter_sv: bool = True) -> None:
+    """ Plot a single instance of a spatial velocity curve, but with multiple limits for QRS
+
+    DEPRECATED: Plan to integrate into plot_spatial_velocity
+
+    Parameters
+    ----------
+    vcg : np.ndarray
+        VCG data
+    sv : list of list of float, optional
+        Spatial velocity data. Only required to be given here if special parameters wish to be given, otherwise it
+        will be calculated using default paramters (default)
+    qrs_limits : list of list of float, optional
+        A series of 'limits' to be plotted on the figure with the VCG and spatial plot. Presented as a list of the
+        same length of the VCG data, with the required limits within:
+            e.g. [[QRS_start1, QRS_end1, ...], [QRS_start2, QRS_end, ...], ...]
+        Default=None
+    fig : plt.figure, optional
+        Handle to existing figure, if data is wished to be plotted on existing plot, default=None
+    legend : str or list of str, optional
+        Labels to apply to the limits, default=None
+    t_end : int, optional
+        Duration of the data, default=200
+    dt : int, optional
+        Time step between successive data points, default=2
+    filter_sv : bool, optional
+        Whether or not to apply filtering to spatial velocity prior to finding the start/end points for the
+        threshold, default=True
+    """
 
     """ Confirm VCG and limit data are correctly formatted """
     assert isinstance(vcg, np.ndarray)
@@ -837,7 +1100,9 @@ def plot_spatial_velocity_multilimit(vcg, sv=None, qrs_limits=None, fig=None, le
     return None
 
 
-def __plot_spatial_velocity_preprocess_inputs(vcg, legend):
+def __plot_spatial_velocity_preprocess_inputs(vcg: Union[np.ndarray, List[np.ndarray]],
+                                              legend: Union[str, List[str]])\
+        -> Tuple[List[np.ndarray], List[Optional[str]]]:
     """ Preprocess other inputs """
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
@@ -851,7 +1116,8 @@ def __plot_spatial_velocity_preprocess_inputs(vcg, legend):
     return vcg, legend
 
 
-def __plot_spatial_velocity_prep_axes(vcg, fig):
+def __plot_spatial_velocity_prep_axes(vcg: List[np.ndarray],
+                                      fig: plt.figure) -> Tuple:
     """ Prepare figure and axes """
     if fig is None:
         fig = plt.figure()
@@ -893,7 +1159,11 @@ def __plot_spatial_velocity_prep_axes(vcg, fig):
     return fig, ax, colours
 
 
-def __plot_spatial_velocity_get_plot_data(sv, vcg, t_end, dt, filter_sv):
+def __plot_spatial_velocity_get_plot_data(sv: List[List[float]],
+                                          vcg: np.ndarray,
+                                          t_end: float,
+                                          dt: float,
+                                          filter_sv: bool) -> Tuple[List[float], List[List[float]]]:
     """ Prepare spatial velocity """
     if sv is None:
         x_val, sv, _, _ = vcg_analysis.get_spatial_velocity(vcg=vcg, t_end=t_end, dt=dt, filter_sv=filter_sv)
@@ -904,7 +1174,8 @@ def __plot_spatial_velocity_get_plot_data(sv, vcg, t_end, dt, filter_sv):
     return x_val, sv
 
 
-def __plot_spatial_velocity_plot_data(x_sv_data, sv_data, x_vcg_data, vcg_data, data_label, plot_colour, ax):
+def __plot_spatial_velocity_plot_data(x_sv_data: List[float], sv_data: List[float], x_vcg_data: List[float],
+                                      vcg_data: List[float], data_label: str, plot_colour: str, ax: dict) -> None:
     ax['vcg_x'].plot(x_vcg_data, vcg_data[:, 0], color=plot_colour)
     ax['vcg_y'].plot(x_vcg_data, vcg_data[:, 1], color=plot_colour)
     ax['vcg_z'].plot(x_vcg_data, vcg_data[:, 2], color=plot_colour)
@@ -912,7 +1183,9 @@ def __plot_spatial_velocity_plot_data(x_sv_data, sv_data, x_vcg_data, vcg_data, 
     return None
 
 
-def __plot_spatial_velocity_plot_limits(qrs_limit, ax, limit_colour):
+def __plot_spatial_velocity_plot_limits(qrs_limit: float,
+                                        ax: dict,
+                                        limit_colour: str) -> None:
     for key in ax:
         ax[key].axvspan(qrs_limit, qrs_limit+0.1, color=limit_colour, alpha=0.5)
     return None
@@ -929,10 +1202,67 @@ def get_i_colour(axis_handle):
             return len(axis_handle.lines)-1
 
 
-def plot_metric_change(metrics, metrics_phi, metrics_rho, metrics_z, metric_name, metrics_lv=None,
-                       labels=None, scattermarkers=None, linemarkers=None, colours=None, linestyles=None,
-                       layout=None, axis_match=True, no_labels=False):
-    """ Function to plot all the various figures for trend analysis in one go. """
+def plot_metric_change(metrics: List[List[List[float]]],
+                       metrics_phi: List[List[List[float]]],
+                       metrics_rho: List[List[List[float]]],
+                       metrics_z: List[List[List[float]]],
+                       metric_name: str,
+                       metrics_lv: List[bool] = None,
+                       labels: List[str] = None,
+                       scattermarkers: List[str] = None,
+                       linemarkers: List[str] = None,
+                       colours: List[str] = None,
+                       linestyles: List[str] = None,
+                       layout: str = None,
+                       axis_match: bool = True,
+                       no_labels: bool = False) -> Tuple:
+    """ Function to plot all the various figures for trend analysis in one go.
+
+    TODO: labels parameter seems redundant - potentially remove
+
+    Parameters
+    ----------
+    metrics : list of list of list of float
+        Complete list of all metric data recorded
+        [phi+rho+z+size+other]
+    metrics_phi : list of list of list of float
+        Metric data recorded for scar size variations in phi UVC
+    metrics_rho : list of list of list of float
+        Metric data recorded for scar size variations in rho UVC
+    metrics_z : list of list of list of float
+        Metric data recorded for scar size variations in z UVC
+    metric_name : str
+        Name of metric being plotted (for labelling purposes). Can incorporate LaTeX typesetting.
+    metrics_lv : list of bool, optional
+        Boolean to distinguish whether metrics being plotted are for LV or septal data, default=[True, False]
+    labels : list of str, optional
+        Labels for the data sets being plotted, default=['LV', 'Septum']
+    scattermarkers : list of str, optional
+        Markers to use to plot the data on the scatterplots, default=['+', 'o', 'D', 'v', '^', 's', '*', 'x']
+    linemarkers : list of str, optional
+        Markers to use on the line plots to indicate discrete data points, required to be at least as long as
+        the longest line plot to be drawn (rho), default=['.' for _ in range(len(metrics_rho))]
+    colours : list of str, optional
+        Sequence of colours to plot data (if plotting LV and septal data, will require two different colours to allow
+        them to be distinguished), default=common_analysis.get_plot_colours(len(metrics_rho))
+    linestyles : list of str, optional
+        Linestyles to be used for plotting the data on lineplots, default=['-' for _ in range(len(metrics_rho))]
+    layout : {'combined', 'figures'}, optional
+        String specifying the output, whether all plots should be combined into one figure window (default), or whether
+        individual figure windows should be plotted for each plot
+    axis_match : bool, optional
+        Whether to make sure all plotted figures share the same axis ranges, default=True
+    no_labels : bool, optional
+        Whether to have labels on the figures, or not - having no labels can make it far easier to 'prettify' the
+        figures manually later in Inkscape, default=False
+
+    Returns
+    -------
+    fig : plt.figure or dict of plt.figure
+        Handle to figure(s)
+    ax : dict
+        Handles to axes
+    """
     plt.rc('text', usetex=True)
 
     """ Underlying constants (volumes, sizes, labels, etc.) """
@@ -1133,7 +1463,7 @@ def plot_metric_change(metrics, metrics_phi, metrics_rho, metrics_z, metric_name
     return fig, ax
 
 
-def __set_metric_to_metrics(metric):
+def __set_metric_to_metrics(metric: Union[List, List[List[float]]]):
     """ Function to change single list of metrics to list of one entry if required (so loops work correctly) """
     if not isinstance(metric[0], list):
         return [metric]
@@ -1141,8 +1471,33 @@ def __set_metric_to_metrics(metric):
         return metric
 
 
-def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_labels, layout=None):
-    """ Plots a bar chart for the observed metrics. """
+def plot_metric_change_barplot(metrics_cont: List[List[float]],
+                               metrics_lv: List[List[float]],
+                               metrics_sept: List[List[float]],
+                               metric_labels: List[str],
+                               layout: str = None) -> Tuple:
+    """ Plots a bar chart for the observed metrics.
+
+    Parameters
+    ----------
+    metrics_cont : list of list of float
+        Values of series of metrics for no scar
+    metrics_lv : list of list of float
+        Values of series of metrics for LV scar
+    metrics_sept : list of list of float
+        Values of series of metrics for septal scar
+    metric_labels : list of str
+        Names of metrics being plotted
+    layout : {'combined', 'fig'}, optional
+        Whether to plot bar charts on combined plot window, or in individual figure windows
+
+    Returns
+    -------
+    fig : plt.figure or list of plt.figure
+        Handle(s) to figures
+    ax: list
+        Handles to axes
+    """
 
     """ Conduct initial checks, and set up values appropriate to plotting """
     assert len(metrics_cont) == len(metrics_lv)
@@ -1193,9 +1548,34 @@ def plot_metric_change_barplot(metrics_cont, metrics_lv, metrics_sept, metric_la
     return fig, axes
 
 
-def plot_density_effect(metrics, metric_name, metric_labels=None, density_labels=None, linestyles=None, colours=None,
-                        markers=None):
-    """ Plot the effect of density on metrics. """
+def plot_density_effect(metrics: List[List[float]],
+                        metric_name: str,
+                        metric_labels: List[str] = None,
+                        density_labels: List[str] = None,
+                        linestyles: List[str] = None,
+                        colours: List[str] = None,
+                        markers: List[str] = None):
+    """ Plot the effect of density on metrics.
+
+    TODO: look into decorator for the LaTeX preamble?
+
+    Parameters
+    ----------
+    metrics : list of list of float
+        Effects of scar density on given metrics, presented as e.g. [metric_LV, metric_septum]
+    metric_name : str
+        Name of metric being assessed
+    metric_labels : list of str, optional
+        Labels for the metrics being plotted, default=['LV', 'Septum']
+    density_labels : list of str, optional
+        Labels for the different scar densities being plotted
+    linestyles : list of str, optional
+        Linestyles for the density effect plots, default=['-' for _ in range(len(metrics))]
+    colours : list of str, optional
+        Colours to use for the plot, default=common_analysis.get_plot_colours(len(metrics))
+    markers : list of str, optional
+        Markers to use for the discrete data points in the plot, default=['o' for _ in range(len(metrics))]
+    """
     preamble = {
         'text.usetex': True,
         'text.latex.preamble': [r'\usepackage{amsmath}']

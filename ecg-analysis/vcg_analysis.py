@@ -168,7 +168,8 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray], velocity_offs
     matlab_match : bool, optional
         Apply fudge factor to match Matlab results, default=False
     filter_sv : bool, optional
-        Whether or not to apply filtering to spatial velocity prior to finding the start/end points for the threshold
+        Whether or not to apply filtering to spatial velocity prior to finding the start/end points for the
+        threshold, default=True
     low_p : float, optional
         Low frequency for bandpass filter, default=40
     order : int, optional

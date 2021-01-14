@@ -1,13 +1,14 @@
 import sys
 import numpy as np
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Tuple
 
-# Add carputils functions
-sys.path.append('/home/pg16/software/carputils/')
+# Add carputils functions (https://git.opencarp.org/openCARP/carputils)
+# sys.path.append('/home/pg16/software/carputils/')
+sys.path.append('/home/philip/Documents/carputils/')
 from carputils.carpio import igb
 
 
-def get_ecg(phie_file: Union[List[str], str], electrode_file: Optional[str] = None) -> List[dict]:
+def get_ecg_from_igb(phie_file: Union[List[str], str], electrode_file: Optional[str] = None) -> List[dict]:
     """
     Translate the phie.igb file(s) to 10-lead, 12-trace ECG data
 
@@ -123,3 +124,41 @@ def convert_electrodes_to_ecg(electrode_data: dict) -> dict:
     ecg['aVF'] = electrode_data['LL']-0.5*(electrode_data['LA']+electrode_data['RA'])
 
     return ecg
+
+
+def get_ecg_from_dat(ecg_file: str) -> Tuple[dict, np.ndarray]:
+    """Read ECG data from .dat file
+
+    Parameters
+    ----------
+    ecg_file : str
+        Name/location of the .dat file to read
+
+    Returns
+    -------
+    ecg : dict
+        Extracted data for the 12-lead ECG
+    t_steps : np.ndarray
+        Time data associated with the ECG data
+    """
+    ecgdata = np.loadtxt(ecg_file, dtype=float)
+    t_steps = ecgdata[:, 0]
+
+    ecg = dict()
+    # Limb Leads
+    ecg['LI'] = ecgdata[:, 1]
+    ecg['LII'] = ecgdata[:, 2]
+    ecg['LIII'] = ecgdata[:, 3]
+    # Augmented leads
+    ecg['aVR'] = ecgdata[:, 4]
+    ecg['aVL'] = ecgdata[:, 5]
+    ecg['aVF'] = ecgdata[:, 6]
+    # Precordeal leads
+    ecg['V1'] = ecgdata[:, 7]
+    ecg['V2'] = ecgdata[:, 8]
+    ecg['V3'] = ecgdata[:, 9]
+    ecg['V4'] = ecgdata[:, 10]
+    ecg['V5'] = ecgdata[:, 11]
+    ecg['V6'] = ecgdata[:, 12]
+
+    return ecg, t_steps

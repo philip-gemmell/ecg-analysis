@@ -337,7 +337,7 @@ def plot_2d(vcg_x: np.ndarray,
             linewidth: float = 3,
             axis_limits: Optional[Union[List[float], float]] = None,
             time_limits: Optional[List[float]] = None,
-            fig: Optional[plt.figure] = None) -> plt.figure():
+            fig: Optional[plt.figure] = None) -> plt.figure:
     """
     Plot x vs y (or y vs z, or other combination) for VCG trace, with line colour shifting to show time progression.
 
@@ -420,7 +420,7 @@ def plot_3d(vcg: np.ndarray,
             linewidth: float = 3,
             axis_limits: Optional[Union[List[float], float]] = None,
             time_limits: Optional[List[float]] = None,
-            fig: Optional[plt.figure] = None) -> plt.figure():
+            fig: Optional[plt.figure] = None) -> plt.figure:
     """
     Plot the evolution of VCG in 3D space
 
@@ -569,15 +569,17 @@ def __add_colourbar(limits: List[float],
         Number of entries to be made in the colourmap index
     """
 
+    # from matplotlib import colors.Normalize
+
     cmap = plt.get_cmap(colourmap, n_elements)
     norm = mpl.colors.Normalize(vmin=limits[0], vmax=limits[1])
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
+    sm.set_array(np.ndarray([]))
     plt.colorbar(sm)
     return None
 
 
-def __get_xyz_from_vcg(vcg: np.ndarray) -> Tuple[list, list, list]:
+def __get_xyz_from_vcg(vcg: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """ Extract individual elements of VCG (x, y, z). """
 
     if vcg.shape[0] == 3:
@@ -748,7 +750,7 @@ def add_unit_sphere(ax) -> None:
     return None
 
 
-def add_xyz_axes(ax,
+def add_xyz_axes(ax: Axes3D,
                  axis_limits: Optional[Union[float, List[float], List[List[float]]]] = None,
                  symmetrical_axes: bool = False,
                  equal_limits: bool = False,
@@ -823,9 +825,9 @@ def add_xyz_axes(ax,
             y_max = axis_limits[1][1]
             z_min = axis_limits[2][0]
             z_max = axis_limits[2][1]
-    ax.set_xlim([x_min, x_max])
-    ax.set_ylim([y_min, y_max])
-    ax.set_zlim([z_min, z_max])
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
+    ax.set_zlim(z_min, z_max)
     x_ticks = ax.get_xticks()
     y_ticks = ax.get_yticks()
     z_ticks = ax.get_zticks()
@@ -933,7 +935,8 @@ def plot_arc3d(vector1: List[float],
     """ Calculate vector between two vector end points, and the resulting spherical angles for various points along 
         this vector. From this, derive points that lie along the arc between vector1 and vector2 """
     v = [i-j for i, j in zip(vector1, vector2)]
-    v_points_direct = [(vector2[0]+v[0]*l, vector2[1]+v[1]*l, vector2[2]+v[2]*l) for l in np.linspace(0, 1)]
+    v_points_direct = [(vector2[0]+v[0]*v_distance, vector2[1]+v[1]*v_distance, vector2[2]+v[2]*v_distance)
+                       for v_distance in np.linspace(0, 1)]
     v_phis = [atan2(v_point[1], v_point[0]) for v_point in v_points_direct]
     v_thetas = [acos(v_point[2]/np.linalg.norm(v_point)) for v_point in v_points_direct]
 
@@ -1038,7 +1041,7 @@ def plot_spatial_velocity_multilimit(vcg: np.ndarray,
                                      sv: Optional[List[List[float]]] = None,
                                      qrs_limits: Optional[List[List[float]]] = None,
                                      fig: plt.figure = None,
-                                     legend: Optional[List[str], str] = None,
+                                     legend: Optional[Union[List[str], str]] = None,
                                      t_end: int = 200,
                                      dt: int = 2,
                                      filter_sv: bool = True) -> None:
@@ -1072,7 +1075,8 @@ def plot_spatial_velocity_multilimit(vcg: np.ndarray,
     """
 
     """ Confirm VCG and limit data are correctly formatted """
-    assert isinstance(vcg, np.ndarray)
+    if isinstance(vcg, np.ndarray):
+        vcg = [vcg]
     for qrs_limit in qrs_limits:
         assert len(qrs_limit) == len(qrs_limits[0])
 
@@ -1160,7 +1164,7 @@ def __plot_spatial_velocity_prep_axes(vcg: List[np.ndarray],
 
 
 def __plot_spatial_velocity_get_plot_data(sv: List[List[float]],
-                                          vcg: np.ndarray,
+                                          vcg: List[np.ndarray],
                                           t_end: float,
                                           dt: float,
                                           filter_sv: bool) -> Tuple[List[float], List[List[float]]]:

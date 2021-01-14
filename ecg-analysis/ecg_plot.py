@@ -1,13 +1,22 @@
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # type: ignore
+import numpy as np  # type: ignore
 from typing import Union, Optional, List, Tuple
 
 import common_analysis as ca
 
 
-def plot(ecg: Union[List[dict], dict], dt: Union[int, float] = 2, legend: Optional[List[str]] = None,
-         linewidth: float = 3, qrs_limits: Union[list, float, None] = None, plot_sequence: Optional[List[str]] = None,
-         single_fig: bool = True, colours: Optional[list] = None, linestyles: Optional[List[str]] = None,
-         fig: Optional = None, ax: Optional = None) -> tuple:
+def plot(ecg: Union[List[dict], dict],
+         time: np.ndarray = None,
+         dt: Union[int, float] = 2,
+         legend: Optional[List[str]] = None,
+         linewidth: float = 3,
+         qrs_limits: Union[list, float, None] = None,
+         plot_sequence: Optional[List[str]] = None,
+         single_fig: bool = True,
+         colours: Union[List[str], List[List[float]], List[Tuple[float]], None] = None,
+         linestyles: Optional[List[str]] = None,
+         fig: Optional[plt.figure] = None,
+         ax=None) -> tuple:
     """
     Plot and label the ECG data from simulation(s). Optional to add in QRS start/end boundaries for plotting
 
@@ -15,8 +24,10 @@ def plot(ecg: Union[List[dict], dict], dt: Union[int, float] = 2, legend: Option
     ----------
     ecg : dict or list
         Dictionary or list of dictionaries for ECG data, with dictionary keys corresponding to the trace name
+    time : np.ndarray
+        Time data for the ECG (given as opposed to dt), default=None
     dt : int or float, optional
-        Time interval at which data is recorded, default=2
+        Time interval at which data is recorded, given as opposed to t, default=2
     legend : list of str, optional
         List of names for each given set of ECG data e.g. ['BCL=300ms', 'BCL=600ms']
     linewidth : float, optional
@@ -29,8 +40,9 @@ def plot(ecg: Union[List[dict], dict], dt: Union[int, float] = 2, legend: Option
     single_fig : bool, optional
         If true, will plot all axes on a single figure window. If false, will plot each axis on a separate figure
         window. Default is True
-    colours : list, optional
-        Colours to be used to plot ECG traces. Will default to common_analysis.get_plot_colours()
+    colours : str or list of str or list of list/tuple of float, optional
+        Colours to be used to plot ECG traces. Can provide as either string (e.g. 'b') or as RGB values (floats). Will
+        default to common_analysis.get_plot_colours()
     linestyles : str or list, optional
         Linestyles to be used to plot ECG traces. Will default to '-'
     fig : optional
@@ -50,6 +62,8 @@ def plot(ecg: Union[List[dict], dict], dt: Union[int, float] = 2, legend: Option
     ------
     AssertionError
         Checks that various list lengths are the same
+    TypeError
+        If input argument is given in an unexpected format
     """
 
     # Prepare axes and inputs
@@ -65,18 +79,25 @@ def plot(ecg: Union[List[dict], dict], dt: Union[int, float] = 2, legend: Option
         colours = ca.get_plot_colours(len(ecg))
     elif isinstance(colours, list):
         assert len(colours) == len(ecg), "Length of colour plotting list must be same as length of ECG data"
-    else:
+    elif isinstance(colours, str):
         colours = [colours for _ in ecg]
+    else:
+        raise TypeError('colours variable not entered correctly, and not planned for.')
 
     if linestyles is None:
         linestyles = ['-' for _ in ecg]
     elif isinstance(linestyles, list):
         assert len(linestyles) == len(ecg), "Length of linestyle list must be same as length of ECG data"
-    else:
+    elif isinstance(linestyles, str):
         linestyles = [linestyles for _ in ecg]
+    else:
+        raise TypeError('linestyles variable not entered correctly, and not planned for.')
 
     # Plot data
-    time = [i*dt for i in range(len(ecg[0]['V1']))]
+    if time is None:
+        time = [i*dt for i in range(len(ecg[0]['V1']))]
+    else:
+        assert(len(time) == len(ecg[0]['V1']))
     for (sim_ecg, sim_label, sim_colour, sim_linestyle) in zip(ecg, legend, colours, linestyles):
         for key in plot_sequence:
             ax[key].plot(time, sim_ecg[key], linewidth=linewidth, label=sim_label, color=sim_colour,
@@ -84,6 +105,9 @@ def plot(ecg: Union[List[dict], dict], dt: Union[int, float] = 2, legend: Option
 
     # Add QRS limits, if supplied
     if qrs_limits is not None:
+        if isinstance(qrs_limits, float):
+            qrs_limits = [qrs_limits]
+
         # Cycle through each limit provided, e.g. QRS start, QRS end...
         for qrs_limit in qrs_limits:
             __plot_limits(ax, qrs_limit, colours, linestyles)
@@ -96,7 +120,8 @@ def plot(ecg: Union[List[dict], dict], dt: Union[int, float] = 2, legend: Option
     return fig, ax
 
 
-def __process_inputs(ecg: Union[List[dict], dict], legend: Union[None, List[str]]) -> Tuple[List[dict], List[str]]:
+def __process_inputs(ecg: Union[List[dict], dict],
+                     legend: Union[None, List[str]]) -> Tuple[List[dict], Union[List[str], List[None]]]:
     """
     Process input arguments
 
@@ -134,7 +159,8 @@ def __process_inputs(ecg: Union[List[dict], dict], legend: Union[None, List[str]
     return ecg, legend
 
 
-def __init_axes(plot_sequence: List[str], single_fig: bool = True):
+def __init_axes(plot_sequence: List[str],
+                single_fig: bool = True):
     """
     Initialise figure and axis handles
 
@@ -175,7 +201,10 @@ def __init_axes(plot_sequence: List[str], single_fig: bool = True):
     return fig, ax
 
 
-def __plot_limits(ax, limits: Union[List[float], float], colours: List[List[float]], linestyles: List[str]) -> None:
+def __plot_limits(ax,
+                  limits: Union[List[float], float],
+                  colours: Union[List[List[float]], List[Tuple[float]], List[str]],
+                  linestyles: List[str]) -> None:
     """
     Add limit markers to a given plot (e.g. add line marking start of QRS complex)
 
@@ -185,7 +214,7 @@ def __plot_limits(ax, limits: Union[List[float], float], colours: List[List[floa
         Handle to axis
     limits: list of float or float
         Limits to plot on the axis
-    colours : list of list of float
+    colours : list of list/tuple of float or list of str
         RGB values of colours for the individual limits to plot. For plotting n limits, then should be given as
         [[R1, G1, B1], [R2, G2, B2], ... [Rn, Gn, Bn]]
     linestyles : list of str

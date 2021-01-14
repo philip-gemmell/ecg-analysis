@@ -1,11 +1,11 @@
 import sys
-import numpy as np
+import numpy as np  # type: ignore
 from typing import Union, List, Optional, Tuple
 
 # Add carputils functions (https://git.opencarp.org/openCARP/carputils)
 # sys.path.append('/home/pg16/software/carputils/')
 sys.path.append('/home/philip/Documents/carputils/')
-from carputils.carpio import igb
+from carputils.carpio import igb  # type: ignore
 
 
 def get_ecg_from_igb(phie_file: Union[List[str], str], electrode_file: Optional[str] = None) -> List[dict]:

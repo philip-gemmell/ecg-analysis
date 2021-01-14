@@ -1,6 +1,6 @@
-import numpy as np
-import matplotlib.cm as cm
-from scipy import signal
+import numpy as np  # type: ignore
+import matplotlib.cm as cm  # type: ignore
+from scipy import signal  # type: ignore
 from typing import List, Tuple, Optional
 
 
@@ -40,7 +40,7 @@ def filter_egm(egm: list, sample_freq: float = 500, freq_filter: float = 40, ord
     return filter_out
 
 
-def get_plot_colours(n: int = 10, colourmap: Optional[str] = None) -> List[tuple]:
+def get_plot_colours(n: int = 10, colourmap: Optional[str] = None) -> List[Tuple[float]]:
     """
     Return iterable list of RGB colour values that can be used for custom plotting functions
 

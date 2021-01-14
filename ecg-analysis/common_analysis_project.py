@@ -1,10 +1,17 @@
-import numpy as np
+import numpy as np  # type: ignore
 import math
 import common_analysis as ca
 
 
-def write_colourmap_to_xml(start_data, end_data, start_highlight, end_highlight, opacity_data=1, opacity_highlight=1,
-                           n_tags=20, colourmap='viridis', outfile='colourmap.xml'):
+def write_colourmap_to_xml(start_data: float,
+                           end_data: float,
+                           start_highlight: float,
+                           end_highlight: float,
+                           opacity_data: float = 1,
+                           opacity_highlight: float = 1,
+                           n_tags: int = 20,
+                           colourmap: str = 'viridis',
+                           outfile: str = 'colourmap.xml') -> None:
     """
     Create a Paraview friendly colourmap useful for highlighting a particular range
 
@@ -51,7 +58,7 @@ def write_colourmap_to_xml(start_data, end_data, start_highlight, end_highlight,
 
     # Write to file
     with open(outfile, 'w') as pFile:
-        pFile.write('<ColorMaps>\n'.format(name))
+        # pFile.write('<ColorMaps>\n'.format(name))
         pFile.write('\t<ColorMap name="{}" space="RGB">\n'.format(name))
 
         # Write non-highlighted data values

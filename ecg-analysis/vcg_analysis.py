@@ -662,7 +662,7 @@ def get_spatial_velocity(vcg, velocity_offset=2, t_end=200, dt=2, threshold_frac
     threshold_end_full = list()
     for sim_vcg in vcg:
         """ Compute spatial velocity of VCG """
-        dvcg = ((sim_vcg[velocity_offset:] - sim_vcg[:-velocity_offset]) / 2) * dt
+        dvcg = (sim_vcg[velocity_offset:] - sim_vcg[:-velocity_offset]) / (velocity_offset*dt)
 
         # Calculates Euclidean distance based on spatial velocity in x, y and z directions
         sim_sv = np.linalg.norm(dvcg, axis=1)

@@ -980,7 +980,7 @@ def plot_spatial_velocity(vcg: np.ndarray,
         VCG data
     sv : list of list of float, optional
         Spatial velocity data. Only required to be given here if special parameters wish to be given, otherwise it
-        will be calculated using default paramters (default)
+        will be calculated using default parameters (default)
     qrs_limits : list of list of float, optional
         A series of 'limits' to be plotted on the figure with the VCG and spatial plot. Presented as a list of the
         same length of the VCG data, with the required limits within:
@@ -1048,6 +1048,7 @@ def plot_spatial_velocity_multilimit(vcg: np.ndarray,
     """ Plot a single instance of a spatial velocity curve, but with multiple limits for QRS
 
     DEPRECATED: Plan to integrate into plot_spatial_velocity
+    https://riptutorial.com/matplotlib/example/32429/multiple-legends-on-the-same-axes
 
     Parameters
     ----------

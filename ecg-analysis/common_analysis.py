@@ -84,8 +84,11 @@ def recursive_len(item: list):
         return 1
 
 
-def convert_time_to_index(qrs_start: Optional[float] = None, qrs_end: Optional[float] = None,
-                          t_start: float = 0, t_end: float = 200, dt: float = 2) -> Tuple[int, int]:
+def convert_time_to_index(qrs_start: Optional[float] = None,
+                          qrs_end: Optional[float] = None,
+                          t_start: float = 0,
+                          t_end: float = 200,
+                          dt: float = 2) -> Tuple[int, int]:
     """
     Return indices of QRS start and end points. NB: indices returned match Matlab output
 
@@ -121,7 +124,10 @@ def convert_time_to_index(qrs_start: Optional[float] = None, qrs_end: Optional[f
     return i_qrs_start, i_qrs_end
 
 
-def convert_index_to_time(idx: int, t_start: float = 0, t_end: float = 200, dt: float = 2) -> float:
+def convert_index_to_time(idx: int,
+                          t_start: float = 0,
+                          t_end: float = 200,
+                          dt: float = 2) -> float:
     """
     Return 'real' time for a given index
 

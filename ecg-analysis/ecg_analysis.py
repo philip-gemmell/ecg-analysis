@@ -22,7 +22,7 @@ def get_ecg_from_igb(phie_file: Union[List[str], str], electrode_file: Optional[
         Filename for the phie.igb data to extract
     electrode_file : str, optional
         File which contains the node indices in the mesh that correspond to the placement of the leads for the
-        10-lead ECG
+        10-lead ECG. Default given in get_electrode_phie function.
 
     Returns
     -------

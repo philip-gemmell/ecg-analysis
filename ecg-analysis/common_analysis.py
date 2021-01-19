@@ -4,8 +4,11 @@ from scipy import signal  # type: ignore
 from typing import List, Tuple, Optional
 
 
-def filter_egm(egm: list, sample_freq: float = 500, freq_filter: float = 40, order: int = 2, filter_type: str = 'low')\
-        -> np.ndarray:
+def filter_egm(egm: np.ndarray,
+               sample_freq: float = 500,
+               freq_filter: float = 40,
+               order: int = 2,
+               filter_type: str = 'low') -> np.ndarray:
     """
     Filter EGM data (low pass)
 

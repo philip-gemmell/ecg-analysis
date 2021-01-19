@@ -223,8 +223,8 @@ def __plot_limits(ax,
 
     if not isinstance(limits, list):
         limits = [limits]
-    assert len(limits) == len(colours), "Incompatible length of limits to plot and colours"
-    assert len(limits) == len(linestyles), "Incompatible length of limits to plot and linestyles"
+    assert len(limits) <= len(colours), "Incompatible length of limits to plot and colours"
+    assert len(limits) <= len(linestyles), "Incompatible length of limits to plot and linestyles"
     for (sim_limit, sim_colour, sim_linestyle) in zip(limits, colours, linestyles):
         for key in ax:
             ax[key].axvline(sim_limit, color=sim_colour, alpha=0.5, linestyle=sim_linestyle)

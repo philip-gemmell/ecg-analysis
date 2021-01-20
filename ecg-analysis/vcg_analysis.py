@@ -170,7 +170,7 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray],
     ----------
     vcg : list of np.ndarray or np.ndarray
         VCG data to analyse
-    time : list of np.ndarray, optional
+    time : list of np.ndarray or np.ndarray, optional
         Time data associated with the VCG data. Provided instead of dt/t_end data, default=None (will calculate based on
         dt and t_end)
     velocity_offset : int, optional

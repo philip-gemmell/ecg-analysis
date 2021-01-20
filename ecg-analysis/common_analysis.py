@@ -121,7 +121,7 @@ def get_time(time: Optional[np.ndarray] = None,
     Time OR t_end/dt/len_vcg must be passed to this function
     """
 
-    if time is None:
+    if time is None or time[0] is None:
         assert dt is not None, "Must pass either time or dt/t_end/len_vcg"
         assert t_end is not None, "Must pass either time or dt/t_end/len_vcg"
         assert len_vcg is not None, "Must pass either time or dt/t_end/len_vcg"

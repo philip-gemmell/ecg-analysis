@@ -960,7 +960,7 @@ def plot_arc3d(vector1: List[float],
     return fig
 
 
-def plot_spatial_velocity(vcg: np.ndarray,
+def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
                           sv: Optional[List[List[float]]] = None,
                           qrs_limits: Optional[List[List[float]]] = None,
                           fig: plt.figure = None,
@@ -978,7 +978,7 @@ def plot_spatial_velocity(vcg: np.ndarray,
 
     Parameters
     ----------
-    vcg : np.ndarray
+    vcg : np.ndarray or list of np.ndarray
         VCG data
     sv : list of list of float, optional
         Spatial velocity data. Only required to be given here if special parameters wish to be given, otherwise it
@@ -1012,8 +1012,8 @@ def plot_spatial_velocity(vcg: np.ndarray,
 
     vcg, legend_vcg, time_vcg, dt, t_end = __plot_spatial_velocity_preprocess_inputs(vcg, legend_vcg, time_vcg, dt,
                                                                                      t_end)
-    fig, ax, colours = __plot_spatial_velocity_prep_axes(vcg, fig)
-    if sv is None and time_sv is None:
+    fig, ax, colours = __plot_spatial_velocity_prep_axes(len(vcg), fig)
+    if sv is None and (time_sv is None or time_sv[0] is None):
         time_sv, sv, _, _ = vcg_analysis.get_spatial_velocity(vcg=vcg, time=time_vcg, t_end=t_end, dt=dt,
                                                               filter_sv=filter_sv)
     elif sv is None:
@@ -1025,8 +1025,10 @@ def plot_spatial_velocity(vcg: np.ndarray,
     """ Plot spatial velocity and VCG components"""
     i_colour_init = get_i_colour(ax['sv'])
     i_colour = i_colour_init
-    if time_vcg is None:
+    if time_vcg is None or time_vcg[0] is None:
         time_vcg = [list(range(0, sim_t_end + sim_dt, sim_dt)) for (sim_dt, sim_t_end) in zip(dt, t_end)]
+    for sim_time, sim_vcg in zip(time_vcg, vcg):
+        assert len(sim_time) == len(sim_vcg), "VCG and time data are different lengths"
     for (sim_time_sv, sim_sv, sim_time_vcg, sim_vcg, sim_label) in zip(time_sv, sv, time_vcg, vcg, legend_vcg):
         ax['vcg_x'].plot(sim_time_vcg, sim_vcg[:, 0], color=colours[i_colour])
         ax['vcg_y'].plot(sim_time_vcg, sim_vcg[:, 1], color=colours[i_colour])
@@ -1124,8 +1126,8 @@ def plot_spatial_velocity_multilimit(vcg: np.ndarray,
 
 
 def __plot_spatial_velocity_preprocess_inputs(vcg: Union[np.ndarray, List[np.ndarray]],
-                                              legend: Union[str, List[str]],
-                                              time: Union[np.ndarray, List[np.ndarray]],
+                                              legend: Union[str, List[str], None],
+                                              time: Union[np.ndarray, List[np.ndarray], None],
                                               dt: Union[float, List[float]],
                                               t_end: Union[float, List[float]])\
         -> Tuple[List[np.ndarray], List[Optional[str]], List[np.ndarray], List[float], List[float]]:
@@ -1134,25 +1136,35 @@ def __plot_spatial_velocity_preprocess_inputs(vcg: Union[np.ndarray, List[np.nda
         vcg = [vcg]
 
     if isinstance(legend, str):
+        assert len(vcg) == 1, "Only one legend entry passed for multiple VCG entries"
         legend = [legend]
     elif legend is None:
         if len(vcg) > 1:
             legend = [str(i) for i in range(len(vcg))]
         else:
             legend = [None for _ in range(len(vcg))]
+    else:
+        assert len(legend) == len(vcg), "legend and vcg are of different lengths"
 
-    if isinstance(time, np.ndarray):
+    if not isinstance(time, list):
         time = [time for _ in range(len(vcg))]
+    else:
+        assert len(time) == len(vcg), "Time and VCG variables not the same length"
 
     if isinstance(dt, (int, float)):
         dt = [dt for _ in range(len(vcg))]
+    else:
+        assert len(dt) == len(vcg), "dt and VCG variables not the same length"
 
     if isinstance(t_end, (int, float)):
         t_end = [t_end for _ in range(len(vcg))]
+    else:
+        assert len(t_end) == len(vcg), "t_end and VCG variables not the same length"
+
     return vcg, legend, time, dt, t_end
 
 
-def __plot_spatial_velocity_prep_axes(vcg: List[np.ndarray],
+def __plot_spatial_velocity_prep_axes(len_vcg: int,
                                       fig: plt.figure) -> Tuple:
     """ Prepare figure and axes """
     if fig is None:
@@ -1166,7 +1178,7 @@ def __plot_spatial_velocity_prep_axes(vcg: List[np.ndarray],
         plt.setp(ax['vcg_x'].get_xticklabels(), visible=False)
         plt.setp(ax['vcg_y'].get_xticklabels(), visible=False)
         gs.update(hspace=0.05)
-        colours = common_analysis.get_plot_colours(len(vcg))
+        colours = common_analysis.get_plot_colours(len_vcg)
     else:
         ax = dict()
         ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z = fig.get_axes()
@@ -1174,9 +1186,9 @@ def __plot_spatial_velocity_prep_axes(vcg: List[np.ndarray],
         ax['vcg_x'] = ax_vcg_x
         ax['vcg_y'] = ax_vcg_y
         ax['vcg_z'] = ax_vcg_z
-        colours = common_analysis.get_plot_colours(len(ax_sv.lines) + len(vcg))
+        colours = common_analysis.get_plot_colours(len(ax_sv.lines) + len_vcg)
         """ If too many lines already exist on the plot, need to recolour them all to prevent cross-talk """
-        if len(ax_sv.lines) + len(vcg) > 10:
+        if len(ax_sv.lines) + len_vcg > 10:
             for key in ax:
                 lines = ax[key].get_lines()
                 i_vcg = 0

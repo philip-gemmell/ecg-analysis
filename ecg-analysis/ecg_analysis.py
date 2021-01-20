@@ -126,12 +126,12 @@ def convert_electrodes_to_ecg(electrode_data: dict) -> dict:
     return ecg
 
 
-def get_ecg_from_dat(ecg_file: str) -> Tuple[dict, np.ndarray]:
+def get_ecg_from_dat(ecg_files: Union[List[str], str]) -> Tuple[List[dict], List[np.ndarray]]:
     """Read ECG data from .dat file
 
     Parameters
     ----------
-    ecg_file : str
+    ecg_files : str or list of str
         Name/location of the .dat file to read
 
     Returns
@@ -141,24 +141,32 @@ def get_ecg_from_dat(ecg_file: str) -> Tuple[dict, np.ndarray]:
     t_steps : np.ndarray
         Time data associated with the ECG data
     """
-    ecgdata = np.loadtxt(ecg_file, dtype=float)
-    t_steps = ecgdata[:, 0]
+    if isinstance(ecg_files, str):
+        ecg_files = [ecg_files]
 
-    ecg = dict()
-    # Limb Leads
-    ecg['LI'] = ecgdata[:, 1]
-    ecg['LII'] = ecgdata[:, 2]
-    ecg['LIII'] = ecgdata[:, 3]
-    # Augmented leads
-    ecg['aVR'] = ecgdata[:, 4]
-    ecg['aVL'] = ecgdata[:, 5]
-    ecg['aVF'] = ecgdata[:, 6]
-    # Precordeal leads
-    ecg['V1'] = ecgdata[:, 7]
-    ecg['V2'] = ecgdata[:, 8]
-    ecg['V3'] = ecgdata[:, 9]
-    ecg['V4'] = ecgdata[:, 10]
-    ecg['V5'] = ecgdata[:, 11]
-    ecg['V6'] = ecgdata[:, 12]
+    ecgs = list()
+    times = list()
+    for ecg_file in ecg_files:
+        ecgdata = np.loadtxt(ecg_file, dtype=float)
+        times.append(ecgdata[:, 0])
 
-    return ecg, t_steps
+        ecg = dict()
+        # Limb Leads
+        ecg['LI'] = ecgdata[:, 1]
+        ecg['LII'] = ecgdata[:, 2]
+        ecg['LIII'] = ecgdata[:, 3]
+        # Augmented leads
+        ecg['aVR'] = ecgdata[:, 4]
+        ecg['aVL'] = ecgdata[:, 5]
+        ecg['aVF'] = ecgdata[:, 6]
+        # Precordeal leads
+        ecg['V1'] = ecgdata[:, 7]
+        ecg['V2'] = ecgdata[:, 8]
+        ecg['V3'] = ecgdata[:, 9]
+        ecg['V4'] = ecgdata[:, 10]
+        ecg['V5'] = ecgdata[:, 11]
+        ecg['V6'] = ecgdata[:, 12]
+
+        ecgs.append(ecg)
+
+    return ecgs, times

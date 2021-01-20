@@ -51,23 +51,31 @@ def convert_ecg_to_vcg(ecg: Union[List[dict], dict]) -> List[np.ndarray]:
     return vcg
 
 
-def get_qrs_start_end(vcg: Union[list, np.ndarray], dt: float = 2, velocity_offset: int = 2, low_p: float = 40,
-                      order: int = 2, threshold_frac_start: float = 0.15, threshold_frac_end: float = 0.15,
-                      filter_sv: bool = True, t_end: float = 200, matlab_match: bool = False) -> Tuple[List[float],
-                                                                                                       List[float],
-                                                                                                       List[float]]:
+def get_qrs_start_end(vcg: Union[list, np.ndarray],
+                      time: List = None,
+                      dt: float = 2,
+                      velocity_offset: int = 2,
+                      low_p: float = 40,
+                      order: int = 2,
+                      threshold_frac_start: float = 0.15,
+                      threshold_frac_end: float = 0.15,
+                      filter_sv: bool = True,
+                      t_end: float = 200,
+                      matlab_match: bool = False) -> Tuple[List[float], List[float], List[float]]:
     """
     Calculate the extent of the VCG QRS complex on the basis of max derivative
 
     Calculate the start and end points, and hence duration, of the QRS complex of a list of VCGs. It does this by
     finding the time at which the spatial velocity of the VCG exceeds a threshold value (the start time), then searches
     backwards from the end of the VCG to find when this threshold is exceeded (the end time); the start and end
-    thresholds do not ncecessarily have to be the same.
+    thresholds do not necessarily have to be the same.
 
     Parameters
     ----------
     vcg : list of np.ndarray
         List of VCG data to get QRS start and end points for
+    time : list of float, optional
+        Time variable for the VCG data; provided instead of dt and t_end, default=None
     dt : float, optional
         Time interval between successive data points in the VCG data, default=2ms
     velocity_offset : int, optional
@@ -106,16 +114,17 @@ def get_qrs_start_end(vcg: Union[list, np.ndarray], dt: float = 2, velocity_offs
     # Create indices to track (1) which colour to plot, and (2) which of the current set of VCGs is currently under
     # consideration
     i_vcg = 0
-    x_val, sv, threshold_start, threshold_end = get_spatial_velocity(vcg=vcg, velocity_offset=velocity_offset,
-                                                                     t_end=t_end, dt=dt,
-                                                                     threshold_frac_start=threshold_frac_start,
-                                                                     threshold_frac_end=threshold_frac_end,
-                                                                     matlab_match=matlab_match, filter_sv=filter_sv,
-                                                                     low_p=low_p, order=order)
+    sv_time, sv, threshold_start, threshold_end = get_spatial_velocity(vcg=vcg, time=time,
+                                                                       velocity_offset=velocity_offset, t_end=t_end,
+                                                                       dt=dt,
+                                                                       threshold_frac_start=threshold_frac_start,
+                                                                       threshold_frac_end=threshold_frac_end,
+                                                                       matlab_match=matlab_match, filter_sv=filter_sv,
+                                                                       low_p=low_p, order=order)
     qrs_start = list()
     qrs_end = list()
     qrs_duration = list()
-    for (sim_sv, sim_x, sim_threshold_start, sim_threshold_end) in zip(sv, x_val, threshold_start, threshold_end):
+    for (sim_sv, sim_time, sim_threshold_start, sim_threshold_end) in zip(sv, sv_time, threshold_start, threshold_end):
         if matlab_match:
             i_qrs_start = np.where(sim_sv > sim_threshold_start)[0][0] + 2
         else:
@@ -127,8 +136,8 @@ def get_qrs_start_end(vcg: Union[list, np.ndarray], dt: float = 2, velocity_offs
         assert i_qrs_start < i_qrs_end
         assert i_qrs_end <= len(sim_sv)
 
-        qrs_start_temp = sim_x[i_qrs_start]
-        qrs_end_temp = sim_x[i_qrs_end]
+        qrs_start_temp = sim_time[i_qrs_start]
+        qrs_end_temp = sim_time[i_qrs_end]
 
         qrs_start.append(qrs_start_temp)
         qrs_end.append(qrs_end_temp)
@@ -139,10 +148,17 @@ def get_qrs_start_end(vcg: Union[list, np.ndarray], dt: float = 2, velocity_offs
     return qrs_start, qrs_end, qrs_duration
 
 
-def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray], velocity_offset: int = 2, t_end: float = 200,
-                         dt: float = 2, threshold_frac_start: float = 0.15, threshold_frac_end: float = 0.15,
-                         matlab_match: bool = False, filter_sv: bool = True, low_p: float = 40, order: int = 2) -> \
-        Tuple[List[float], List[List[float]], List[float], List[float]]:
+def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray],
+                         time: Union[List[np.ndarray], np.ndarray] = None,
+                         velocity_offset: int = 2,
+                         t_end: Union[float, List[float]] = 200,
+                         dt: Union[float, List[float]] = 2,
+                         threshold_frac_start: float = 0.15,
+                         threshold_frac_end: float = 0.15,
+                         matlab_match: bool = False,
+                         filter_sv: bool = True,
+                         low_p: float = 40,
+                         order: int = 2) -> Tuple[List[float], List[List[float]], List[float], List[float]]:
     """
     Calculate spatial velocity
 
@@ -154,6 +170,9 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray], velocity_offs
     ----------
     vcg : list of np.ndarray or np.ndarray
         VCG data to analyse
+    time : list of np.ndarray, optional
+        Time data associated with the VCG data. Provided instead of dt/t_end data, default=None (will calculate based on
+        dt and t_end)
     velocity_offset : int, optional
         Offset between values in VCG over which to calculate spatial velocity, i.e. 1 will use neighbouring values to
         calculate the gradient/velocity. Default=2
@@ -177,7 +196,7 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray], velocity_offs
 
     Returns
     -------
-    x_val : list of float
+    sv_time : list of float
         x-values against which to measure the spatial velocity, i.e. corresponds to the time for the measurement of
         the spatial velocity points
     sv : list of list of float
@@ -207,30 +226,36 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray], velocity_offs
     assert 0 < threshold_frac_start < 1, "threshold_frac_start must be between 0 and 1"
     assert 0 < threshold_frac_end < 1, "threshold_frac_end must be between 0 and 1"
 
+    # Prepare time variables (time, dt and t_end), depending on input
+    time, dt, t_end = common_analysis.get_time(time=time, dt=dt, t_end=t_end, n_vcg=len(vcg),
+                                               len_vcg=[len(sim_vcg) for sim_vcg in vcg])
+
     sv = list()
-    x_val = list()
+    sv_time = list()
     threshold_start_full = list()
     threshold_end_full = list()
-    for sim_vcg in vcg:
+    for (sim_vcg, sim_time, sim_dt, sim_t_end) in zip(vcg, time, dt, t_end):
         # Compute spatial velocity of VCG
-        dvcg = ((sim_vcg[velocity_offset:] - sim_vcg[:-velocity_offset]) / 2) * dt
+        dvcg = np.divide(sim_vcg[velocity_offset:] - sim_vcg[:-velocity_offset],
+                         sim_time[velocity_offset:, np.newaxis]-sim_time[:-velocity_offset, np.newaxis])
 
-        # Calculates Euclidean distance based on spatial velocity in x, y and z directions
-        sim_sv = list(np.linalg.norm(dvcg, axis=1))
+        # Calculates Euclidean distance based on spatial velocity in x, y and z directions, i.e. will calculate
+        # sqrt(x^2+y^2+z^2) to get total spatial velocity
+        sim_sv = np.linalg.norm(dvcg, axis=1)
 
         # Determine threshold for QRS complex, then find start of QRS complex. Iteratively remove more of the plot if
         # the 'start' is found to be 0 (implies it is still getting confused by the preceding wave). Alternatively, just
         # cut off the first 10ms of the beat (original Matlab method)
-        sample_freq = 1000/dt
+        sample_freq = 1000/sim_dt
         if matlab_match:
             sim_sv = sim_sv[5:]
-            sim_x = list(np.arange(velocity_offset, t_end, dt))[5:]
+            sim_time = sim_time[5:-velocity_offset]
             if filter_sv:
                 sim_sv = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
             threshold_start = max(sim_sv)*threshold_frac_start
             threshold_end = max(sim_sv)*threshold_frac_end
         else:
-            sim_x = list(np.arange(velocity_offset, t_end, dt))
+            sim_time = sim_time[:-velocity_offset]
             threshold_start = max(sim_sv)*threshold_frac_start
             if filter_sv:
                 sv_filtered = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
@@ -239,7 +264,7 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray], velocity_offs
             i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
             while i_qrs_start == 0:
                 sim_sv = sim_sv[1:]
-                sim_x = sim_x[1:]
+                sim_time = sim_time[1:]
                 threshold_start = max(sim_sv) * threshold_frac_start
 
                 if filter_sv:
@@ -247,16 +272,16 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray], velocity_offs
                 else:
                     sv_filtered = sim_sv
                 i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
-                if sim_x[0] > 50:
+                if sim_time[0] > 50:
                     raise Exception('More than 50ms of trace removed - try changing threshold_frac_start')
             threshold_end = max(sim_sv) * threshold_frac_end
             sim_sv = sv_filtered
         sv.append(sim_sv)
-        x_val.append(sim_x)
+        sv_time.append(sim_time)
         threshold_start_full.append(threshold_start)
         threshold_end_full.append(threshold_end)
 
-    return x_val, sv, threshold_start_full, threshold_end_full
+    return sv_time, sv, threshold_start_full, threshold_end_full
 
 
 def get_qrs_area(vcg: Union[List[np.ndarray], np.ndarray], qrs_start: Optional[List[float]] = None,
@@ -337,8 +362,8 @@ def get_qrs_area(vcg: Union[List[np.ndarray], np.ndarray], qrs_start: Optional[L
 
 
 def get_azimuth_elevation(vcg: Union[List[np.ndarray], np.ndarray],
-                          t_start: Optional[List[float]] = None, t_end: Optional[List[float]] = None)\
-        -> Tuple[List[Iterable[float]], List[Iterable[float]]]:
+                          t_start: Optional[List[float]] = None,
+                          t_end: Optional[List[float]] = None) -> Tuple[List[Iterable[float]], List[Iterable[float]]]:
     """
     Calculate azimuth and elevation angles for a specified section of the VCG.
 
@@ -379,7 +404,8 @@ def get_azimuth_elevation(vcg: Union[List[np.ndarray], np.ndarray],
     return azimuth, elevation
 
 
-def get_weighted_dipole_angles(vcg: Union[List[np.ndarray], np.ndarray], t_start: Optional[List[float]] = None,
+def get_weighted_dipole_angles(vcg: Union[List[np.ndarray], np.ndarray],
+                               t_start: Optional[List[float]] = None,
                                t_end: Optional[List[float]] = None) \
         -> Tuple[List[float], List[float], List[List[float]]]:
     """
@@ -430,7 +456,10 @@ def get_weighted_dipole_angles(vcg: Union[List[np.ndarray], np.ndarray], t_start
     return weighted_average_azimuth, weighted_average_elev, unit_weighted_dipole
 
 
-def get_single_vcg_azimuth_elevation(vcg: np.ndarray, t_start: float, t_end: float, weighted: bool = True,
+def get_single_vcg_azimuth_elevation(vcg: np.ndarray,
+                                     t_start: float,
+                                     t_end: float,
+                                     weighted: bool = True,
                                      matlab_match: bool = False) \
         -> Tuple[List[float], List[float], np.ndarray]:
     """
@@ -487,9 +516,10 @@ def get_single_vcg_azimuth_elevation(vcg: np.ndarray, t_start: float, t_end: flo
     return theta, phi, dipole_magnitude
 
 
-def get_dipole_magnitudes(vcg: Union[List[np.ndarray], np.ndarray], t_start: Optional[List[float]] = None,
-                          t_end: Optional[List[float]] = None, matlab_match: bool = False) \
-        -> Tuple[List[float], List[float], List[List[float]], List]:
+def get_dipole_magnitudes(vcg: Union[List[np.ndarray], np.ndarray],
+                          t_start: Optional[List[float]] = None,
+                          t_end: Optional[List[float]] = None,
+                          matlab_match: bool = False) -> Tuple[List[float], List[float], List[List[float]], List]:
     """
     Calculates metrics relating to the magnitude of the weighted dipole of the VCG
 
@@ -554,8 +584,10 @@ def get_dipole_magnitudes(vcg: Union[List[np.ndarray], np.ndarray], t_start: Opt
     return weighted_magnitude, max_dipole_magnitude, max_dipole_components, max_dipole_time
 
 
-def calculate_delta_dipole_angle(azimuth1: List[float], elevation1: List[float],
-                                 azimuth2: List[float], elevation2: List[float],
+def calculate_delta_dipole_angle(azimuth1: List[float],
+                                 elevation1: List[float],
+                                 azimuth2: List[float],
+                                 elevation2: List[float],
                                  convert_to_degrees: bool = False) -> List[float]:
     """
     Calculates the angular difference between two VCGs based on difference in azimuthal and elevation angles.
@@ -602,9 +634,15 @@ def calculate_delta_dipole_angle(azimuth1: List[float], elevation1: List[float],
         return dt
 
 
-def compare_dipole_angles(vcg1: np.ndarray, vcg2: np.ndarray, t_start1: float = 0, t_end1: Optional[float] = None,
-                          t_start2: float = 0, t_end2: Optional[float] = None, n_compare: int = 10,
-                          convert_to_degrees: bool = False, matlab_match: bool = False) -> List[float]:
+def compare_dipole_angles(vcg1: np.ndarray,
+                          vcg2: np.ndarray,
+                          t_start1: float = 0,
+                          t_end1: Optional[float] = None,
+                          t_start2: float = 0,
+                          t_end2: Optional[float] = None,
+                          n_compare: int = 10,
+                          convert_to_degrees: bool = False,
+                          matlab_match: bool = False) -> List[float]:
     """
     Calculates the angular differences between two VCGs at multiple points during their evolution
 

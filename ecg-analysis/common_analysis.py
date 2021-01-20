@@ -1,7 +1,7 @@
 import numpy as np  # type: ignore
 import matplotlib.cm as cm  # type: ignore
 from scipy import signal  # type: ignore
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 
 
 def filter_egm(egm: np.ndarray,
@@ -85,6 +85,64 @@ def recursive_len(item: list):
         return sum(recursive_len(subitem) for subitem in item)
     else:
         return 1
+
+
+def get_time(time: Optional[np.ndarray] = None,
+             dt: Optional[float] = None,
+             t_end: Optional[float] = None,
+             n_vcg: Optional[int] = 1,
+             len_vcg: Optional[List[int]] = None):
+    """Returns variables for time, dt and t_end, depending on input.
+
+    Parameters
+    ----------
+    time : np.ndarray, optional
+        Time data for a given VCG, default=None
+    dt : float, optional
+        Interval between recording points for the VCG, default=None
+    t_end : float, optional
+        Total duration of the VCG recordings, default=None
+    n_vcg : int, optional
+        Number of VCGs being assessed, default=1
+    len_vcg : int, optional
+        Number of data points for each VCG being assessed, None
+
+    Returns
+    -------
+    time : np.ndarray
+        Time data for a given VCG
+    dt : list of float
+        Mean time interval for a given VCG recording
+    t_end : list of float
+        Total duration of each VCG recording
+
+    Notes
+    -----
+    Time OR t_end/dt/len_vcg must be passed to this function
+    """
+
+    if time is None:
+        assert dt is not None, "Must pass either time or dt/t_end/len_vcg"
+        assert t_end is not None, "Must pass either time or dt/t_end/len_vcg"
+        assert len_vcg is not None, "Must pass either time or dt/t_end/len_vcg"
+        if isinstance(dt, (int, float)):
+            dt = [dt for _ in range(n_vcg)]
+        if isinstance(t_end, (int, float)):
+            t_end = [t_end for _ in range(n_vcg)]
+        time = [np.arange(0, sim_t_end+sim_dt, sim_dt) for (sim_dt, sim_t_end) in zip(dt, t_end)]
+        for sim_len_vcg, sim_time in zip(len_vcg, time):
+            assert sim_len_vcg == len(sim_time), "vcg and time variables mis-aligned"
+    else:
+        if isinstance(time, np.ndarray):
+            time = [time]
+        assert len(time) == n_vcg, "vcg and time variables must be same length"
+        for sim_time in time:
+            assert max(np.diff(sim_time))-min(np.diff(sim_time)) < 0.0001,\
+                "dt not constant for across provided time variable"
+        dt = [np.mean(np.diff(sim_time)) for sim_time in time]
+        t_end = [t[-1] for t in time]
+
+    return time, dt, t_end
 
 
 def convert_time_to_index(qrs_start: Optional[float] = None,

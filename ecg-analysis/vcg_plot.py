@@ -964,9 +964,11 @@ def plot_spatial_velocity(vcg: np.ndarray,
                           sv: Optional[List[List[float]]] = None,
                           qrs_limits: Optional[List[List[float]]] = None,
                           fig: plt.figure = None,
-                          legend_vcg: Optional[List[str], str] = None,
-                          t_end: int = 200,
-                          dt: int = 2,
+                          legend_vcg: Union[List[str], str, None] = None,
+                          time_vcg: Optional[np.ndarray] = None,
+                          time_sv: Optional[np.ndarray] = None,
+                          t_end: Union[float, List[float]] = 200,
+                          dt: Union[float, List[float]] = 2,
                           filter_sv: bool = True) -> Tuple:
     """ Plot the spatial velocity for given VCG data
 
@@ -984,12 +986,16 @@ def plot_spatial_velocity(vcg: np.ndarray,
     qrs_limits : list of list of float, optional
         A series of 'limits' to be plotted on the figure with the VCG and spatial plot. Presented as a list of the
         same length of the VCG data, with the required limits within:
-            e.g. [[QRS_start1, QRS_end1, ...], [QRS_start2, QRS_end, ...], ...]
+            e.g. [[QRS_start1, QRS_start2, ...], [QRS_end1, QRS_end2, ...], ...]
         Default=None
     fig : plt.figure, optional
         Handle to existing figure, if data is wished to be plotted on existing plot, default=None
     legend_vcg : str or list of str, optional
         Labels to apply to the VCG/SV data, default=None
+    time_vcg : np.ndarray, optional
+        Time variable for the VCG data NOT THE SPATIAL VELOCITY DATA; provided instead of dt and t_end, default=None
+    time_sv : np.ndarray, optional
+        Time variable for the spatial velocity data, default=None
     t_end : int, optional
         Duration of the data, default=200
     dt : int, optional
@@ -1004,16 +1010,28 @@ def plot_spatial_velocity(vcg: np.ndarray,
     ax
     """
 
-    vcg, legend_vcg = __plot_spatial_velocity_preprocess_inputs(vcg, legend_vcg)
+    vcg, legend_vcg, time_vcg, dt, t_end = __plot_spatial_velocity_preprocess_inputs(vcg, legend_vcg, time_vcg, dt,
+                                                                                     t_end)
     fig, ax, colours = __plot_spatial_velocity_prep_axes(vcg, fig)
-    x_val, sv = __plot_spatial_velocity_get_plot_data(sv, vcg, t_end, dt, filter_sv)
+    if sv is None and time_sv is None:
+        time_sv, sv, _, _ = vcg_analysis.get_spatial_velocity(vcg=vcg, time=time_vcg, t_end=t_end, dt=dt,
+                                                              filter_sv=filter_sv)
+    elif sv is None:
+        _, sv, _, _ = vcg_analysis.get_spatial_velocity(vcg=vcg, time=time_vcg, t_end=t_end, dt=dt, filter_sv=filter_sv)
+    else:
+        for sim_time, sim_sv in zip(time_sv, sv):
+            assert len(sim_time) == len(sim_sv)
 
     """ Plot spatial velocity and VCG components"""
     i_colour_init = get_i_colour(ax['sv'])
     i_colour = i_colour_init
-    x_vcg_data = list(range(0, t_end + dt, dt))
-    for (sim_x, sim_vcg, sim_sv, sim_label) in zip(x_val, vcg, sv, legend_vcg):
-        __plot_spatial_velocity_plot_data(sim_x, sim_sv, x_vcg_data, sim_vcg, sim_label, colours[i_colour], ax)
+    if time_vcg is None:
+        time_vcg = [list(range(0, sim_t_end + sim_dt, sim_dt)) for (sim_dt, sim_t_end) in zip(dt, t_end)]
+    for (sim_time_sv, sim_sv, sim_time_vcg, sim_vcg, sim_label) in zip(time_sv, sv, time_vcg, vcg, legend_vcg):
+        ax['vcg_x'].plot(sim_time_vcg, sim_vcg[:, 0], color=colours[i_colour])
+        ax['vcg_y'].plot(sim_time_vcg, sim_vcg[:, 1], color=colours[i_colour])
+        ax['vcg_z'].plot(sim_time_vcg, sim_vcg[:, 2], color=colours[i_colour])
+        ax['sv'].plot(sim_time_sv, sim_sv, color=colours[i_colour], label=sim_label)
         i_colour += 1
 
     """ Plot QRS limits, if provided """
@@ -1106,11 +1124,15 @@ def plot_spatial_velocity_multilimit(vcg: np.ndarray,
 
 
 def __plot_spatial_velocity_preprocess_inputs(vcg: Union[np.ndarray, List[np.ndarray]],
-                                              legend: Union[str, List[str]])\
-        -> Tuple[List[np.ndarray], List[Optional[str]]]:
+                                              legend: Union[str, List[str]],
+                                              time: Union[np.ndarray, List[np.ndarray]],
+                                              dt: Union[float, List[float]],
+                                              t_end: Union[float, List[float]])\
+        -> Tuple[List[np.ndarray], List[Optional[str]], List[np.ndarray], List[float], List[float]]:
     """ Preprocess other inputs """
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
+
     if isinstance(legend, str):
         legend = [legend]
     elif legend is None:
@@ -1118,7 +1140,16 @@ def __plot_spatial_velocity_preprocess_inputs(vcg: Union[np.ndarray, List[np.nda
             legend = [str(i) for i in range(len(vcg))]
         else:
             legend = [None for _ in range(len(vcg))]
-    return vcg, legend
+
+    if isinstance(time, np.ndarray):
+        time = [time for _ in range(len(vcg))]
+
+    if isinstance(dt, (int, float)):
+        dt = [dt for _ in range(len(vcg))]
+
+    if isinstance(t_end, (int, float)):
+        t_end = [t_end for _ in range(len(vcg))]
+    return vcg, legend, time, dt, t_end
 
 
 def __plot_spatial_velocity_prep_axes(vcg: List[np.ndarray],
@@ -1179,8 +1210,13 @@ def __plot_spatial_velocity_get_plot_data(sv: List[List[float]],
     return x_val, sv
 
 
-def __plot_spatial_velocity_plot_data(x_sv_data: List[float], sv_data: List[float], x_vcg_data: List[float],
-                                      vcg_data: List[float], data_label: str, plot_colour: str, ax: dict) -> None:
+def __plot_spatial_velocity_plot_data(x_sv_data: List[float],
+                                      sv_data: List[float],
+                                      x_vcg_data: List[float],
+                                      vcg_data: List[float],
+                                      data_label: str,
+                                      plot_colour: str,
+                                      ax: dict) -> None:
     ax['vcg_x'].plot(x_vcg_data, vcg_data[:, 0], color=plot_colour)
     ax['vcg_y'].plot(x_vcg_data, vcg_data[:, 1], color=plot_colour)
     ax['vcg_z'].plot(x_vcg_data, vcg_data[:, 2], color=plot_colour)

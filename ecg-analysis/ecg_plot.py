@@ -4,6 +4,9 @@ from typing import Union, Optional, List, Tuple
 
 import common_analysis as ca
 
+# import matplotlib
+# matplotlib.use('Agg')
+
 
 def plot(ecg: Union[List[dict], dict],
          time: np.ndarray = None,
@@ -95,13 +98,20 @@ def plot(ecg: Union[List[dict], dict],
 
     # Plot data
     if time is None:
-        time = [i*dt for i in range(len(ecg[0]['V1']))]
+        time = list()
+        for sim_ecg in ecg:
+            # time.append([i*dt for i in range(len(ecg[0]['V1']))])
+            time.append(np.arange(0, dt*(len(sim_ecg['V1'])), dt))
     else:
-        assert(len(time) == len(ecg[0]['V1']))
-    for (sim_ecg, sim_label, sim_colour, sim_linestyle) in zip(ecg, legend, colours, linestyles):
+        for sim_time, sim_ecg in zip(time, ecg):
+            assert(len(sim_time) == len(sim_ecg['V1']))
+    for (sim_time, sim_ecg, sim_label, sim_colour, sim_linestyle) in zip(time, ecg, legend, colours, linestyles):
         for key in plot_sequence:
-            ax[key].plot(time, sim_ecg[key], linewidth=linewidth, label=sim_label, color=sim_colour,
-                         linestyle=sim_linestyle)
+            try:
+                ax[key].plot(sim_time, sim_ecg[key], linewidth=linewidth, label=sim_label, color=sim_colour,
+                             linestyle=sim_linestyle)
+            except ValueError:
+                breakpoint()
 
     # Add QRS limits, if supplied
     if qrs_limits is not None:

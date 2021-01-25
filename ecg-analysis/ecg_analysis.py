@@ -1,6 +1,6 @@
 import sys
 import numpy as np  # type: ignore
-from typing import Union, List, Optional, Tuple
+from typing import Union, List, Optional, Tuple, Dict
 
 # Add carputils functions (https://git.opencarp.org/openCARP/carputils)
 # sys.path.append('/home/pg16/software/carputils/')
@@ -8,7 +8,9 @@ sys.path.append('/home/philip/Documents/carputils/')
 from carputils.carpio import igb  # type: ignore
 
 
-def get_ecg_from_igb(phie_file: Union[List[str], str], electrode_file: Optional[str] = None) -> List[dict]:
+def get_ecg_from_igb(phie_file: Union[List[str], str],
+                     electrode_file: Optional[str] = None,
+                     normalise: bool = True) -> List[Dict[str, np.ndarray]]:
     """
     Translate the phie.igb file(s) to 10-lead, 12-trace ECG data
 
@@ -23,6 +25,8 @@ def get_ecg_from_igb(phie_file: Union[List[str], str], electrode_file: Optional[
     electrode_file : str, optional
         File which contains the node indices in the mesh that correspond to the placement of the leads for the
         10-lead ECG. Default given in get_electrode_phie function.
+    normalise : bool, optional
+        Whether or not to normalise the ECG signals on a per-lead basis, default=True
 
     Returns
     -------
@@ -39,7 +43,10 @@ def get_ecg_from_igb(phie_file: Union[List[str], str], electrode_file: Optional[
 
     ecg = [convert_electrodes_to_ecg(elec_tmp) for elec_tmp in electrode_data]
 
-    return ecg
+    if normalise:
+        return [normalise_ecg(sim_ecg) for sim_ecg in ecg]
+    else:
+        return ecg
 
 
 def get_electrode_phie(phie_data: np.ndarray, electrode_file: Optional[str] = None) -> dict:
@@ -126,13 +133,16 @@ def convert_electrodes_to_ecg(electrode_data: dict) -> dict:
     return ecg
 
 
-def get_ecg_from_dat(ecg_files: Union[List[str], str]) -> Tuple[List[dict], List[np.ndarray]]:
+def get_ecg_from_dat(ecg_files: Union[List[str], str],
+                     normalise: bool = True) -> Tuple[List[dict], List[np.ndarray]]:
     """Read ECG data from .dat file
 
     Parameters
     ----------
     ecg_files : str or list of str
         Name/location of the .dat file to read
+    normalise : bool, optional
+        Whether or not to normalise the ECG signals on a per-lead basis, default=True
 
     Returns
     -------
@@ -169,4 +179,27 @@ def get_ecg_from_dat(ecg_files: Union[List[str], str]) -> Tuple[List[dict], List
 
         ecgs.append(ecg)
 
+    if normalise:
+        ecgs = [normalise_ecg(ecg) for ecg in ecgs]
+
     return ecgs, times
+
+
+def normalise_ecg(ecg: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+    """Normalise ECG leads, so that the maximum value is either 1 or the minimum value is -1
+
+    Parameters
+    ----------
+    ecg: dict of np.ndarray
+        ECG data
+
+    Returns
+    -------
+    ecg: dict of np.ndarray
+        Normalised ECG data
+    """
+
+    for key in ecg:
+        ecg[key] = np.divide(ecg[key], np.amax(np.absolute(ecg[key])))
+
+    return ecg

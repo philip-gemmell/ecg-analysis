@@ -1,6 +1,9 @@
 import sys
 import numpy as np  # type: ignore
+import scipy
 from typing import Union, List, Optional, Tuple, Dict
+
+import common_analysis
 
 # Add carputils functions (https://git.opencarp.org/openCARP/carputils)
 # sys.path.append('/home/pg16/software/carputils/')
@@ -203,3 +206,66 @@ def normalise_ecg(ecg: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         ecg[key] = np.divide(ecg[key], np.amax(np.absolute(ecg[key])))
 
     return ecg
+
+
+def get_twave_end(ecg: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]],
+                  lead: str = 'LII',
+                  time: Union[List[np.ndarray], np.ndarray, None] = None,
+                  dt: Union[List[float], float] = 2,
+                  t_end: Union[List[float], float] = 200,
+                  i_distance: int = 200,
+                  ecg_filter: bool = False) -> List[float]:
+    """ Return the time point at which it is estimated that the T-wave has bee completed
+
+    Parameters
+    ----------
+    ecg : dict of np.ndarray
+        ECG data
+    lead : str, optional
+        Which lead to check for the T-wave - usually this is either LII or V5, default LII
+    time : np.ndarray, optional
+        Time data associated with ECG (provided instead of dt, t_end), default=None
+    dt : float, optional
+        Time interval between recording points in the ECG (provided with t_end instead of time), default=2
+    t_end : float, optional
+        Duration of the ECG recording (provided with dt instead of time), default=200
+    i_distance : int, optional
+        Distance between peaks in the gradient, i.e. will direct that the function will only find the points of
+        maximum gradient (representing T-wave, etc.) with a minimum distance given here (in terms of indices,
+        rather than time). Helps prevent being overly sensitive to 'wobbles' in the signal. Default=200
+    ecg_filter: bool, optional
+        Whether or not to apply a Butterworth filter to the ECG data to try and simplify the task of finding the
+        actual T-wave gradient, default=False
+
+    Returns
+    -------
+    twave_end : float
+        Time value for when T-wave is estimated to have ended
+
+    References
+    ----------
+    Postema PG, Wilde AA. The measurement of the QT interval. Curr Cardiol Rev. 2014 Aug;10(3):287-94.
+    doi: 10.2174/1573403x10666140514103612. PMID: 24827793; PMCID: PMC4040880.
+    """
+
+    if isinstance(ecg, dict):
+        ecg = [ecg]
+    for sim_ecg in ecg:
+        assert lead in sim_ecg, 'Lead not present in ECG'
+
+    if ecg_filter:
+        ecg_lead = [common_analysis.filter_egm(sim_ecg[lead]) for sim_ecg in ecg]
+    else:
+        ecg_lead = [sim_ecg[lead] for sim_ecg in ecg]
+    time, dt, _ = common_analysis.get_time(time, dt, t_end, n_vcg=len(ecg))
+    ecg_grad = [np.gradient(sim_ecg_lead, dt[0]) for sim_ecg_lead in ecg_lead]
+    ecg_grad_norm = [np.divide(np.absolute(sim_ecg_grad), np.amax(np.absolute(sim_ecg_grad))) for sim_ecg_grad in
+                     ecg_grad]
+
+    # Find last peak in gradient, then by basic trig find the x-intercept (which is used as the T-wave end point)
+    # noinspection PyUnresolvedReferences
+    i_maxgradient = [scipy.signal.find_peaks(sim_ecg_grad_norm, distance=i_distance)[0][-1] for sim_ecg_grad_norm in
+                     ecg_grad_norm]
+    twave_end = [sim_time[i_max]-(sim_ecg_lead[i_max]/sim_ecg_grad[i_max])
+                 for (sim_time, sim_ecg_lead, sim_ecg_grad, i_max) in zip(time, ecg_lead, ecg_grad, i_maxgradient)]
+    return twave_end

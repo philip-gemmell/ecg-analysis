@@ -57,8 +57,8 @@ def get_qrs_start_end(vcg: Union[list, np.ndarray],
                       velocity_offset: int = 2,
                       low_p: float = 40,
                       order: int = 2,
-                      threshold_frac_start: float = 0.15,
-                      threshold_frac_end: float = 0.15,
+                      threshold_frac_start: float = 0.22,
+                      threshold_frac_end: float = 0.54,
                       filter_sv: bool = True,
                       t_end: float = 200,
                       matlab_match: bool = False) -> Tuple[List[float], List[float], List[float]]:
@@ -153,8 +153,8 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray],
                          velocity_offset: int = 2,
                          t_end: Union[float, List[float]] = 200,
                          dt: Union[float, List[float]] = 2,
-                         threshold_frac_start: float = 0.15,
-                         threshold_frac_end: float = 0.15,
+                         threshold_frac_start: float = 0.22,
+                         threshold_frac_end: float = 0.54,
                          matlab_match: bool = False,
                          filter_sv: bool = True,
                          low_p: float = 40,
@@ -262,6 +262,8 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray],
             else:
                 sv_filtered = sim_sv
             i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
+            sim_sv_orig = sim_sv
+            sim_time_orig = sim_time
             while i_qrs_start == 0:
                 sim_sv = sim_sv[1:]
                 sim_time = sim_time[1:]
@@ -273,6 +275,14 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray],
                     sv_filtered = sim_sv
                 i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
                 if sim_time[0] > 50:
+                    import matplotlib.pyplot as plt
+                    fig = plt.figure()
+                    ax = fig.add_subplot(1, 1, 1)
+                    ax.plot(sim_time_orig, sim_sv_orig, linewidth=3)
+                    ax.set_xlabel('Time')
+                    ax.set_ylabel('Spatial Velocity')
+                    ax.axhline(max(sim_sv) * threshold_frac_start, label='Threshold={}'.format(threshold_frac_start))
+                    ax.legend()
                     raise Exception('More than 50ms of trace removed - try changing threshold_frac_start')
             threshold_end = max(sim_sv) * threshold_frac_end
             sim_sv = sv_filtered

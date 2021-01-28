@@ -1019,23 +1019,21 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
     ax
     """
 
-    # Check input arguments are correctly formatted
+    """ Check input arguments are correctly formatted """
     if isinstance(vcg, np.ndarray):
         n_vcg = 1
     else:
         n_vcg = len(vcg)
-    # vcg = common_analysis.convert_input_to_list(vcg, n_list=n_vcg)
-    # qrs_limits = common_analysis.convert_input_to_list(qrs_limits, n_list=n_vcg, list_depth=2)
-    # legend_vcg = common_analysis.convert_input_to_list(legend_vcg, n_list=n_vcg)
-    # legend_limits = common_analysis.convert_input_to_list(legend_limits, n_list=n_vcg)
-    # limits_linestyles = common_analysis.convert_input_to_list(limits_linestyles, n_list=len(qrs_limits))
-    # time_vcg = common_analysis.convert_input_to_list(time_vcg, n_list=n_vcg)
-    # time_sv = common_analysis.convert_input_to_list(time_sv, n_list=n_vcg)
-    # dt = common_analysis.convert_input_to_list(dt, n_list=n_vcg)
-    # t_end = common_analysis.convert_input_to_list(t_end, n_list=n_vcg)
-    vcg, qrs_limits, legend_vcg, legend_limits, limits_linestyles, time_vcg, dt, t_end = \
-        __plot_spatial_velocity_preprocess_inputs(vcg, qrs_limits, legend_vcg, legend_limits, limits_linestyles,
-                                                  time_vcg, dt, t_end)
+    vcg = common_analysis.convert_input_to_list(vcg, n_list=n_vcg)
+    qrs_limits = common_analysis.convert_input_to_list(qrs_limits, n_list=n_vcg, list_depth=2)
+    legend_vcg = common_analysis.convert_input_to_list(legend_vcg, n_list=n_vcg)
+    legend_limits = common_analysis.convert_input_to_list(legend_limits, n_list=len(qrs_limits))
+    limits_linestyles = common_analysis.convert_input_to_list(limits_linestyles, n_list=len(qrs_limits))
+    time_vcg = common_analysis.convert_input_to_list(time_vcg, n_list=n_vcg)
+    time_sv = common_analysis.convert_input_to_list(time_sv, n_list=n_vcg)
+    dt = common_analysis.convert_input_to_list(dt, n_list=n_vcg)
+    t_end = common_analysis.convert_input_to_list(t_end, n_list=n_vcg)
+
     fig, ax, colours = __plot_spatial_velocity_prep_axes(len(vcg), fig)
     if sv is None and (time_sv is None or time_sv[0] is None):
         time_sv, sv, _, _ = vcg_analysis.get_spatial_velocity(vcg=vcg, time=time_vcg, t_end=t_end, dt=dt,

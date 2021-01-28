@@ -1,7 +1,7 @@
 import numpy as np  # type: ignore
 import matplotlib.cm as cm  # type: ignore
 from scipy import signal  # type: ignore
-from typing import List, Tuple, Optional, Union
+from typing import List, Tuple, Optional, Union, Any
 
 
 def filter_egm(egm: np.ndarray,
@@ -211,3 +211,91 @@ def convert_index_to_time(idx: int,
     x_val = np.array(np.arange(t_start, t_end+dt, dt))
     return x_val[idx]
 
+
+def convert_input_to_list(input_data: Any,
+                          n_list: int = 1,
+                          list_depth: int = 1,
+                          default_entry: Any = None) -> list:
+    """Convert a given input to a list of inputs of required length. If already a list, will confirm that it's the
+    right length.
+
+    Parameters
+    ----------
+    input_data : Any
+        Input argument to be checked
+    n_list : int, optional
+        Number of entries required in input, default=1
+    list_depth : int
+        Number of nested lists required. If just a simple list of e.g. VCGs, then will be 1 ([vcg1, vcg2,...]). If a
+        list of lists (e.g. [[qrs_start1, qrs_start2,...], [qrs_end1, qrs_end2,...]), then 2.
+    default_entry : Any, optional
+        Default entry to put into list, default=None
+
+    Returns
+    -------
+    output : list
+        Formatted output
+    """
+
+    if isinstance(input_data, list):
+        if list_depth == 1:
+            assert len(input_data) == n_list, "Incorrect number of entries in input_data"
+        elif list_depth == 2:
+            for inner_data in input_data:
+                assert len(inner_data) == n_list, "inner_data of input incorrectly formatted"
+        else:
+            raise Exception("Not coded for this eventuality...")
+        return input_data
+    else:
+        return [default_entry for _ in range(n_list)]
+
+
+def check_list_depth(input_list, depth_count=1, max_depth=0, n_args=0):
+    """ Function to calculate the depth of nested loops
+
+    TODO: Finish this damn code
+
+    Parameters
+    ----------
+    input_list : list
+        Input argument to check
+    depth_count : int, optional
+        Depth of nested loops thus far
+    max_depth : int, optional
+        Maximum expected depth of list, default=0 (not checked)
+    n_args : int, optional
+        Required length of 'base' list, default=0 (not checked)
+
+    Returns
+    -------
+    depth_count : int
+        Depth of nested loops
+
+    Notes
+    -----
+    A list of form [a1, a2, a3, ...] has depth 1.
+    A list of form [[a1, a2, a3, ...], [b1, b2, b3, ...], ...] has depth 2.
+    And so forth...
+
+    If n_args is set to an integer greater than 0, it will check that the lowest level of lists (for all entries)
+    will be of the required length
+        if depth=1 as above, len([a1, a2, a3, ...]) == n_args
+        if depth=2 as above, len([a1, a2, a3, ...]) == n_args && len([b1, b2, b3, ...]) == n_args
+    """
+
+    for input_list_inner in input_list:
+        if isinstance(input_list_inner, list):
+            depth_count += 1
+
+    if not isinstance(input_list[0], list):
+        assert all([not isinstance(input_list_inner, list) for input_list_inner in input_list])
+        if n_args > 0:
+            for input_list_inner in input_list:
+                assert len(input_list_inner) == n_args, "Incorrect list lengths"
+    else:
+        depth_count += 1
+        if max_depth > 0:
+            assert depth_count <= max_depth, "Maximum depth exceeded"
+        for input_list_inner in input_list:
+            check_list_depth(input_list_inner, depth_count=depth_count)
+    return depth_count

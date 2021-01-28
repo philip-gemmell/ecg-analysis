@@ -12,6 +12,9 @@ from typing import List, Tuple, Optional, Union
 import common_analysis
 import vcg_analysis
 
+# import matplotlib
+# matplotlib.use('Agg')
+
 __all__ = ['Axes3D']    # Workaround to prevent Axes3D import statement to be labelled as unused
 
 
@@ -965,6 +968,8 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
                           qrs_limits: Optional[List[List[float]]] = None,
                           fig: plt.figure = None,
                           legend_vcg: Union[List[str], str, None] = None,
+                          legend_limits: Union[List[str], str, None] = None,
+                          limits_linestyles: Optional[List[str]] = None,
                           time_vcg: Optional[np.ndarray] = None,
                           time_sv: Optional[np.ndarray] = None,
                           t_end: Union[float, List[float]] = 200,
@@ -992,6 +997,10 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
         Handle to existing figure, if data is wished to be plotted on existing plot, default=None
     legend_vcg : str or list of str, optional
         Labels to apply to the VCG/SV data, default=None
+    legend_limits : str or list of str, optional
+        Labels to apply to the limits, default=None
+    limits_linestyles : list of str
+        Linestyles to apply to the different limits being supplied, default=None (will plot as straight lines)
     time_vcg : np.ndarray, optional
         Time variable for the VCG data NOT THE SPATIAL VELOCITY DATA; provided instead of dt and t_end, default=None
     time_sv : np.ndarray, optional
@@ -1010,8 +1019,23 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
     ax
     """
 
-    vcg, legend_vcg, time_vcg, dt, t_end = __plot_spatial_velocity_preprocess_inputs(vcg, legend_vcg, time_vcg, dt,
-                                                                                     t_end)
+    # Check input arguments are correctly formatted
+    if isinstance(vcg, np.ndarray):
+        n_vcg = 1
+    else:
+        n_vcg = len(vcg)
+    # vcg = common_analysis.convert_input_to_list(vcg, n_list=n_vcg)
+    # qrs_limits = common_analysis.convert_input_to_list(qrs_limits, n_list=n_vcg, list_depth=2)
+    # legend_vcg = common_analysis.convert_input_to_list(legend_vcg, n_list=n_vcg)
+    # legend_limits = common_analysis.convert_input_to_list(legend_limits, n_list=n_vcg)
+    # limits_linestyles = common_analysis.convert_input_to_list(limits_linestyles, n_list=len(qrs_limits))
+    # time_vcg = common_analysis.convert_input_to_list(time_vcg, n_list=n_vcg)
+    # time_sv = common_analysis.convert_input_to_list(time_sv, n_list=n_vcg)
+    # dt = common_analysis.convert_input_to_list(dt, n_list=n_vcg)
+    # t_end = common_analysis.convert_input_to_list(t_end, n_list=n_vcg)
+    vcg, qrs_limits, legend_vcg, legend_limits, limits_linestyles, time_vcg, dt, t_end = \
+        __plot_spatial_velocity_preprocess_inputs(vcg, qrs_limits, legend_vcg, legend_limits, limits_linestyles,
+                                                  time_vcg, dt, t_end)
     fig, ax, colours = __plot_spatial_velocity_prep_axes(len(vcg), fig)
     if sv is None and (time_sv is None or time_sv[0] is None):
         time_sv, sv, _, _ = vcg_analysis.get_spatial_velocity(vcg=vcg, time=time_vcg, t_end=t_end, dt=dt,
@@ -1029,30 +1053,51 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
         time_vcg = [list(range(0, sim_t_end + sim_dt, sim_dt)) for (sim_dt, sim_t_end) in zip(dt, t_end)]
     for sim_time, sim_vcg in zip(time_vcg, vcg):
         assert len(sim_time) == len(sim_vcg), "VCG and time data are different lengths"
+    h_lines = list()
     for (sim_time_sv, sim_sv, sim_time_vcg, sim_vcg, sim_label) in zip(time_sv, sv, time_vcg, vcg, legend_vcg):
         ax['vcg_x'].plot(sim_time_vcg, sim_vcg[:, 0], color=colours[i_colour])
         ax['vcg_y'].plot(sim_time_vcg, sim_vcg[:, 1], color=colours[i_colour])
         ax['vcg_z'].plot(sim_time_vcg, sim_vcg[:, 2], color=colours[i_colour])
-        ax['sv'].plot(sim_time_sv, sim_sv, color=colours[i_colour], label=sim_label)
+        h_lines.append(ax['sv'].plot(sim_time_sv, sim_sv, color=colours[i_colour], label=sim_label))
         i_colour += 1
 
     """ Plot QRS limits, if provided """
+    h_limits = list()
     if qrs_limits is not None:
         # Cycle through each limit provided, e.g. QRS start, QRS end...
-        for qrs_limit in qrs_limits:
+        for (qrs_limit, limits_linestyle) in zip(qrs_limits, limits_linestyles):
             i_colour = i_colour_init
-            assert len(qrs_limit) == len(vcg)
+            add_limit_handle = True
 
             # Plot limits for each given VCG
             for sim_qrs_limit in qrs_limit:
-                __plot_spatial_velocity_plot_limits(sim_qrs_limit, ax, colours[i_colour])
+                for key in ax:
+                    if key == 'sv' and add_limit_handle:
+                        h_limits.append(ax[key].axvline(sim_qrs_limit, color=colours[i_colour], alpha=0.8,
+                                                        linestyle=limits_linestyle, label=None))
+                        add_limit_handle = False
+                    else:
+                        ax[key].axvline(sim_qrs_limit, color=colours[i_colour], alpha=0.8,
+                                        linestyle=limits_linestyle, label=None)
                 i_colour += 1
 
-    """ Add legend_vcg (or legend_vcg for limits, if appropriate """
+    """ Add legend_vcg and legend_limits """
     if legend_vcg[0] is not None:
         labels = [line.get_label() for line in ax['sv'].get_lines()]
+        labels = [labelstr for labelstr in labels if not labelstr.startswith('_')] # Remove implicit labels from list
         plt.rc('text', usetex=True)
-        ax['sv'].legend(labels)
+        leg_vcg = ax['sv'].legend(labels, loc='upper right')
+    else:
+        leg_vcg = None
+
+    if legend_limits[0] is not None:
+        plt.rc('text', usetex=True)
+        ax['sv'].legend(h_limits, legend_limits, loc='upper center')
+        if legend_vcg[0] is not None:
+            ax['sv'].add_artist(leg_vcg)
+
+    if legend_limits is not None:
+        print()
 
     return fig, ax
 
@@ -1126,25 +1171,45 @@ def plot_spatial_velocity_multilimit(vcg: np.ndarray,
 
 
 def __plot_spatial_velocity_preprocess_inputs(vcg: Union[np.ndarray, List[np.ndarray]],
-                                              legend: Union[str, List[str], None],
+                                              qrs_limits: Optional[List[List[float]]],
+                                              legend_vcg: Union[str, List[str], None],
+                                              legend_limits: Union[str, List[str], None],
+                                              limits_linestyles: Optional[List[str]],
                                               time: Union[np.ndarray, List[np.ndarray], None],
                                               dt: Union[float, List[float]],
                                               t_end: Union[float, List[float]])\
-        -> Tuple[List[np.ndarray], List[Optional[str]], List[np.ndarray], List[float], List[float]]:
+        -> Tuple[List[np.ndarray], Optional[List[List[float]]], List[Optional[str]], List[Optional[str]], List[str],
+                 List[np.ndarray], List[float], List[float]]:
     """ Preprocess other inputs """
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
 
-    if isinstance(legend, str):
+    if qrs_limits is not None:
+        assert isinstance(qrs_limits, list), "QRS limits variable passed incorrectly"
+        assert isinstance(qrs_limits[0], list), "QRS limits variable passed incorrectly"
+        for qrs_limit in qrs_limits:
+            assert len(qrs_limit) == len(vcg)
+
+    if isinstance(legend_vcg, str):
         assert len(vcg) == 1, "Only one legend entry passed for multiple VCG entries"
-        legend = [legend]
-    elif legend is None:
+        legend_vcg = [legend_vcg]
+    elif legend_vcg is None:
         if len(vcg) > 1:
-            legend = [str(i) for i in range(len(vcg))]
+            legend_vcg = [str(i) for i in range(len(vcg))]
         else:
-            legend = [None for _ in range(len(vcg))]
+            legend_vcg = [None for _ in range(len(vcg))]
     else:
-        assert len(legend) == len(vcg), "legend and vcg are of different lengths"
+        assert len(legend_vcg) == len(vcg), "legend and vcg are of different lengths"
+
+    if legend_limits is not None:
+        if isinstance(legend_limits, list):
+            assert len(legend_limits) == len(qrs_limits)
+
+    if limits_linestyles is None:
+        if qrs_limits is not None:
+            limits_linestyles = ['-' for _ in range(len(qrs_limits))]
+    else:
+        assert len(limits_linestyles) >= len(qrs_limits)
 
     if not isinstance(time, list):
         time = [time for _ in range(len(vcg))]
@@ -1161,7 +1226,7 @@ def __plot_spatial_velocity_preprocess_inputs(vcg: Union[np.ndarray, List[np.nda
     else:
         assert len(t_end) == len(vcg), "t_end and VCG variables not the same length"
 
-    return vcg, legend, time, dt, t_end
+    return vcg, qrs_limits, legend_vcg, legend_limits, limits_linestyles, time, dt, t_end
 
 
 def __plot_spatial_velocity_prep_axes(len_vcg: int,
@@ -1240,7 +1305,8 @@ def __plot_spatial_velocity_plot_limits(qrs_limit: float,
                                         ax: dict,
                                         limit_colour: str) -> None:
     for key in ax:
-        ax[key].axvspan(qrs_limit, qrs_limit+0.1, color=limit_colour, alpha=0.5)
+        # ax[key].axvspan(qrs_limit, qrs_limit+0.1, color=limit_colour, alpha=0.5)
+        ax[key].axvline(qrs_limit, color=limit_colour, alpha=0.5)
     return None
 
 

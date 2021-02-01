@@ -1,6 +1,8 @@
 import sys
 import numpy as np  # type: ignore
 import scipy
+import pandas as pd
+import re
 from typing import Union, List, Optional, Tuple, Dict
 
 import common_analysis
@@ -151,7 +153,7 @@ def get_ecg_from_dat(ecg_files: Union[List[str], str],
     -------
     ecg : dict
         Extracted data for the 12-lead ECG
-    t_steps : np.ndarray
+    times : np.ndarray
         Time data associated with the ECG data
     """
     if isinstance(ecg_files, str):
@@ -179,6 +181,72 @@ def get_ecg_from_dat(ecg_files: Union[List[str], str],
         ecg['V4'] = ecgdata[:, 10]
         ecg['V5'] = ecgdata[:, 11]
         ecg['V6'] = ecgdata[:, 12]
+
+        ecgs.append(ecg)
+
+    if normalise:
+        ecgs = [normalise_ecg(ecg) for ecg in ecgs]
+
+    return ecgs, times
+
+
+def get_ecg_from_csv(ecg_files: Union[List[str], str],
+                     normalise: bool = True) -> Tuple[List[dict], List[np.ndarray]]:
+    """Extract ECG data from CSV file exported from St Jude Medical ECG recording
+
+    Parameters
+    ----------
+    ecg_files : str or list of str
+        Name/location of the .dat file to read
+    normalise : bool, optional
+        Whether or not to normalise the ECG signals on a per-lead basis, default=True
+
+    Returns
+    -------
+    ecg : dict
+        Extracted data for the 12-lead ECG
+    times : np.ndarray
+        Time data associated with the ECG data
+    """
+    if isinstance(ecg_files, str):
+        ecg_files = [ecg_files]
+
+    ecgs = list()
+    times = list()
+    for ecg_file in ecg_files:
+        line_count = 0
+        with open(ecg_file, 'r') as pFile:
+            while True:
+                line_count += 1
+                line = pFile.readline()
+                if 'number of samples' in line.lower():
+                    n_rows = int(re.search(r'\d+', line).group())
+                    break
+                if not line:
+                    raise EOFError('Number of Samples entry not found - check file input')
+        ecgdata = pd.read_csv(ecg_file, skiprows=line_count, index_col=False)
+        ecgdata.drop(ecgdata.tail(1).index, inplace=True)
+        n_rows_read, _ = ecgdata.shape
+        assert n_rows_read == n_rows, "Mismatch between expected data and read data"
+
+        times.append(ecgdata['t_ref'].values)
+
+        ecg = dict()
+        # Limb Leads
+        ecg['LI'] = ecgdata['I'].values
+        ecg['LII'] = ecgdata['II'].values
+        ecg['LIII'] = ecgdata['III'].values
+        # Augmented leads
+        ecg['aVR'] = ecgdata['aVR'].values
+        ecg['aVL'] = ecgdata['aVL'].values
+        ecg['aVF'] = ecgdata['aVF'].values
+        # Precordeal leads
+        ecg['V1'] = ecgdata['V1'].values
+        ecg['V2'] = ecgdata['V2'].values
+        ecg['V3'] = ecgdata['V3'].values
+        ecg['V4'] = ecgdata['V4'].values
+        ecg['V5'] = ecgdata['V5'].values
+        ecg['V6'] = ecgdata['V6'].values
 
         ecgs.append(ecg)
 

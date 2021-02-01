@@ -241,13 +241,16 @@ def convert_input_to_list(input_data: Any,
         if list_depth == 1:
             assert len(input_data) == n_list, "Incorrect number of entries in input_data"
         elif list_depth == 2:
+            for i_input_data in range(len(input_data)):
+                if not isinstance(input_data[i_input_data], list):
+                    input_data[i_input_data] = [input_data[i_input_data]]
             for inner_data in input_data:
                 assert len(inner_data) == n_list, "inner_data of input incorrectly formatted"
         else:
             raise Exception("Not coded for this eventuality...")
         return input_data
     else:
-        return [default_entry for _ in range(n_list)]
+        return [input_data for _ in range(n_list)]
 
 
 def check_list_depth(input_list, depth_count=1, max_depth=0, n_args=0):

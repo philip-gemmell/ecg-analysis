@@ -276,22 +276,25 @@ def normalise_ecg(ecg: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
     return ecg
 
 
-def get_twave_end(ecg: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]],
-                  lead: str = 'LII',
-                  time: Union[List[np.ndarray], np.ndarray, None] = None,
+def get_twave_end(ecgs: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]],
+                  leads: Union[str, List[str]] = 'LII',
+                  times: Union[List[np.ndarray], np.ndarray, None] = None,
                   dt: Union[List[float], float] = 2,
                   t_end: Union[List[float], float] = 200,
                   i_distance: int = 200,
-                  ecg_filter: bool = False) -> List[float]:
+                  ecg_filter: bool = False,
+                  return_average: bool = True) -> Union[List[float], List[List[float]]]:
     """ Return the time point at which it is estimated that the T-wave has bee completed
 
     Parameters
     ----------
-    ecg : dict of np.ndarray
+    ecgs : dict of np.ndarray
         ECG data
-    lead : str, optional
-        Which lead to check for the T-wave - usually this is either LII or V5, default LII
-    time : np.ndarray, optional
+    leads : str, optional
+        Which lead to check for the T-wave - usually this is either 'LII' or 'V5', but can be set to a list of
+        various leads. If set to 'global', then all T-wave values will be calculated. Will return all values unless
+        return_average flag is set. Default 'LII'
+    times : np.ndarray, optional
         Time data associated with ECG (provided instead of dt, t_end), default=None
     dt : float, optional
         Time interval between recording points in the ECG (provided with t_end instead of time), default=2
@@ -304,11 +307,17 @@ def get_twave_end(ecg: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]]
     ecg_filter: bool, optional
         Whether or not to apply a Butterworth filter to the ECG data to try and simplify the task of finding the
         actual T-wave gradient, default=False
+    return_average: bool, optional
+        Whether or not to return an average of the leads requested, default=True
 
     Returns
     -------
-    twave_end : float
-        Time value for when T-wave is estimated to have ended
+    twave_end : list of float or list of list of float
+        Time value for when T-wave is estimated to have ended. This will be returned as either:
+            [t1, t2, t3,...] for [ecg1, ecg2, ecg3,...]
+                if only a single lead is given or return_average is true
+            [[t1a, t1b,...], [t2a, t2b,...],...] for [ecg1, ecg,...] in leads [a, b,...]
+                if multiple leads are given and return_average is false
 
     References
     ----------
@@ -316,24 +325,42 @@ def get_twave_end(ecg: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]]
     doi: 10.2174/1573403x10666140514103612. PMID: 24827793; PMCID: PMC4040880.
     """
 
-    if isinstance(ecg, dict):
-        ecg = [ecg]
-    for sim_ecg in ecg:
-        assert lead in sim_ecg, 'Lead not present in ECG'
-
-    if ecg_filter:
-        ecg_lead = [common_analysis.filter_egm(sim_ecg[lead]) for sim_ecg in ecg]
+    if isinstance(ecgs, dict):
+        ecgs = [ecgs]
+    if leads == 'global':
+        leads = ecgs[0].keys()
     else:
-        ecg_lead = [sim_ecg[lead] for sim_ecg in ecg]
-    time, dt, _ = common_analysis.get_time(time, dt, t_end, n_vcg=len(ecg))
-    ecg_grad = [np.gradient(sim_ecg_lead, dt[0]) for sim_ecg_lead in ecg_lead]
-    ecg_grad_norm = [np.divide(np.absolute(sim_ecg_grad), np.amax(np.absolute(sim_ecg_grad))) for sim_ecg_grad in
-                     ecg_grad]
+        leads = common_analysis.convert_input_to_list(leads, len(ecgs))
+    for sim_ecg in ecgs:
+        for lead in leads:
+            assert lead in sim_ecg, 'Lead not present in ECG'
+    if len(leads) > 1 and not return_average:
+        print("Lead output: {}".format(leads))
 
-    # Find last peak in gradient, then by basic trig find the x-intercept (which is used as the T-wave end point)
+    # Extract ECG data for the required leads, then calculate the gradient and the normalised gradient
+    if ecg_filter:
+        ecgs_leads = [[common_analysis.filter_egm(ecg[lead]) for lead in leads] for ecg in ecgs]
+    else:
+        ecgs_leads = [[ecg[lead] for lead in leads] for ecg in ecgs]
+    times, dt, _ = common_analysis.get_time(times, dt, t_end, n_vcg=len(ecgs))
+    ecg_grad = [[np.gradient(ecg_lead, dt[0]) for ecg_lead in ecgs_lead] for ecgs_lead in ecgs_leads]
+    ecg_grad_norm = [[common_analysis.normalise_signal(ecg_grad_leads) for ecg_grad_leads in ecg_grad_ecgs]
+                     for ecg_grad_ecgs in ecg_grad]
+
+    # Find last peak in gradient (with the limitations imposed by only looking for a single peak within the range
+    # defined by i_distance, to minimise the effect of 'wibbles in the signal), then by basic trig find the
+    # x-intercept (which is used as the T-wave end point)
     # noinspection PyUnresolvedReferences
-    i_maxgradient = [scipy.signal.find_peaks(sim_ecg_grad_norm, distance=i_distance)[0][-1] for sim_ecg_grad_norm in
-                     ecg_grad_norm]
-    twave_end = [sim_time[i_max]-(sim_ecg_lead[i_max]/sim_ecg_grad[i_max])
-                 for (sim_time, sim_ecg_lead, sim_ecg_grad, i_max) in zip(time, ecg_lead, ecg_grad, i_maxgradient)]
+    i_maxgradient = [[scipy.signal.find_peaks(ecg_grad_norm_lead, distance=i_distance)[0][-1]
+                      for ecg_grad_norm_lead in ecg_grad_norm_ecg]
+                     for ecg_grad_norm_ecg in ecg_grad_norm]
+    twave_end = [[t_ecg[i_max_lead] - (ecg_lead_lead[i_max_lead]/ecg_grad_lead[i_max_lead])
+                  for (ecg_lead_lead, ecg_grad_lead, i_max_lead) in zip(ecg_lead_ecg, ecg_grad_ecg, i_max_ecg)]
+                 for (t_ecg, ecg_lead_ecg, ecg_grad_ecg, i_max_ecg) in zip(times, ecgs_leads, ecg_grad, i_maxgradient)]
+
+    if len(leads) == 1:
+        twave_end = [twave[0] for twave in twave_end]
+    elif return_average:
+        twave_end = [np.nanmean(twave) for twave in twave_end]
+
     return twave_end

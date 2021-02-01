@@ -302,3 +302,20 @@ def check_list_depth(input_list, depth_count=1, max_depth=0, n_args=0):
         for input_list_inner in input_list:
             check_list_depth(input_list_inner, depth_count=depth_count)
     return depth_count
+
+
+def normalise_signal(data: np.ndarray) -> np.ndarray:
+    """Returns a normalised signal, such that the maximum value in the signal is 1, or the minimum is -1
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Signal to be normalised
+
+    Returns
+    -------
+    normalised_data : np.ndarray
+        Normalised signal
+    """
+
+    return np.divide(np.absolute(data), np.amax(np.absolute(data)))

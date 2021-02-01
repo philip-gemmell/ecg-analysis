@@ -78,6 +78,43 @@ def get_plot_colours(n: int = 10, colourmap: Optional[str] = None) -> List[Tuple
         return [cmap(i) for i in np.linspace(0, 1, n)]
 
 
+def get_plot_lines(n: int = 4) -> Union[List[tuple], List[str]]:
+    """Returns different line-styles for plotting
+
+    Parameters
+    ----------
+    n : int, optional
+        Number of different line-styles required
+
+    Returns
+    -------
+    lines : list of str or list of tuple
+        List of different line-styles
+    """
+
+    if n <= 4:
+        return['-', '--', '-.', ':']
+    elif n < 15:
+        lines = list()
+        dash_gap = 2
+        i_lines = 0
+        while i_lines < 5:
+            # First few iterations to be '-----', '-.-.-.', '-..-..-..-',...
+            lines.append((0, tuple([5, dash_gap]+[1, dash_gap]*i_lines)))
+            i_lines += 1
+        while i_lines < 10:
+            # Following iterations to be '--.--', '--..--'. '--...---',...
+            lines.append((0, tuple([5, dash_gap, 5, dash_gap, 1, dash_gap]+[1, dash_gap]*(i_lines-5))))
+            i_lines += 1
+        while i_lines < 15:
+            # Following iterations to be '---.---', '---..---', '---...---',...
+            lines.append((0, tuple([5, dash_gap, 5, dash_gap, 5, dash_gap, 1, dash_gap]+[1, dash_gap]*(i_lines-10))))
+            i_lines += 1
+        return lines
+    else:
+        raise Exception('Unsure of how effective this number of different linestyles will be...')
+
+
 def recursive_len(item: list):
     """ Return the total number of elements with a potentially nested list """
 
@@ -215,7 +252,7 @@ def convert_index_to_time(idx: int,
 def convert_input_to_list(input_data: Any,
                           n_list: int = 1,
                           list_depth: int = 1,
-                          default_entry: Any = None) -> list:
+                          default_entry: Optional[str] = None) -> list:
     """Convert a given input to a list of inputs of required length. If already a list, will confirm that it's the
     right length.
 
@@ -228,8 +265,9 @@ def convert_input_to_list(input_data: Any,
     list_depth : int
         Number of nested lists required. If just a simple list of e.g. VCGs, then will be 1 ([vcg1, vcg2,...]). If a
         list of lists (e.g. [[qrs_start1, qrs_start2,...], [qrs_end1, qrs_end2,...]), then 2.
-    default_entry : Any, optional
-        Default entry to put into list, default=None
+    default_entry : {'colour', 'line', None}, optional
+        Default entry to put into list. If set to None, will just repeat the input data to match n_list. However,
+        if set to either 'colour' or 'line', will return the default potential settings, default=None
 
     Returns
     -------
@@ -239,9 +277,14 @@ def convert_input_to_list(input_data: Any,
 
     if isinstance(input_data, list):
         if list_depth == 1:
+            # Simplest option - just want a list of equal length to the variable of interest
             assert len(input_data) == n_list, "Incorrect number of entries in input_data"
         elif list_depth == 2:
+            # More complicated - we require data to be passed in form [[x1a, x1b,...],[x2a,x2b,...],...],
+            # where the length of [xna, xnb,...] is equal to the variable of interest
             for i_input_data in range(len(input_data)):
+                # This is the instance where there is only a single variable of interest, i.e. we require the data to
+                # be reformatted from [x1a, x2a, x3a,...] to [[x1a],[x2a],[x3a],...]
                 if not isinstance(input_data[i_input_data], list):
                     input_data[i_input_data] = [input_data[i_input_data]]
             for inner_data in input_data:
@@ -250,7 +293,14 @@ def convert_input_to_list(input_data: Any,
             raise Exception("Not coded for this eventuality...")
         return input_data
     else:
-        return [input_data for _ in range(n_list)]
+        if default_entry is None:
+            return [input_data for _ in range(n_list)]
+        elif default_entry == 'colour':
+            return get_plot_colours(n=n_list)
+        elif default_entry == 'line':
+            return get_plot_lines(n=n_list)
+        else:
+            raise Exception("Not coded for this eventuality...")
 
 
 def check_list_depth(input_list, depth_count=1, max_depth=0, n_args=0):

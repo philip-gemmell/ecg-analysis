@@ -1017,6 +1017,7 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
     -------
     fig
     ax
+        Handles to the figure and axes generated
     """
 
     """ Check input arguments are correctly formatted """
@@ -1028,7 +1029,8 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
     qrs_limits = common_analysis.convert_input_to_list(qrs_limits, n_list=n_vcg, list_depth=2)
     legend_vcg = common_analysis.convert_input_to_list(legend_vcg, n_list=n_vcg)
     legend_limits = common_analysis.convert_input_to_list(legend_limits, n_list=len(qrs_limits))
-    limits_linestyles = common_analysis.convert_input_to_list(limits_linestyles, n_list=len(qrs_limits))
+    limits_linestyles = common_analysis.convert_input_to_list(limits_linestyles, n_list=len(qrs_limits),
+                                                              default_entry='line')
     time_vcg = common_analysis.convert_input_to_list(time_vcg, n_list=n_vcg)
     time_sv = common_analysis.convert_input_to_list(time_sv, n_list=n_vcg)
     dt = common_analysis.convert_input_to_list(dt, n_list=n_vcg)
@@ -1083,14 +1085,16 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
     if legend_vcg[0] is not None:
         labels = [line.get_label() for line in ax['sv'].get_lines()]
         labels = [labelstr for labelstr in labels if not labelstr.startswith('_')] # Remove implicit labels from list
+        plt.rc('font', family='sans-serif')
         plt.rc('text', usetex=True)
         leg_vcg = ax['sv'].legend(labels, loc='upper right')
     else:
         leg_vcg = None
 
     if legend_limits[0] is not None:
+        plt.rc('font', family='sans-serif')
         plt.rc('text', usetex=True)
-        ax['sv'].legend(h_limits, legend_limits, loc='upper center')
+        ax['sv'].legend(h_limits, legend_limits, loc='upper center', handlelength=5)
         if legend_vcg[0] is not None:
             ax['sv'].add_artist(leg_vcg)
 
@@ -1380,6 +1384,7 @@ def plot_metric_change(metrics: List[List[List[float]]],
     ax : dict
         Handles to axes
     """
+    plt.rc('font', family='sans-serif')
     plt.rc('text', usetex=True)
 
     """ Underlying constants (volumes, sizes, labels, etc.) """
@@ -1694,6 +1699,7 @@ def plot_density_effect(metrics: List[List[float]],
         Markers to use for the discrete data points in the plot, default=['o' for _ in range(len(metrics))]
     """
     preamble = {
+        'font.family': 'sans-serif',
         'text.usetex': True,
         'text.latex.preamble': [r'\usepackage{amsmath}']
     }

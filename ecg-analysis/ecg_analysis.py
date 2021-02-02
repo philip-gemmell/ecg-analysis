@@ -327,10 +327,12 @@ def get_twave_end(ecgs: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]
 
     if isinstance(ecgs, dict):
         ecgs = [ecgs]
+
     if leads == 'global':
         leads = ecgs[0].keys()
     else:
-        leads = common_analysis.convert_input_to_list(leads, len(ecgs))
+        leads = common_analysis.convert_input_to_list(leads)
+    print(len(leads))
     for sim_ecg in ecgs:
         for lead in leads:
             assert lead in sim_ecg, 'Lead not present in ECG'

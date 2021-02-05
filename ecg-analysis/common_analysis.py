@@ -128,7 +128,7 @@ def get_time(time: Optional[np.ndarray] = None,
              dt: Optional[float] = None,
              t_end: Optional[float] = None,
              n_vcg: Optional[int] = 1,
-             len_vcg: Optional[List[int]] = None):
+             len_vcg: Optional[List[int]] = None) -> Tuple[List[np.ndarray], List[float], List[float]]:
     """Returns variables for time, dt and t_end, depending on input.
 
     Parameters
@@ -146,7 +146,7 @@ def get_time(time: Optional[np.ndarray] = None,
 
     Returns
     -------
-    time : np.ndarray
+    time : list of np.ndarray
         Time data for a given VCG
     dt : list of float
         Mean time interval for a given VCG recording
@@ -172,7 +172,7 @@ def get_time(time: Optional[np.ndarray] = None,
     else:
         if isinstance(time, np.ndarray):
             time = [time]
-        assert len(time) == n_vcg, "vcg and time variables must be same length"
+        assert len(time) == n_vcg, "vcg ({}) and time ({}) variables must be same length".format(n_vcg, len(time))
         for sim_time in time:
             assert max(np.diff(sim_time))-min(np.diff(sim_time)) < 0.0001,\
                 "dt not constant for across provided time variable"
@@ -182,13 +182,57 @@ def get_time(time: Optional[np.ndarray] = None,
     return time, dt, t_end
 
 
-def convert_time_to_index(qrs_start: Optional[float] = None,
-                          qrs_end: Optional[float] = None,
-                          t_start: float = 0,
-                          t_end: float = 200,
-                          dt: float = 2) -> Tuple[int, int]:
+def convert_time_to_index(time_point: float,
+                          time: Union[List[float], np.ndarray, None] = None,
+                          t_start: Optional[float] = None,
+                          t_end: Optional[float] = None,
+                          dt: Optional[float] = None) -> int:
+    """Converts a given time point to the relevant index value
+
+    Parameters
+    ----------
+    time_point : float
+        Time point for which we wish to find the corresponding index. If set to -1, will return the final index
+    time : float or np.ndarray, optional
+        Time data from which we wish to extract the index. If set to None, the time will be constructed based on the
+        assumed t_start, t_end and dt values
+    t_start : float, optional
+        Start point of time; only used if `time' variable not given, default=None
+    t_end : float, optional
+        End point of time; only used if `time' variable not given, default=None
+    dt : float, optional
+        Interval between time points; only used if time not given, default=None
+
+    Returns
+    -------
+    i_time : int
+        Index corresponding to the time point given
+
+    Raises
+    ------
+    AssertionError
+        If insufficient data are provided to the function to enable it to function
     """
-    Return indices of QRS start and end points. NB: indices returned match Matlab output
+
+    if time is None:
+        assert t_start is not None, "t_start not provided"
+        assert t_end is not None, "t_end not provided"
+        assert dt is not None, "dt not provided"
+        time = np.array(np.arange(t_start, t_end + dt, dt))
+
+    if time_point == -1:
+        return len(time)-1
+    else:
+        return np.where(time >= time_point)[0][0]
+
+
+def convert_time_to_index_deprecated(qrs_start: Optional[float] = None,
+                                     qrs_end: Optional[float] = None,
+                                     time: Optional[List[float]] = None,
+                                     t_start: float = 0,
+                                     t_end: float = 200,
+                                     dt: float = 2) -> Tuple[int, int]:
+    """Return indices of QRS start and end points. NB: indices returned match Matlab output
 
     Parameters
     ----------
@@ -196,6 +240,9 @@ def convert_time_to_index(qrs_start: Optional[float] = None,
         Start time to convert to index. If not given, will default to the same as the start time of the entire list
     qrs_end : float or int, optional
         End time to convert to index. If not given, will default to the same as the end time of the entire list
+    time : float, optional
+        Time data to be used to calculate index. If given, will over-ride the values used for dt/t_start/t_end.
+        Default=None
     t_start : float or int, optional
          Start time of overall data, default=0
     t_end : float or int, optional
@@ -211,18 +258,25 @@ def convert_time_to_index(qrs_start: Optional[float] = None,
         Index of end time
 
     """
+
+    if time is None:
+        time = np.array(np.arange(t_start, t_end + dt, dt))
+
     if qrs_start is None:
-        qrs_start = t_start
+        i_qrs_start = 0
+    else:
+        i_qrs_start = np.where(time >= qrs_start)[0][0]
+
     if qrs_end is None:
-        qrs_end = t_end
-    x_val = np.array(np.arange(t_start, t_end + dt, dt))
-    i_qrs_start = np.where(x_val >= qrs_start)[0][0]
-    i_qrs_end = np.where(x_val > qrs_end)[0][0]-1
+        i_qrs_end = -1
+    else:
+        i_qrs_end = np.where(time >= qrs_end)[0][0]-1
 
     return i_qrs_start, i_qrs_end
 
 
 def convert_index_to_time(idx: int,
+                          time: Optional[np.ndarray] = None,
                           t_start: float = 0,
                           t_end: float = 200,
                           dt: float = 2) -> float:
@@ -233,6 +287,8 @@ def convert_index_to_time(idx: int,
     ----------
     idx : int
         Index to convert
+    time : np.ndarray, optional
+        Time data; if not provided, will be assumed from t_start, t_end and dt variables, default=None
     t_start : float, optional
         Start time for overall data, default=0
     t_end : float, optional
@@ -245,14 +301,16 @@ def convert_index_to_time(idx: int,
     time : float
         The time value that corresponds to the given index
     """
-    x_val = np.array(np.arange(t_start, t_end+dt, dt))
-    return x_val[idx]
+
+    if time is None:
+        time = np.array(np.arange(t_start, t_end+dt, dt))
+    return time[idx]
 
 
 def convert_input_to_list(input_data: Any,
                           n_list: int = 1,
                           list_depth: int = 1,
-                          default_entry: Optional[str] = None) -> list:
+                          default_entry: Any = None) -> list:
     """Convert a given input to a list of inputs of required length. If already a list, will confirm that it's the
     right length.
 
@@ -265,7 +323,7 @@ def convert_input_to_list(input_data: Any,
     list_depth : int
         Number of nested lists required. If just a simple list of e.g. VCGs, then will be 1 ([vcg1, vcg2,...]). If a
         list of lists (e.g. [[qrs_start1, qrs_start2,...], [qrs_end1, qrs_end2,...]), then 2.
-    default_entry : {'colour', 'line', None}, optional
+    default_entry : {'colour', 'line', None, Any}, optional
         Default entry to put into list. If set to None, will just repeat the input data to match n_list. However,
         if set to either 'colour' or 'line', will return the default potential settings, default=None
 
@@ -300,7 +358,7 @@ def convert_input_to_list(input_data: Any,
         elif default_entry == 'line':
             return get_plot_lines(n=n_list)
         else:
-            raise Exception("Not coded for this eventuality...")
+            return [default_entry for _ in range(n_list)]
 
 
 def check_list_depth(input_list, depth_count=1, max_depth=0, n_args=0):

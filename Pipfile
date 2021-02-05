@@ -7,8 +7,11 @@ name = "pypi"
 numpy = "*"
 matplotlib = "*"
 scipy = "*"
+pandas = "*"
+py-ecg-detectors = "*"
 
 [dev-packages]
+ipython = "*"
 
 [requires]
 python_version = "3.8"

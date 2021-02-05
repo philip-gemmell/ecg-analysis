@@ -1,0 +1,9 @@
+Install packages using the "pipenv install" command to
+ensure compatible packages are installed (though this was
+a post-hoc use of pipenv, so mistakes may exist)
+
+For some of the plotting functions, a working LaTeX
+installation is also required. In addition, the cm-super
+and dvipng packages are required for Linux platforms - I'm
+afraid I don't know what the equivalent installation
+requirements are for non-Linux OS.

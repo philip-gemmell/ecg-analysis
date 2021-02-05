@@ -1,54 +1,69 @@
-from scipy import signal
-import numpy as np
-import math
-# import matplotlib.pyplot as plt
-# import matplotlib.colors as mpl_colours
-import matplotlib.cm as cm
-import shelve
+import numpy as np  # type: ignore
+import matplotlib.cm as cm  # type: ignore
+from scipy import signal  # type: ignore
+from typing import List, Tuple, Optional, Union, Any
 
 
-def filter_egm(egm, sample_freq=500, freq_filter=40, order=2, filter_type='low'):
-    """ Filters EGM data (low pass) """
+def filter_egm(egm: np.ndarray,
+               sample_freq: float = 500,
+               freq_filter: float = 40,
+               order: int = 2,
+               filter_type: str = 'low') -> np.ndarray:
+    """
+    Filter EGM data (low pass)
 
-    """ egm             data to filter
-        sample_rate     sampling rate of data
-        freq_filter     cut-off frequency for filter
-        order           order of the Butterworth filter
-        filter_type     type of filter ('low', 'high', 'band')
+    Filter a given set of EGM data using a Butterworth filter, designed to have a specific passband for desired
+    frequencies.
+
+    Parameters
+    ----------
+    egm : list
+        Data to filter
+    sample_freq : int or float
+        Sampling rate of data (Hz), default=500
+    freq_filter : int or float
+        Cut-off frequency for filter, default=40
+    order : int
+        Order of the Butterworth filter, default=2
+    filter_type : {'low', 'high', 'band'}
+        Type of filter to use, default='low'
+
+    Returns
+    -------
+    filter_out : np.ndarray
+        Output filtered data
     """
 
     # Define filter window (expressed as a fraction of the Nyquist frequency, which is half the sampling rate)
     window = freq_filter/(sample_freq*0.5)
 
     [b, a] = signal.butter(order, window, filter_type)
-    # print("type(b) = {}, type(a) = {}".format(type(b),type(a)))
     filter_out = signal.filtfilt(b, a, egm)
 
     return filter_out
 
 
-def convert_time_to_index(qrs_start=None, qrs_end=None, t_start=0, t_end=200, dt=2, matlab_match=False):
-    """ Returns indices of QRS start and end points. NB: indices returned match Matlab output """
-    if qrs_start is None:
-        qrs_start = t_start
-    if qrs_end is None:
-        qrs_end = t_end
-    x_val = np.array(range(t_start, t_end + dt, dt))
-    i_qrs_start = np.where(x_val >= qrs_start)[0][0]
-    i_qrs_end = np.where(x_val > qrs_end)[0][0]-1
+def get_plot_colours(n: int = 10, colourmap: Optional[str] = None) -> List[Tuple[float]]:
+    """
+    Return iterable list of RGB colour values that can be used for custom plotting functions
 
-    return i_qrs_start, i_qrs_end
+    Returns a list of RGB colours values, potentially according to a specified colourmap. If n is low enough, will use
+    the custom 'tab10' colourmap by default, which will use alternating colours as much as possible to maximise
+    visibility. If n is too big, then the default setting is 'viridis', which should provide a gradation of colour from
+    first to last.
 
+    Parameters
+    ----------
+    n : int, optional
+        Number of distinct colours required, default=10
+    colourmap : str
+        Matplotlib colourmap to base the end result on. Will default to 'tab10' if n<11, 'viridis' otherwise
 
-def convert_index_to_time(idx, t_start=0, t_end=200, dt=2):
-    """ Returns 'real' time for a given index """
-    x_val = np.array(range(t_start, t_end+dt, dt))
-    return x_val[idx]
-
-
-def get_plot_colours(n, colourmap=None):
-    """ Returns colour values to be used when plotting """
-
+    Returns
+    -------
+    cmap : list of tuple
+        List of RGB values
+    """
     if colourmap is None:
         if n < 11:
             colourmap = 'tab10'
@@ -56,188 +71,359 @@ def get_plot_colours(n, colourmap=None):
             colourmap = 'viridis'
 
     if n < 11:
-        # cmap = plt.get_cmap('tab10')
         cmap = cm.get_cmap(colourmap)
         return [cmap(i) for i in np.linspace(0, 1, 10)]
     else:
-        # cmap = plt.get_cmap('viridis', n)
         cmap = cm.get_cmap(colourmap, n)
         return [cmap(i) for i in np.linspace(0, 1, n)]
 
-    # values = range(n)
-    # c_norm = mpl_colours.Normalize(vmin=0, vmax=values[-1])
-    # scalar_cmap = cm.ScalarMappable(norm=c_norm, cmap=cmap)
-    #
-    # return [scalar_cmap.to_rgba(values[i]) for i in range(n)]
 
+def get_plot_lines(n: int = 4) -> Union[List[tuple], List[str]]:
+    """Returns different line-styles for plotting
 
-def write_colourmap_to_xml(start_data, end_data, start_highlight, end_highlight, opacity_data=1, opacity_highlight=1,
-                           n_tags=20, colourmap='viridis', outfile='colourmap.xml'):
-    """ Creates a Paraview friendly colourmap useful for highlighting a particular range that can be imported to
-        Paraview. """
+    Parameters
+    ----------
+    n : int, optional
+        Number of different line-styles required
 
-    """ INPUT: 
-        start_data                      start value for overall data (can't just use data for region of interest -
-                                        Paraview will scale)
-        end_data                        end value for overall data
-        start_highlight                 start value for region of interest
-        end_highlight                   end value for region of interest
-        opacity_data        1.0         overall opacity to use for all data
-        opacity_highlight   1.0         opacity for region of interest
-        colourmap           'viridis'   colourmap to use
-        outfile             <filename>  filename to save .xml file under
+    Returns
+    -------
+    lines : list of str or list of tuple
+        List of different line-styles
     """
 
-    """ Get colour values """
-    cmap = get_plot_colours(n_tags, colourmap=colourmap)
-
-    """ Get values for x, depending on start and end values """
-    x_offset = 0.2      # Value to provide safespace round x values
-    x_maintain = 0.01   # Value to maintain safespace round n_tag values
-    cmap_x_data = np.linspace(start_data, end_data, 20)
-    cmap_x_data = np.delete(cmap_x_data, np.where(np.logical_and(cmap_x_data > start_highlight-x_offset,
-                                                                 cmap_x_data < end_highlight+x_offset)))
-    cmap_x_highlight = np.linspace(start_highlight-x_offset, end_highlight+x_offset, n_tags)
-
-    """ Extract colourmap name from given value for outfile """
-    if outfile.endswith('.xml'):
-        name = outfile[:-4]
+    if n <= 4:
+        return['-', '--', '-.', ':']
+    elif n < 15:
+        lines = list()
+        dash_gap = 2
+        i_lines = 0
+        while i_lines < 5:
+            # First few iterations to be '-----', '-.-.-.', '-..-..-..-',...
+            lines.append((0, tuple([5, dash_gap]+[1, dash_gap]*i_lines)))
+            i_lines += 1
+        while i_lines < 10:
+            # Following iterations to be '--.--', '--..--'. '--...---',...
+            lines.append((0, tuple([5, dash_gap, 5, dash_gap, 1, dash_gap]+[1, dash_gap]*(i_lines-5))))
+            i_lines += 1
+        while i_lines < 15:
+            # Following iterations to be '---.---', '---..---', '---...---',...
+            lines.append((0, tuple([5, dash_gap, 5, dash_gap, 5, dash_gap, 1, dash_gap]+[1, dash_gap]*(i_lines-10))))
+            i_lines += 1
+        return lines
     else:
-        name = outfile[:]
-        outfile = outfile+'.xml'
-
-    """ Write to file """
-    with open(outfile, 'w') as pFile:
-        pFile.write('<ColorMaps>\n'.format(name))
-        pFile.write('\t<ColorMap name="{}" space="RGB">\n'.format(name))
-
-        """ Write non-highlighted data values"""
-        for x in cmap_x_data:
-            pFile.write('\t\t<Point x="{}" o="{}" r="0.5" g="0.5" b="0.5"/>\n'.format(x, opacity_data))
-        pFile.write('\t\t<Point x="{}" o="{}" r="0.5" g="0.5" b="0.5"/>\n'.format(start_highlight-3*x_offset,
-                                                                                  opacity_data))
-        pFile.write('\t\t<Point x="{}" o="{}" r="0.5" g="0.5" b="0.5"/>\n'.format(end_highlight+3*x_offset,
-                                                                                  opacity_data))
-
-        """ Write highlighted data values """
-        for (rgb, x) in zip(cmap, cmap_x_highlight):
-            pFile.write('\t\t<Point x="{}" o="{}" r="{}" g="{}" b="{}"/>\n'.format(x-x_maintain, opacity_highlight,
-                                                                                   rgb[0], rgb[1], rgb[2]))
-            pFile.write('\t\t<Point x="{}" o="{}" r="{}" g="{}" b="{}"/>\n'.format(x, opacity_highlight,
-                                                                                   rgb[0], rgb[1], rgb[2]))
-            pFile.write('\t\t<Point x="{}" o="{}" r="{}" g="{}" b="{}"/>\n'.format(x+x_maintain, opacity_highlight,
-                                                                                   rgb[0], rgb[1], rgb[2]))
-
-        pFile.write('\t</ColorMap>\n')
-        pFile.write('</ColorMaps>')
-
-    return None
+        raise Exception('Unsure of how effective this number of different linestyles will be...')
 
 
-def save_workspace(shelf_name):
-    my_shelf = shelve.open(shelf_name, 'n')   # 'n' for new
+def recursive_len(item: list):
+    """ Return the total number of elements with a potentially nested list """
 
-    for key in dir():
-        try:
-            my_shelf[key] = globals()[key]
-        except (TypeError, KeyError):
-            # __builtins__, my_shelf, and imported modules can not be shelved.
-            print('ERROR shelving: {0}'.format(key))
-    my_shelf.close()
-
-    return None
+    if type(item) == list:
+        return sum(recursive_len(subitem) for subitem in item)
+    else:
+        return 1
 
 
-def load_workspace(shelf_name):
-    my_shelf = shelve.open(shelf_name)
-    for key in my_shelf:
-        globals()[key] = my_shelf[key]
-    my_shelf.close()
+def get_time(time: Optional[np.ndarray] = None,
+             dt: Optional[float] = None,
+             t_end: Optional[float] = None,
+             n_vcg: Optional[int] = 1,
+             len_vcg: Optional[List[int]] = None) -> Tuple[List[np.ndarray], List[float], List[float]]:
+    """Returns variables for time, dt and t_end, depending on input.
 
-    return None
+    Parameters
+    ----------
+    time : np.ndarray, optional
+        Time data for a given VCG, default=None
+    dt : float, optional
+        Interval between recording points for the VCG, default=None
+    t_end : float, optional
+        Total duration of the VCG recordings, default=None
+    n_vcg : int, optional
+        Number of VCGs being assessed, default=1
+    len_vcg : int, optional
+        Number of data points for each VCG being assessed, None
 
+    Returns
+    -------
+    time : list of np.ndarray
+        Time data for a given VCG
+    dt : list of float
+        Mean time interval for a given VCG recording
+    t_end : list of float
+        Total duration of each VCG recording
 
-def asin2(x, y):
-    """ Function to return the inverse sin function across the range (-pi, pi], rather than (-pi/2, pi/2] """
-    """ x: x coordinate of the point in 2D space
-        y: y coordinate of the point in 2D space
+    Notes
+    -----
+    Time OR t_end/dt/len_vcg must be passed to this function
     """
-    r = math.sqrt(x**2+y**2)
-    if x >= 0:
-        return math.asin(y/r)
+
+    if time is None or time[0] is None:
+        assert dt is not None, "Must pass either time or dt/t_end/len_vcg"
+        assert t_end is not None, "Must pass either time or dt/t_end/len_vcg"
+        assert len_vcg is not None, "Must pass either time or dt/t_end/len_vcg"
+        if isinstance(dt, (int, float)):
+            dt = [dt for _ in range(n_vcg)]
+        if isinstance(t_end, (int, float)):
+            t_end = [t_end for _ in range(n_vcg)]
+        time = [np.arange(0, sim_t_end+sim_dt, sim_dt) for (sim_dt, sim_t_end) in zip(dt, t_end)]
+        for sim_len_vcg, sim_time in zip(len_vcg, time):
+            assert sim_len_vcg == len(sim_time), "vcg and time variables mis-aligned"
     else:
-        if y >= 0:
-            return math.pi-math.asin(y/r)
-        else:
-            return -math.pi-math.asin(y/r)
+        if isinstance(time, np.ndarray):
+            time = [time]
+        assert len(time) == n_vcg, "vcg ({}) and time ({}) variables must be same length".format(n_vcg, len(time))
+        for sim_time in time:
+            assert max(np.diff(sim_time))-min(np.diff(sim_time)) < 0.0001,\
+                "dt not constant for across provided time variable"
+        dt = [np.mean(np.diff(sim_time)) for sim_time in time]
+        t_end = [t[-1] for t in time]
+
+    return time, dt, t_end
 
 
-def acos2(x, y):
-    """ Function to return the inverse cos function across the range (-pi, pi], rather than (0, pi] """
-    """ x: x coordinate of the point in 2D space
-        y: y coordinate of the point in 2D space
+def convert_time_to_index(time_point: float,
+                          time: Union[List[float], np.ndarray, None] = None,
+                          t_start: Optional[float] = None,
+                          t_end: Optional[float] = None,
+                          dt: Optional[float] = None) -> int:
+    """Converts a given time point to the relevant index value
+
+    Parameters
+    ----------
+    time_point : float
+        Time point for which we wish to find the corresponding index. If set to -1, will return the final index
+    time : float or np.ndarray, optional
+        Time data from which we wish to extract the index. If set to None, the time will be constructed based on the
+        assumed t_start, t_end and dt values
+    t_start : float, optional
+        Start point of time; only used if `time' variable not given, default=None
+    t_end : float, optional
+        End point of time; only used if `time' variable not given, default=None
+    dt : float, optional
+        Interval between time points; only used if time not given, default=None
+
+    Returns
+    -------
+    i_time : int
+        Index corresponding to the time point given
+
+    Raises
+    ------
+    AssertionError
+        If insufficient data are provided to the function to enable it to function
     """
-    r = math.sqrt(x**2+y**2)
-    if y >= 0:
-        return math.acos(x/r)
+
+    if time is None:
+        assert t_start is not None, "t_start not provided"
+        assert t_end is not None, "t_end not provided"
+        assert dt is not None, "dt not provided"
+        time = np.array(np.arange(t_start, t_end + dt, dt))
+
+    if time_point == -1:
+        return len(time)-1
     else:
-        return -math.acos(x/r)
+        return np.where(time >= time_point)[0][0]
 
 
-def convert_to_plane(x, y):
-    """ Function to convert a given coordinate to a corresponding point in the coplanar system. """
-    r = math.sqrt(x**2+y**2)
-    if x >= 0:
-        return r
+def convert_time_to_index_deprecated(qrs_start: Optional[float] = None,
+                                     qrs_end: Optional[float] = None,
+                                     time: Optional[List[float]] = None,
+                                     t_start: float = 0,
+                                     t_end: float = 200,
+                                     dt: float = 2) -> Tuple[int, int]:
+    """Return indices of QRS start and end points. NB: indices returned match Matlab output
+
+    Parameters
+    ----------
+    qrs_start : float or int, optional
+        Start time to convert to index. If not given, will default to the same as the start time of the entire list
+    qrs_end : float or int, optional
+        End time to convert to index. If not given, will default to the same as the end time of the entire list
+    time : float, optional
+        Time data to be used to calculate index. If given, will over-ride the values used for dt/t_start/t_end.
+        Default=None
+    t_start : float or int, optional
+         Start time of overall data, default=0
+    t_end : float or int, optional
+        End time of overall data, default=200
+    dt : float or int, optional
+        Interval between time points, default=2
+
+    Returns
+    -------
+    i_qrs_start : int
+        Index of start time
+    i_qrs_end : int
+        Index of end time
+
+    """
+
+    if time is None:
+        time = np.array(np.arange(t_start, t_end + dt, dt))
+
+    if qrs_start is None:
+        i_qrs_start = 0
     else:
-        return -r
+        i_qrs_start = np.where(time >= qrs_start)[0][0]
 
-
-def find_list_fraction(input_list, fraction=0.5, interpolate=True):
-    fraction_list = np.linspace(0, 1, len(input_list))
-    fraction_bounds = 0.1
-    fraction_idx = np.where((fraction_list >= fraction-fraction_bounds) &
-                            (fraction_list <= fraction+fraction_bounds))[0]
-    while len(fraction_idx) > 2:
-        fraction_bounds /= 10
-        fraction_idx = np.where((fraction_list >= fraction - fraction_bounds) &
-                                (fraction_list <= fraction + fraction_bounds))[0]
-        if len(fraction_idx) < 1:
-            fraction_bounds *= 2
-            fraction_idx = np.where((fraction_list >= fraction - fraction_bounds) &
-                                    (fraction_list <= fraction + fraction_bounds))[0]
-
-    if len(fraction_idx) == 1:
-        return input_list[fraction_idx[0]]
+    if qrs_end is None:
+        i_qrs_end = -1
     else:
-        if interpolate:
-            """ Interpolate between two values, based on:
-                l = l_a * f_a + l_b * f_b
-                where l_a is value of list at fraction_idx[0] and l_b is value of list at fraction_idx[1]
-                f_a = (-1/(b-a))*(x-a) + 1
-                f_b = (1/(b-a))*(x-a)
-                where a=fraction_idx[0], b=fraction_idx[1], and x is the actually desired fraction
-            """
-            a = fraction_list[fraction_idx[0]]
-            b = fraction_list[fraction_idx[1]]
-            gradient = 1/(b-a)
-            f_a = -gradient*(fraction-a)+1
-            f_b = gradient*(fraction-a)
-            # Return different answers, depending on whether the input list is a list of lists or not
-            if isinstance(input_list[0], list):
-                return [i*f_a+j*f_b for i, j in zip(input_list[fraction_idx[0]], input_list[fraction_idx[1]])]
-            else:
-                return input_list[fraction_idx[0]]*f_a + input_list[fraction_idx[1]]*f_b
+        i_qrs_end = np.where(time >= qrs_end)[0][0]-1
+
+    return i_qrs_start, i_qrs_end
+
+
+def convert_index_to_time(idx: int,
+                          time: Optional[np.ndarray] = None,
+                          t_start: float = 0,
+                          t_end: float = 200,
+                          dt: float = 2) -> float:
+    """
+    Return 'real' time for a given index
+
+    Parameters
+    ----------
+    idx : int
+        Index to convert
+    time : np.ndarray, optional
+        Time data; if not provided, will be assumed from t_start, t_end and dt variables, default=None
+    t_start : float, optional
+        Start time for overall data, default=0
+    t_end : float, optional
+        End time for overall data, default=200
+    dt : float, optional
+        Interval between time points, default=2
+
+    Returns
+    -------
+    time : float
+        The time value that corresponds to the given index
+    """
+
+    if time is None:
+        time = np.array(np.arange(t_start, t_end+dt, dt))
+    return time[idx]
+
+
+def convert_input_to_list(input_data: Any,
+                          n_list: int = 1,
+                          list_depth: int = 1,
+                          default_entry: Any = None) -> list:
+    """Convert a given input to a list of inputs of required length. If already a list, will confirm that it's the
+    right length.
+
+    Parameters
+    ----------
+    input_data : Any
+        Input argument to be checked
+    n_list : int, optional
+        Number of entries required in input, default=1
+    list_depth : int
+        Number of nested lists required. If just a simple list of e.g. VCGs, then will be 1 ([vcg1, vcg2,...]). If a
+        list of lists (e.g. [[qrs_start1, qrs_start2,...], [qrs_end1, qrs_end2,...]), then 2.
+    default_entry : {'colour', 'line', None, Any}, optional
+        Default entry to put into list. If set to None, will just repeat the input data to match n_list. However,
+        if set to either 'colour' or 'line', will return the default potential settings, default=None
+
+    Returns
+    -------
+    output : list
+        Formatted output
+    """
+
+    if isinstance(input_data, list):
+        if list_depth == 1:
+            # Simplest option - just want a list of equal length to the variable of interest
+            assert len(input_data) == n_list, "Incorrect number of entries in input_data"
+        elif list_depth == 2:
+            # More complicated - we require data to be passed in form [[x1a, x1b,...],[x2a,x2b,...],...],
+            # where the length of [xna, xnb,...] is equal to the variable of interest
+            for i_input_data in range(len(input_data)):
+                # This is the instance where there is only a single variable of interest, i.e. we require the data to
+                # be reformatted from [x1a, x2a, x3a,...] to [[x1a],[x2a],[x3a],...]
+                if not isinstance(input_data[i_input_data], list):
+                    input_data[i_input_data] = [input_data[i_input_data]]
+            for inner_data in input_data:
+                assert len(inner_data) == n_list, "inner_data of input incorrectly formatted"
         else:
-            return tuple(np.array(input_list)[fraction_idx])
-
-
-def find_list_middle(input_list, interpolate=True):
-    middle = float(len(input_list))/2
-    if middle % 2 != 0:
-        return input_list[int(middle - .5)]
+            raise Exception("Not coded for this eventuality...")
+        return input_data
     else:
-        if interpolate:
-            return np.mean((input_list[int(middle)], input_list[int(middle-1)]), axis=0)
+        if default_entry is None:
+            return [input_data for _ in range(n_list)]
+        elif default_entry == 'colour':
+            return get_plot_colours(n=n_list)
+        elif default_entry == 'line':
+            return get_plot_lines(n=n_list)
         else:
-            return input_list[int(middle-1)], input_list[int(middle)]
+            return [default_entry for _ in range(n_list)]
+
+
+def check_list_depth(input_list, depth_count=1, max_depth=0, n_args=0):
+    """ Function to calculate the depth of nested loops
+
+    TODO: Finish this damn code
+
+    Parameters
+    ----------
+    input_list : list
+        Input argument to check
+    depth_count : int, optional
+        Depth of nested loops thus far
+    max_depth : int, optional
+        Maximum expected depth of list, default=0 (not checked)
+    n_args : int, optional
+        Required length of 'base' list, default=0 (not checked)
+
+    Returns
+    -------
+    depth_count : int
+        Depth of nested loops
+
+    Notes
+    -----
+    A list of form [a1, a2, a3, ...] has depth 1.
+    A list of form [[a1, a2, a3, ...], [b1, b2, b3, ...], ...] has depth 2.
+    And so forth...
+
+    If n_args is set to an integer greater than 0, it will check that the lowest level of lists (for all entries)
+    will be of the required length
+        if depth=1 as above, len([a1, a2, a3, ...]) == n_args
+        if depth=2 as above, len([a1, a2, a3, ...]) == n_args && len([b1, b2, b3, ...]) == n_args
+    """
+
+    for input_list_inner in input_list:
+        if isinstance(input_list_inner, list):
+            depth_count += 1
+
+    if not isinstance(input_list[0], list):
+        assert all([not isinstance(input_list_inner, list) for input_list_inner in input_list])
+        if n_args > 0:
+            for input_list_inner in input_list:
+                assert len(input_list_inner) == n_args, "Incorrect list lengths"
+    else:
+        depth_count += 1
+        if max_depth > 0:
+            assert depth_count <= max_depth, "Maximum depth exceeded"
+        for input_list_inner in input_list:
+            check_list_depth(input_list_inner, depth_count=depth_count)
+    return depth_count
+
+
+def normalise_signal(data: np.ndarray) -> np.ndarray:
+    """Returns a normalised signal, such that the maximum value in the signal is 1, or the minimum is -1
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Signal to be normalised
+
+    Returns
+    -------
+    normalised_data : np.ndarray
+        Normalised signal
+    """
+
+    return np.divide(np.absolute(data), np.amax(np.absolute(data)))

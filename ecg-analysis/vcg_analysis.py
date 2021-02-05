@@ -353,7 +353,7 @@ def get_qrs_area(vcg: Union[List[np.ndarray], np.ndarray], qrs_start: Optional[L
     qrs_area_components = list()
     for sim_vcg, sim_qrs_start, sim_qrs_end in zip(vcg, qrs_start, qrs_end):
         # Recalculate indices for start and end points of QRS, and extract relevant data
-        i_qrs_start, i_qrs_end = common_analysis.convert_time_to_index(sim_qrs_start, sim_qrs_end, t_end=t_end, dt=dt)
+        i_qrs_start, i_qrs_end = common_analysis.convert_time_to_index_deprecated(sim_qrs_start, sim_qrs_end, t_end=t_end, dt=dt)
         if matlab_match:
             sim_vcg_qrs = sim_vcg[i_qrs_start - 1:i_qrs_end + 1]
         else:
@@ -504,7 +504,7 @@ def get_single_vcg_azimuth_elevation(vcg: np.ndarray,
     dipole_magnitude : np.ndarray
         Array containing the dipole magnitude at all points throughout the VCG
     """
-    i_start, i_end = common_analysis.convert_time_to_index(t_start, t_end)
+    i_start, i_end = common_analysis.convert_time_to_index_deprecated(t_start, t_end)
     if matlab_match:
         sim_vcg = vcg[i_start - 1:i_end]
     else:
@@ -527,11 +527,13 @@ def get_single_vcg_azimuth_elevation(vcg: np.ndarray,
 
 
 def get_dipole_magnitudes(vcg: Union[List[np.ndarray], np.ndarray],
-                          t_start: Optional[List[float]] = None,
-                          t_end: Optional[List[float]] = None,
-                          matlab_match: bool = False) -> Tuple[List[float], List[float], List[List[float]], List]:
-    """
-    Calculates metrics relating to the magnitude of the weighted dipole of the VCG
+                          time: Optional[List[float]] = None,
+                          t_start: Union[float, List[float]] = 0,
+                          t_end: Union[float, List[float]] = -1,
+                          dt: Optional[List[float]] = None,
+                          matlab_match: bool = False) -> Tuple[List[List[float]], List[float], List[float],
+                                                               List[List[float]], List]:
+    """Calculates metrics relating to the magnitude of the weighted dipole of the VCG
 
     Returns the mean weighted dipole, maximum dipole magnitude,(x,y.z) components of the maximum dipole and the time
     at which the maximum dipole occurs
@@ -540,16 +542,24 @@ def get_dipole_magnitudes(vcg: Union[List[np.ndarray], np.ndarray],
     ----------
     vcg : np.ndarray or list of np.ndarray
         VCG data to calculate
+    time : list of float, optional
+        Time data for VCG data
     t_start : list of float, optional
-        Start time from which to calculate the magnitude, default=0
+        Start time from which to calculate the magnitude, default=0 (for any other value to be recognisable,
+        time variable must be given)
     t_end : list of float, optional
-        End time until which to calculate the magnitudes, default=end
+        End time until which to calculate the magnitudes, default=end (for any other value to be recognisable,
+        time variable must be given)
+    dt : list of float, default=None
+        Time interval for recorded data, only used if time is not given, default=None
     matlab_match : bool, optional
         Whether or not to match the original Matlab function's output, regarding how the section of the VCG is
         extracted, default=False
 
     Returns
     -------
+    dipole_magnitude : list of list of float
+        Magnitude time courses for each VCG
     weighted_magnitude : list of float
         Mean magnitude of the VCG
     max_dipole_magnitude : list of float
@@ -560,38 +570,60 @@ def get_dipole_magnitudes(vcg: Union[List[np.ndarray], np.ndarray],
         Time at which the maximum magnitude of the VCG occurs
     """
 
+    # Check input arguments are in the correct format
     if isinstance(vcg, np.ndarray):
         vcg = [vcg]
-    if t_start is not None:
-        assert len(vcg) == len(t_start)
-    else:
-        t_start = [None for _ in range(len(vcg))]
-    if t_end is not None:
-        assert len(vcg) == len(t_end)
-    else:
-        t_end = [None for _ in range(len(vcg))]
 
+    if isinstance(time, list):
+        if not hasattr(time[0], '__iter__'):
+            time = [time]
+        else:
+            assert len(vcg) == len(time), "Time and VCG variables mismatched"
+    else:
+        time = [None for _ in range(len(vcg))]
+
+    t_start = common_analysis.convert_input_to_list(t_start, n_list=len(vcg), default_entry=t_start)
+    # if t_start is not None:
+    #     assert len(vcg) == len(t_start)
+    # else:
+    #     t_start = [None for _ in range(len(vcg))]
+
+    t_end = common_analysis.convert_input_to_list(t_end, n_list=len(vcg), default_entry=t_end)
+    # if t_end is not None:
+    #     assert len(vcg) == len(t_end)
+    # else:
+    #     t_end = [None for _ in range(len(vcg))]
+
+    dt = common_analysis.convert_input_to_list(dt, n_list=len(vcg))
+
+    dipole_magnitude = list()
     weighted_magnitude = list()
     max_dipole_magnitude = list()
     max_dipole_components = list()
     max_dipole_time = list()
-    for (sim_vcg, sim_t_start, sim_t_end) in zip(vcg, t_start, t_end):
+    for (sim_vcg, sim_time, sim_t_start, sim_t_end, sim_dt) in zip(vcg, time, t_start, t_end, dt):
         # Calculate dipole at all points
-        i_start, i_end = common_analysis.convert_time_to_index(sim_t_start, sim_t_end)
+        # i_start, i_end = common_analysis.convert_time_to_index_deprecated(sim_t_start, sim_t_end, time=sim_time)
+        i_start = common_analysis.convert_time_to_index(sim_t_start, time=sim_time,
+                                                        t_start=sim_t_start, t_end=sim_t_end, dt=sim_dt)
+        i_end = common_analysis.convert_time_to_index(sim_t_end, time=sim_time,
+                                                      t_start=sim_t_start, t_end=sim_t_end, dt=sim_dt)
         if matlab_match:
             sim_vcg_qrs = sim_vcg[i_start-1:i_end]
         else:
             sim_vcg_qrs = sim_vcg[i_start:i_end+1]
-        dipole_magnitude = np.linalg.norm(sim_vcg_qrs, axis=1)
+        sim_dipole_magnitude = np.linalg.norm(sim_vcg_qrs, axis=1)
 
-        weighted_magnitude.append(sum(dipole_magnitude)/len(sim_vcg_qrs))
-        max_dipole_magnitude.append(max(dipole_magnitude))
-        i_max = np.where(dipole_magnitude == max(dipole_magnitude))
+        dipole_magnitude.append(sim_dipole_magnitude)
+        weighted_magnitude.append(sum(sim_dipole_magnitude) / len(sim_vcg_qrs))
+        max_dipole_magnitude.append(max(sim_dipole_magnitude))
+        i_max = np.where(sim_dipole_magnitude == max(sim_dipole_magnitude))
         assert len(i_max) == 1
         max_dipole_components.append(sim_vcg_qrs[i_max[0]])
-        max_dipole_time.append(common_analysis.convert_index_to_time(i_max[0], sim_t_start, sim_t_end))
+        max_dipole_time.append(common_analysis.convert_index_to_time(i_max[0], time=sim_time,
+                                                                     t_start=sim_t_start, t_end=sim_t_end))
 
-    return weighted_magnitude, max_dipole_magnitude, max_dipole_components, max_dipole_time
+    return dipole_magnitude, weighted_magnitude, max_dipole_magnitude, max_dipole_components, max_dipole_time
 
 
 def calculate_delta_dipole_angle(azimuth1: List[float],
@@ -688,8 +720,8 @@ def compare_dipole_angles(vcg1: np.ndarray,
     """
 
     # Calculate indices for the two VCG traces that correspond to the time points to be compared
-    i_start1, i_end1 = common_analysis.convert_time_to_index(t_start1, t_end1)
-    i_start2, i_end2 = common_analysis.convert_time_to_index(t_start2, t_end2)
+    i_start1, i_end1 = common_analysis.convert_time_to_index_deprecated(t_start1, t_end1)
+    i_start2, i_end2 = common_analysis.convert_time_to_index_deprecated(t_start2, t_end2)
 
     if n_compare == -1:
         assert len(vcg1) == len(vcg2)

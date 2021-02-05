@@ -92,10 +92,10 @@ def plot_xyz_components(vcg: Union[np.ndarray, List[np.ndarray]],
     for (sim_vcg, sim_legend, sim_colour, sim_linestyle) in zip(vcg, legend, colours, linestyles):
         if sim_vcg.shape[0] < sim_vcg.shape[1]:
             for (sim_vcg_xyz, xyz) in zip(sim_vcg, xyz_label):
-                ax[xyz].plot(time, sim_vcg_xyz, label=sim_legend, color=sim_colour, linestyle=sim_linestyle)
+                ax[xyz].plot(time, sim_vcg_xyz)
         else:
             for (sim_vcg_xyz, xyz) in zip(sim_vcg.T, xyz_label):
-                ax[xyz].plot(time, sim_vcg_xyz, label=sim_legend, color=sim_colour, linestyle=sim_linestyle)
+                ax[xyz].plot(time, sim_vcg_xyz)
 
     if legend[0] is not None:
         if layout == 'figures':
@@ -1020,7 +1020,7 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
         Handles to the figure and axes generated
     """
 
-    """ Check input arguments are correctly formatted """
+    # Check input arguments are correctly formatted
     if isinstance(vcg, np.ndarray):
         n_vcg = 1
     else:
@@ -1055,10 +1055,10 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
         assert len(sim_time) == len(sim_vcg), "VCG and time data are different lengths"
     h_lines = list()
     for (sim_time_sv, sim_sv, sim_time_vcg, sim_vcg, sim_label) in zip(time_sv, sv, time_vcg, vcg, legend_vcg):
-        ax['vcg_x'].plot(sim_time_vcg, sim_vcg[:, 0], color=colours[i_colour])
-        ax['vcg_y'].plot(sim_time_vcg, sim_vcg[:, 1], color=colours[i_colour])
-        ax['vcg_z'].plot(sim_time_vcg, sim_vcg[:, 2], color=colours[i_colour])
-        h_lines.append(ax['sv'].plot(sim_time_sv, sim_sv, color=colours[i_colour], label=sim_label))
+        ax['x'].plot(sim_time_vcg, sim_vcg[:, 0])
+        ax['y'].plot(sim_time_vcg, sim_vcg[:, 1])
+        ax['z'].plot(sim_time_vcg, sim_vcg[:, 2])
+        h_lines.append(ax['sv'].plot(sim_time_sv, sim_sv))
         i_colour += 1
 
     """ Plot QRS limits, if provided """
@@ -1239,20 +1239,20 @@ def __plot_spatial_velocity_prep_axes(len_vcg: int,
         ax = dict()
         gs = gridspec.GridSpec(3, 3)
         ax['sv'] = fig.add_subplot(gs[:, :-1])
-        ax['vcg_x'] = fig.add_subplot(gs[0, -1])
-        ax['vcg_y'] = fig.add_subplot(gs[1, -1])
-        ax['vcg_z'] = fig.add_subplot(gs[2, -1])
-        plt.setp(ax['vcg_x'].get_xticklabels(), visible=False)
-        plt.setp(ax['vcg_y'].get_xticklabels(), visible=False)
+        ax['x'] = fig.add_subplot(gs[0, -1])
+        ax['y'] = fig.add_subplot(gs[1, -1])
+        ax['z'] = fig.add_subplot(gs[2, -1])
+        plt.setp(ax['x'].get_xticklabels(), visible=False)
+        plt.setp(ax['y'].get_xticklabels(), visible=False)
         gs.update(hspace=0.05)
         colours = common_analysis.get_plot_colours(len_vcg)
     else:
         ax = dict()
         ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z = fig.get_axes()
         ax['sv'] = ax_sv
-        ax['vcg_x'] = ax_vcg_x
-        ax['vcg_y'] = ax_vcg_y
-        ax['vcg_z'] = ax_vcg_z
+        ax['x'] = ax_vcg_x
+        ax['y'] = ax_vcg_y
+        ax['z'] = ax_vcg_z
         colours = common_analysis.get_plot_colours(len(ax_sv.lines) + len_vcg)
         """ If too many lines already exist on the plot, need to recolour them all to prevent cross-talk """
         if len(ax_sv.lines) + len_vcg > 10:
@@ -1266,10 +1266,10 @@ def __plot_spatial_velocity_prep_axes(len_vcg: int,
     """ Add labels to axes """
     ax['sv'].set_xlabel('Time (ms)')
     ax['sv'].set_ylabel('Spatial velocity')
-    ax['vcg_x'].set_ylabel('VCG (x)')
-    ax['vcg_y'].set_ylabel('VCG (y)')
-    ax['vcg_z'].set_ylabel('VCG (z)')
-    ax['vcg_z'].set_xlabel('Time (ms)')
+    ax['x'].set_ylabel('VCG (x)')
+    ax['y'].set_ylabel('VCG (y)')
+    ax['z'].set_ylabel('VCG (z)')
+    ax['z'].set_xlabel('Time (ms)')
 
     return fig, ax, colours
 
@@ -1296,10 +1296,10 @@ def __plot_spatial_velocity_plot_data(x_sv_data: List[float],
                                       data_label: str,
                                       plot_colour: str,
                                       ax: dict) -> None:
-    ax['vcg_x'].plot(x_vcg_data, vcg_data[:, 0], color=plot_colour)
-    ax['vcg_y'].plot(x_vcg_data, vcg_data[:, 1], color=plot_colour)
-    ax['vcg_z'].plot(x_vcg_data, vcg_data[:, 2], color=plot_colour)
-    ax['sv'].plot(x_sv_data, sv_data, color=plot_colour, label=data_label)
+    ax['vcg_x'].plot(x_vcg_data, vcg_data[:, 0])
+    ax['vcg_y'].plot(x_vcg_data, vcg_data[:, 1])
+    ax['vcg_z'].plot(x_vcg_data, vcg_data[:, 2])
+    ax['sv'].plot(x_sv_data, sv_data)
     return None
 
 
@@ -1491,8 +1491,7 @@ def plot_metric_change(metrics: List[List[List[float]]],
     """ Plot data on axes """
     # Volume
     for (metric, volume, label, colour, scattermarker) in zip(metrics, volumes, labels, colours, scattermarkers):
-        ax['volume'].plot(volume, metric, label=label, linestyle='None', color=colour, marker=scattermarker,
-                          markersize=10, markeredgewidth=3, markerfacecolor='none')
+        ax['volume'].plot(volume, metric)
     # ax['volume'].plot(volume_lv, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
     # ax['volume'].plot(volume_septum, metric_septum, 'o', markersize=10, markeredgewidth=3, label='Septum',
     #                       markerfacecolor='none', color='C1')
@@ -1506,8 +1505,7 @@ def plot_metric_change(metrics: List[List[List[float]]],
 
     # Area
     for (metric, area, label, colour, scattermarker) in zip(metrics, areas, labels, colours, scattermarkers):
-        ax['area'].plot(area, metric, label=label, linestyle='None', color=colour, marker=scattermarker,
-                          markersize=10, markeredgewidth=3, markerfacecolor='none')
+        ax['area'].plot(area, metric)
     # ax['area'].plot(area_lv_norm, metric_lv, '+', label='LV', markersize=10, markeredgewidth=3, color='C0')
     # ax['area'].plot(area_septum_norm, metric_septum, 'o', markersize=10, markeredgewidth=3, label='Septum',
     #                 markerfacecolor='none', color='C1')
@@ -1522,10 +1520,9 @@ def plot_metric_change(metrics: List[List[List[float]]],
     for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_phi, labels, colours, linemarkers,
                                                                      linestyles, metrics_lv):
         if metric_lv:
-            ax['phi_lv'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker, linewidth=3)
+            ax['phi_lv'].plot(metric, linewidths_ecg=3)
         else:
-            ax['phi_septum'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker,
-                                  linewidth=3)
+            ax['phi_septum'].plot(metric, linewidths_ecg=3)
     # ax['phi_lv'].plot(metric_phi_lv, 'o-', label='LV', linewidth=3, color='C0')
     ax['phi_lv'].set_xticks(list(range(len(legend_phi_lv))))
     if no_labels:
@@ -1550,7 +1547,7 @@ def plot_metric_change(metrics: List[List[List[float]]],
     # Rho
     for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_rho, labels, colours, linemarkers,
                                                                      linestyles, metrics_lv):
-        ax['rho'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker, linewidth=3)
+        ax['rho'].plot(metric, linewidths_ecg=3)
     # ax['rho'].plot(metric_rho_lv, 'o-', label='LV', linewidth=3, color='C0')
     # ax['rho'].plot(metric_rho_septum, 'o-', label='Septum', linewidth=3, color='C1')
     ax['rho'].set_xticks(list(range(len(legend_rho))))
@@ -1565,7 +1562,7 @@ def plot_metric_change(metrics: List[List[List[float]]],
     # z
     for (metric, label, colour, marker, linestyle, metric_lv) in zip(metrics_z, labels, colours, linemarkers,
                                                                      linestyles, metrics_lv):
-        ax['z'].plot(metric, label=label, linestyle=linestyle, color=colour, marker=marker, linewidth=3)
+        ax['z'].plot(metric, linewidths_ecg=3)
     # ax['z'].plot(metric_z_lv, 'o-', label='LV', linewidth=3, color='C0')
     # ax['z'].plot(metric_z_septum, 'o-', label='Septum', linewidth=3, color='C1')
     ax['z'].set_xticks(list(range(len(legend_z))))
@@ -1733,7 +1730,7 @@ def plot_density_effect(metrics: List[List[float]],
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for (metric, label, linestyle, colour, marker) in zip(metrics, metric_labels, linestyles, colours, markers):
-        ax.plot(metric, linestyle=linestyle, marker=marker, color=colour, label=label, linewidth=3)
+        ax.plot(metric, linewidths_ecg=3)
 
     if density_labels is None:
         density_labels = ['None',

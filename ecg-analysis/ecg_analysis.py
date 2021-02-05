@@ -6,6 +6,8 @@ import re
 from typing import Union, List, Optional, Tuple, Dict
 
 import common_analysis
+import ecg_plot as ep
+import vcg_plot as vp
 
 # Add carputils functions (https://git.opencarp.org/openCARP/carputils)
 # sys.path.append('/home/pg16/software/carputils/')
@@ -276,6 +278,47 @@ def normalise_ecg(ecg: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
     return ecg
 
 
+def get_ecg_rms(ecgs: List[Dict[str, List[float]]]) -> List[List[float]]:
+    """ Calculate the ECG(RMS) of the ECG as a scalar
+
+    Parameters
+    ----------
+    ecgs: list of dict
+        ECG data
+
+    Returns
+    -------
+    ecgs_rms : list of list of float
+        Scalar RMS ECG data
+
+    Notes
+    -----
+    The scalar RMS is calculated according to
+
+    .. math:: \sqrt{\frac{1}{12}\sum_{i=1}^12 (\textnormal{ECG}_i^2(t))}
+
+    for all leads available from the ECG. This is a slight alteration (for simplicity) on the method presented in
+    Hermans et al.
+
+    References
+    ----------
+    The development and validation of an easy to use automatic QT-interval algorithm
+        Hermans BJM, Vink AS, Bennis FC, Filippini LH, Meijborg VMF, Wilde AAM, Pison L, Postema PG, Delhaas T
+        PLoS ONE, 12(9), 1–14 (2017)
+        https://doi.org/10.1371/journal.pone.0184352
+    """
+
+    if isinstance(ecgs, dict):
+        ecgs = [ecgs]
+
+    ecgs_rms = list()
+    for ecg in ecgs:
+        ecg_squares = [[x**2 for x in ecg[key]] for key in ecg]
+        ecg_rms = [sum(x) for x in zip(*ecg_squares)]
+        ecgs_rms.append([x/9 for x in ecg_rms])
+    return ecgs_rms
+
+
 def get_twave_end(ecgs: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]],
                   leads: Union[str, List[str]] = 'LII',
                   times: Union[List[np.ndarray], np.ndarray, None] = None,
@@ -283,7 +326,9 @@ def get_twave_end(ecgs: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]
                   t_end: Union[List[float], float] = 200,
                   i_distance: int = 200,
                   ecg_filter: bool = False,
-                  return_average: bool = True) -> Union[List[float], List[List[float]]]:
+                  return_median: bool = True,
+                  remove_outliers: bool = True,
+                  plot_result: bool = False) -> Union[List[float], List[List[float]]]:
     """ Return the time point at which it is estimated that the T-wave has bee completed
 
     Parameters
@@ -307,8 +352,13 @@ def get_twave_end(ecgs: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]
     ecg_filter: bool, optional
         Whether or not to apply a Butterworth filter to the ECG data to try and simplify the task of finding the
         actual T-wave gradient, default=False
-    return_average: bool, optional
+    return_median : bool, optional
         Whether or not to return an average of the leads requested, default=True
+    remove_outliers : bool, optional
+        Whether to remove T-wave end values that are greater than 1 standard deviation from the mean from the data. Only
+        has an effect if more than one lead is provided, and return_average is True. Default=True
+    plot_result : bool, optional
+        Whether to plot the results or not, default=False
 
     Returns
     -------
@@ -321,8 +371,14 @@ def get_twave_end(ecgs: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]
 
     References
     ----------
-    Postema PG, Wilde AA. The measurement of the QT interval. Curr Cardiol Rev. 2014 Aug;10(3):287-94.
-    doi: 10.2174/1573403x10666140514103612. PMID: 24827793; PMCID: PMC4040880.
+    The measurement of the QT interval
+        Postema PG, Wilde AA.
+        Curr Cardiol Rev. 2014 Aug;10(3):287-94.
+        doi: 10.2174/1573403x10666140514103612. PMID: 24827793; PMCID: PMC4040880.
+    The development and validation of an easy to use automatic QT-interval algorithm
+        Hermans BJM, Vink AS, Bennis FC, Filippini LH, Meijborg VMF, Wilde AAM, Pison L, Postema PG, Delhaas T
+        PLoS ONE, 12(9), 1–14 (2017)
+        https://doi.org/10.1371/journal.pone.0184352
     """
 
     if isinstance(ecgs, dict):
@@ -330,13 +386,12 @@ def get_twave_end(ecgs: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]
 
     if leads == 'global':
         leads = ecgs[0].keys()
-    else:
-        leads = common_analysis.convert_input_to_list(leads)
-    print(len(leads))
+    elif not isinstance(leads, list):
+        leads = [leads]
     for sim_ecg in ecgs:
         for lead in leads:
             assert lead in sim_ecg, 'Lead not present in ECG'
-    if len(leads) > 1 and not return_average:
+    if len(leads) > 1 and not return_median:
         print("Lead output: {}".format(leads))
 
     # Extract ECG data for the required leads, then calculate the gradient and the normalised gradient
@@ -360,9 +415,41 @@ def get_twave_end(ecgs: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]
                   for (ecg_lead_lead, ecg_grad_lead, i_max_lead) in zip(ecg_lead_ecg, ecg_grad_ecg, i_max_ecg)]
                  for (t_ecg, ecg_lead_ecg, ecg_grad_ecg, i_max_ecg) in zip(times, ecgs_leads, ecg_grad, i_maxgradient)]
 
+    if plot_result:
+        ecg_lead_names = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'RA', 'LA', 'RL', 'LL']
+        vcg_lead_names = ['x', 'y', 'z']
+        # if any(key in ecg_lead_names for key in leads):
+        #     figs_ecg = list()
+        #     axes_ecg = list()
+        #     for ecg in ecgs:
+        #         fig_ecg_temp, ax_ecg_temp = ep.plot(ecg)
+        #         figs_ecg.append(fig_ecg_temp)
+        #         axes_ecg.append(ax_ecg_temp)
+        # if any(key in vcg_lead_names for key in leads):
+        #     figs_vcg = list()
+        #     axes_vcg = list()
+        #     for ecg in ecgs:
+        #         fig_vcg_temp, ax_vcg_temp = vp.plot_spatial_velocity(ecg.values())
+        #         figs_vcg.append(fig_vcg_temp)
+        #         axes_vcg.append(ax_vcg_temp)
+
     if len(leads) == 1:
         twave_end = [twave[0] for twave in twave_end]
-    elif return_average:
-        twave_end = [np.nanmean(twave) for twave in twave_end]
+    elif return_median:
+        twave_end_median = [np.median(twave) for twave in twave_end]
+        if remove_outliers:
+            for i_sim, sim_twave_end in enumerate(twave_end):
+                median_val = np.median(sim_twave_end)
+                stddev_val = np.std(sim_twave_end)
+                while True:
+                    no_outliers = [i for i in sim_twave_end if abs(i - median_val) <= 2 * stddev_val]
+                    if len(no_outliers) == len(sim_twave_end):
+                        break
+                    else:
+                        sim_twave_end = no_outliers
+                        median_val = np.median(sim_twave_end)
+                        stddev_val = np.std(sim_twave_end)
+                twave_end_median[i_sim] = median_val
+        twave_end = twave_end_median
 
     return twave_end

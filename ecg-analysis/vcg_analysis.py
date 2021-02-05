@@ -4,7 +4,8 @@ from math import sin, cos, acos, atan2
 import warnings
 from typing import Union, List, Tuple, Optional, Iterable
 
-import common_analysis
+import tools_maths
+import tools_python
 import set_midwallFibrosis as smF
 
 
@@ -227,8 +228,8 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray],
     assert 0 < threshold_frac_end < 1, "threshold_frac_end must be between 0 and 1"
 
     # Prepare time variables (time, dt and t_end), depending on input
-    time, dt, t_end = common_analysis.get_time(time=time, dt=dt, t_end=t_end, n_vcg=len(vcg),
-                                               len_vcg=[len(sim_vcg) for sim_vcg in vcg])
+    time, dt, t_end = tools_python.get_time(time=time, dt=dt, t_end=t_end, n_vcg=len(vcg),
+                                            len_vcg=[len(sim_vcg) for sim_vcg in vcg])
 
     sv = list()
     sv_time = list()
@@ -251,14 +252,14 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray],
             sim_sv = sim_sv[5:]
             sim_time = sim_time[5:-velocity_offset]
             if filter_sv:
-                sim_sv = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
+                sim_sv = tools_maths.filter_egm(sim_sv, sample_freq, low_p, order)
             threshold_start = max(sim_sv)*threshold_frac_start
             threshold_end = max(sim_sv)*threshold_frac_end
         else:
             sim_time = sim_time[:-velocity_offset]
             threshold_start = max(sim_sv)*threshold_frac_start
             if filter_sv:
-                sv_filtered = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
+                sv_filtered = tools_maths.filter_egm(sim_sv, sample_freq, low_p, order)
             else:
                 sv_filtered = sim_sv
             i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
@@ -270,7 +271,7 @@ def get_spatial_velocity(vcg: Union[List[np.ndarray], np.ndarray],
                 threshold_start = max(sim_sv) * threshold_frac_start
 
                 if filter_sv:
-                    sv_filtered = common_analysis.filter_egm(sim_sv, sample_freq, low_p, order)
+                    sv_filtered = tools_maths.filter_egm(sim_sv, sample_freq, low_p, order)
                 else:
                     sv_filtered = sim_sv
                 i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
@@ -353,7 +354,8 @@ def get_qrs_area(vcg: Union[List[np.ndarray], np.ndarray], qrs_start: Optional[L
     qrs_area_components = list()
     for sim_vcg, sim_qrs_start, sim_qrs_end in zip(vcg, qrs_start, qrs_end):
         # Recalculate indices for start and end points of QRS, and extract relevant data
-        i_qrs_start, i_qrs_end = common_analysis.convert_time_to_index_deprecated(sim_qrs_start, sim_qrs_end, t_end=t_end, dt=dt)
+        i_qrs_start, i_qrs_end = tools_python.deprecated_convert_time_to_index(sim_qrs_start, sim_qrs_end,
+                                                                               t_end=t_end, dt=dt)
         if matlab_match:
             sim_vcg_qrs = sim_vcg[i_qrs_start - 1:i_qrs_end + 1]
         else:
@@ -504,7 +506,7 @@ def get_single_vcg_azimuth_elevation(vcg: np.ndarray,
     dipole_magnitude : np.ndarray
         Array containing the dipole magnitude at all points throughout the VCG
     """
-    i_start, i_end = common_analysis.convert_time_to_index_deprecated(t_start, t_end)
+    i_start, i_end = tools_python.deprecated_convert_time_to_index(t_start, t_end)
     if matlab_match:
         sim_vcg = vcg[i_start - 1:i_end]
     else:
@@ -582,19 +584,9 @@ def get_dipole_magnitudes(vcg: Union[List[np.ndarray], np.ndarray],
     else:
         time = [None for _ in range(len(vcg))]
 
-    t_start = common_analysis.convert_input_to_list(t_start, n_list=len(vcg), default_entry=t_start)
-    # if t_start is not None:
-    #     assert len(vcg) == len(t_start)
-    # else:
-    #     t_start = [None for _ in range(len(vcg))]
-
-    t_end = common_analysis.convert_input_to_list(t_end, n_list=len(vcg), default_entry=t_end)
-    # if t_end is not None:
-    #     assert len(vcg) == len(t_end)
-    # else:
-    #     t_end = [None for _ in range(len(vcg))]
-
-    dt = common_analysis.convert_input_to_list(dt, n_list=len(vcg))
+    t_start = tools_python.convert_input_to_list(t_start, n_list=len(vcg), default_entry=t_start)
+    t_end = tools_python.convert_input_to_list(t_end, n_list=len(vcg), default_entry=t_end)
+    dt = tools_python.convert_input_to_list(dt, n_list=len(vcg))
 
     dipole_magnitude = list()
     weighted_magnitude = list()
@@ -603,11 +595,10 @@ def get_dipole_magnitudes(vcg: Union[List[np.ndarray], np.ndarray],
     max_dipole_time = list()
     for (sim_vcg, sim_time, sim_t_start, sim_t_end, sim_dt) in zip(vcg, time, t_start, t_end, dt):
         # Calculate dipole at all points
-        # i_start, i_end = common_analysis.convert_time_to_index_deprecated(sim_t_start, sim_t_end, time=sim_time)
-        i_start = common_analysis.convert_time_to_index(sim_t_start, time=sim_time,
-                                                        t_start=sim_t_start, t_end=sim_t_end, dt=sim_dt)
-        i_end = common_analysis.convert_time_to_index(sim_t_end, time=sim_time,
-                                                      t_start=sim_t_start, t_end=sim_t_end, dt=sim_dt)
+        i_start = tools_python.convert_time_to_index(sim_t_start, time=sim_time, t_start=sim_t_start,
+                                                     t_end=sim_t_end, dt=sim_dt)
+        i_end = tools_python.convert_time_to_index(sim_t_end, time=sim_time, t_start=sim_t_start, t_end=sim_t_end,
+                                                   dt=sim_dt)
         if matlab_match:
             sim_vcg_qrs = sim_vcg[i_start-1:i_end]
         else:
@@ -620,8 +611,8 @@ def get_dipole_magnitudes(vcg: Union[List[np.ndarray], np.ndarray],
         i_max = np.where(sim_dipole_magnitude == max(sim_dipole_magnitude))
         assert len(i_max) == 1
         max_dipole_components.append(sim_vcg_qrs[i_max[0]])
-        max_dipole_time.append(common_analysis.convert_index_to_time(i_max[0], time=sim_time,
-                                                                     t_start=sim_t_start, t_end=sim_t_end))
+        max_dipole_time.append(tools_python.convert_index_to_time(i_max[0], time=sim_time, t_start=sim_t_start,
+                                                                  t_end=sim_t_end))
 
     return dipole_magnitude, weighted_magnitude, max_dipole_magnitude, max_dipole_components, max_dipole_time
 
@@ -720,8 +711,8 @@ def compare_dipole_angles(vcg1: np.ndarray,
     """
 
     # Calculate indices for the two VCG traces that correspond to the time points to be compared
-    i_start1, i_end1 = common_analysis.convert_time_to_index_deprecated(t_start1, t_end1)
-    i_start2, i_end2 = common_analysis.convert_time_to_index_deprecated(t_start2, t_end2)
+    i_start1, i_end1 = tools_python.deprecated_convert_time_to_index(t_start1, t_end1)
+    i_start2, i_end2 = tools_python.deprecated_convert_time_to_index(t_start2, t_end2)
 
     if n_compare == -1:
         assert len(vcg1) == len(vcg2)

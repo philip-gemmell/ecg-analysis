@@ -9,7 +9,8 @@ from math import sin, cos, acos, atan2
 import warnings
 from typing import List, Tuple, Optional, Union
 
-import common_analysis
+import tools_python
+import tools_plotting
 import vcg_analysis
 
 # import matplotlib
@@ -190,7 +191,7 @@ def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray],
     # Adapt colours and linestyle depending on whether x,y,z plots are combined. Preference is to plot different colours
     # for different VCG traces, with different linestyles representing different x/y/z
     if colours is None:
-        colours = common_analysis.get_plot_colours(n_colours)
+        colours = tools_plotting.get_plot_colours(n_colours)
     elif isinstance(colours, list):
         assert len(colours) == n_colours
     else:
@@ -211,7 +212,7 @@ def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray],
         # Extract correct colours - different colour for each limit e.g. start1, start2, ...
         n_limits = len(qrs_limits[0])
         if limit_colours is None:
-            limit_colours = common_analysis.get_plot_colours(n_limits)
+            limit_colours = tools_plotting.get_plot_colours(n_limits)
         elif isinstance(limit_colours, list):
             assert len(limit_colours) == n_limits
         else:
@@ -1025,16 +1026,16 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
         n_vcg = 1
     else:
         n_vcg = len(vcg)
-    vcg = common_analysis.convert_input_to_list(vcg, n_list=n_vcg)
-    qrs_limits = common_analysis.convert_input_to_list(qrs_limits, n_list=n_vcg, list_depth=2)
-    legend_vcg = common_analysis.convert_input_to_list(legend_vcg, n_list=n_vcg)
-    legend_limits = common_analysis.convert_input_to_list(legend_limits, n_list=len(qrs_limits))
-    limits_linestyles = common_analysis.convert_input_to_list(limits_linestyles, n_list=len(qrs_limits),
-                                                              default_entry='line')
-    time_vcg = common_analysis.convert_input_to_list(time_vcg, n_list=n_vcg)
-    time_sv = common_analysis.convert_input_to_list(time_sv, n_list=n_vcg)
-    dt = common_analysis.convert_input_to_list(dt, n_list=n_vcg)
-    t_end = common_analysis.convert_input_to_list(t_end, n_list=n_vcg)
+    vcg = tools_python.convert_input_to_list(vcg, n_list=n_vcg)
+    qrs_limits = tools_python.convert_input_to_list(qrs_limits, n_list=n_vcg, list_depth=2)
+    legend_vcg = tools_python.convert_input_to_list(legend_vcg, n_list=n_vcg)
+    legend_limits = tools_python.convert_input_to_list(legend_limits, n_list=len(qrs_limits))
+    limits_linestyles = tools_python.convert_input_to_list(limits_linestyles, n_list=len(qrs_limits),
+                                                           default_entry='line')
+    time_vcg = tools_python.convert_input_to_list(time_vcg, n_list=n_vcg)
+    time_sv = tools_python.convert_input_to_list(time_sv, n_list=n_vcg)
+    dt = tools_python.convert_input_to_list(dt, n_list=n_vcg)
+    t_end = tools_python.convert_input_to_list(t_end, n_list=n_vcg)
 
     fig, ax, colours = __plot_spatial_velocity_prep_axes(len(vcg), fig)
     if sv is None and (time_sv is None or time_sv[0] is None):
@@ -1084,7 +1085,7 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
     """ Add legend_vcg and legend_limits """
     if legend_vcg[0] is not None:
         labels = [line.get_label() for line in ax['sv'].get_lines()]
-        labels = [labelstr for labelstr in labels if not labelstr.startswith('_')] # Remove implicit labels from list
+        labels = [labelstr for labelstr in labels if not labelstr.startswith('_')]  # Remove implicit labels from list
         plt.rc('font', family='sans-serif')
         plt.rc('text', usetex=True)
         leg_vcg = ax['sv'].legend(labels, loc='upper right')
@@ -1102,74 +1103,6 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
         print()
 
     return fig, ax
-
-
-def plot_spatial_velocity_multilimit(vcg: np.ndarray,
-                                     sv: Optional[List[List[float]]] = None,
-                                     qrs_limits: Optional[List[List[float]]] = None,
-                                     fig: plt.figure = None,
-                                     legend: Optional[Union[List[str], str]] = None,
-                                     t_end: int = 200,
-                                     dt: int = 2,
-                                     filter_sv: bool = True) -> None:
-    """ Plot a single instance of a spatial velocity curve, but with multiple limits for QRS
-
-    DEPRECATED: Plan to integrate into plot_spatial_velocity
-    https://riptutorial.com/matplotlib/example/32429/multiple-legends-on-the-same-axes
-
-    Parameters
-    ----------
-    vcg : np.ndarray
-        VCG data
-    sv : list of list of float, optional
-        Spatial velocity data. Only required to be given here if special parameters wish to be given, otherwise it
-        will be calculated using default paramters (default)
-    qrs_limits : list of list of float, optional
-        A series of 'limits' to be plotted on the figure with the VCG and spatial plot. Presented as a list of the
-        same length of the VCG data, with the required limits within:
-            e.g. [[QRS_start1, QRS_end1, ...], [QRS_start2, QRS_end, ...], ...]
-        Default=None
-    fig : plt.figure, optional
-        Handle to existing figure, if data is wished to be plotted on existing plot, default=None
-    legend : str or list of str, optional
-        Labels to apply to the limits, default=None
-    t_end : int, optional
-        Duration of the data, default=200
-    dt : int, optional
-        Time step between successive data points, default=2
-    filter_sv : bool, optional
-        Whether or not to apply filtering to spatial velocity prior to finding the start/end points for the
-        threshold, default=True
-    """
-
-    """ Confirm VCG and limit data are correctly formatted """
-    if isinstance(vcg, np.ndarray):
-        vcg = [vcg]
-    for qrs_limit in qrs_limits:
-        assert len(qrs_limit) == len(qrs_limits[0])
-
-    fig, ax, colours = __plot_spatial_velocity_prep_axes(vcg, fig)
-    vcg, legend = __plot_spatial_velocity_preprocess_inputs(vcg, legend)
-    x_val, sv = __plot_spatial_velocity_get_plot_data(sv, vcg, t_end, dt, filter_sv)
-
-    """ Plot spatial velocity and VCG components"""
-    x_vcg_data = list(range(0, t_end + dt, dt))
-    __plot_spatial_velocity_plot_data(x_val[0], sv[0], x_vcg_data, vcg[0], None, None, ax)
-
-    """ Plot QRS limits, along with proxy patches for the legend. Adjust values for QRS limits to prevent overlap. """
-    colours = common_analysis.get_plot_colours(n=len(qrs_limits[0]))
-    import matplotlib.lines as mlines
-    line_handles = None
-    for qrs_limit in qrs_limits:
-        line_handles = list()
-        for i in range(len(qrs_limit)):
-            line_handles.append(mlines.Line2D([], [], color=colours[i], label=legend[i]))
-            if i > 0:
-                if qrs_limit[i] <= qrs_limit[i-1]:
-                    qrs_limit[i] += 0.1
-            __plot_spatial_velocity_plot_limits(qrs_limit[i], ax, colours[i])
-    ax['sv'].legend(handles=line_handles)
-    return None
 
 
 def __plot_spatial_velocity_preprocess_inputs(vcg: Union[np.ndarray, List[np.ndarray]],
@@ -1245,7 +1178,7 @@ def __plot_spatial_velocity_prep_axes(len_vcg: int,
         plt.setp(ax['x'].get_xticklabels(), visible=False)
         plt.setp(ax['y'].get_xticklabels(), visible=False)
         gs.update(hspace=0.05)
-        colours = common_analysis.get_plot_colours(len_vcg)
+        colours = tools_plotting.get_plot_colours(len_vcg)
     else:
         ax = dict()
         ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z = fig.get_axes()
@@ -1253,7 +1186,7 @@ def __plot_spatial_velocity_prep_axes(len_vcg: int,
         ax['x'] = ax_vcg_x
         ax['y'] = ax_vcg_y
         ax['z'] = ax_vcg_z
-        colours = common_analysis.get_plot_colours(len(ax_sv.lines) + len_vcg)
+        colours = tools_plotting.get_plot_colours(len(ax_sv.lines) + len_vcg)
         """ If too many lines already exist on the plot, need to recolour them all to prevent cross-talk """
         if len(ax_sv.lines) + len_vcg > 10:
             for key in ax:
@@ -1287,29 +1220,6 @@ def __plot_spatial_velocity_get_plot_data(sv: List[List[float]],
         for sim_sv in sv:
             x_val.append([(i * dt) + 2 for i in range(len(sim_sv))])
     return x_val, sv
-
-
-def __plot_spatial_velocity_plot_data(x_sv_data: List[float],
-                                      sv_data: List[float],
-                                      x_vcg_data: List[float],
-                                      vcg_data: List[float],
-                                      data_label: str,
-                                      plot_colour: str,
-                                      ax: dict) -> None:
-    ax['vcg_x'].plot(x_vcg_data, vcg_data[:, 0])
-    ax['vcg_y'].plot(x_vcg_data, vcg_data[:, 1])
-    ax['vcg_z'].plot(x_vcg_data, vcg_data[:, 2])
-    ax['sv'].plot(x_sv_data, sv_data)
-    return None
-
-
-def __plot_spatial_velocity_plot_limits(qrs_limit: float,
-                                        ax: dict,
-                                        limit_colour: str) -> None:
-    for key in ax:
-        # ax[key].axvspan(qrs_limit, qrs_limit+0.1, color=limit_colour, alpha=0.5)
-        ax[key].axvline(qrs_limit, color=limit_colour, alpha=0.5)
-    return None
 
 
 def get_i_colour(axis_handle):
@@ -1459,7 +1369,7 @@ def plot_metric_change(metrics: List[List[List[float]]],
     else:
         assert len(linestyles) >= len(metrics_rho)
     if colours is None:
-        colours = common_analysis.get_plot_colours(len(metrics_rho))
+        colours = tools_plotting.get_plot_colours(len(metrics_rho))
     else:
         assert len(colours) >= len(metrics_rho)
 
@@ -1719,7 +1629,7 @@ def plot_density_effect(metrics: List[List[float]],
     else:
         assert len(metrics) == len(linestyles)
     if colours is None:
-        colours = common_analysis.get_plot_colours(len(metrics))
+        colours = tools_plotting.get_plot_colours(len(metrics))
     else:
         assert len(metrics) == len(colours)
     if markers is None:

@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt  # type: ignore
 import numpy as np  # type: ignore
 from typing import Union, Optional, List, Tuple
 
-import common_analysis as ca
+import tools_python
 
 # import matplotlib
 # matplotlib.use('Agg')
@@ -96,20 +96,20 @@ def plot(ecgs: Union[List[dict], dict],
     else:
         n_limits = len(limits)
 
-    legend_ecg = ca.convert_input_to_list(legend_ecg, n_list=n_ecgs)
-    legend_limits = ca.convert_input_to_list(legend_limits, n_list=n_limits)
+    legend_ecg = tools_python.convert_input_to_list(legend_ecg, n_list=n_ecgs)
+    legend_limits = tools_python.convert_input_to_list(legend_limits, n_list=n_limits)
 
-    colours_ecg = ca.convert_input_to_list(colours_ecg, n_list=n_ecgs, default_entry='colour')
-    colours_limits = ca.convert_input_to_list(colours_limits, n_list=n_limits, default_entry='colour')
+    colours_ecg = tools_python.convert_input_to_list(colours_ecg, n_list=n_ecgs, default_entry='colour')
+    colours_limits = tools_python.convert_input_to_list(colours_limits, n_list=n_limits, default_entry='colour')
     if linestyles_ecg is None:
-        linestyles_ecg = ca.convert_input_to_list(linestyles_ecg, n_list=n_ecgs, default_entry='line')
+        linestyles_ecg = tools_python.convert_input_to_list(linestyles_ecg, n_list=n_ecgs, default_entry='line')
     else:
-        linestyles_ecg = ca.convert_input_to_list(linestyles_ecg, n_list=n_ecgs, default_entry=linestyles_ecg)
-    linestyles_limits = ca.convert_input_to_list(linestyles_limits, n_list=n_limits, default_entry='line')
-    linewidths_ecg = ca.convert_input_to_list(linewidths_ecg, n_list=n_ecgs)
+        linestyles_ecg = tools_python.convert_input_to_list(linestyles_ecg, n_list=n_ecgs, default_entry=linestyles_ecg)
+    linestyles_limits = tools_python.convert_input_to_list(linestyles_limits, n_list=n_limits, default_entry='line')
+    linewidths_ecg = tools_python.convert_input_to_list(linewidths_ecg, n_list=n_ecgs)
 
     # Plot data
-    times, _, _ = ca.get_time(time=times, dt=dt, t_end=dt * (len(ecgs[0]['V1'])), n_vcg=n_ecgs)
+    times, _, _ = tools_python.get_time(time=times, dt=dt, t_end=dt * (len(ecgs[0]['V1'])), n_vcg=n_ecgs)
 
     for (time, ecg, label, colour, linestyle, linewidth) in zip(times, ecgs, legend_ecg, colours_ecg, linestyles_ecg,
                                                                 linewidths_ecg):
@@ -122,11 +122,9 @@ def plot(ecgs: Union[List[dict], dict],
             limits = [limits]
 
         # Cycle through each limit provided, e.g. QRS start, QRS end...
-        for qrs_limit in limits:
-            # __plot_limits(ax=ax, limits=qrs_limit, colours=colours_ecg, linestyles=linestyles_ecg)
-            for (limit, label, colour, linestyle) in zip(limits, legend_limits, colours_limits, linestyles_limits):
-                for key in ax:
-                    ax[key].axvline(limit, label=label, color=colour, alpha=0.5, linestyle=linestyle)
+        for (limit, label, colour, linestyle) in zip(limits, legend_limits, colours_limits, linestyles_limits):
+            for key in ax:
+                ax[key].axvline(limit, label=label, color=colour, alpha=0.5, linestyle=linestyle)
 
     # Add legend, title and axis labels
     if legend_ecg[0] is not None or legend_limits[0] is not None:

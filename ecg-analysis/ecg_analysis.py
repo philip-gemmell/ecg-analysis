@@ -5,9 +5,10 @@ import pandas as pd
 import re
 from typing import Union, List, Optional, Tuple, Dict
 
-import common_analysis
-import ecg_plot as ep
-import vcg_plot as vp
+import tools_maths
+import tools_python
+# import ecg_plot as ep
+# import vcg_plot as vp
 
 # Add carputils functions (https://git.opencarp.org/openCARP/carputils)
 # sys.path.append('/home/pg16/software/carputils/')
@@ -396,12 +397,12 @@ def get_twave_end(ecgs: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]
 
     # Extract ECG data for the required leads, then calculate the gradient and the normalised gradient
     if ecg_filter:
-        ecgs_leads = [[common_analysis.filter_egm(ecg[lead]) for lead in leads] for ecg in ecgs]
+        ecgs_leads = [[tools_maths.filter_egm(ecg[lead]) for lead in leads] for ecg in ecgs]
     else:
         ecgs_leads = [[ecg[lead] for lead in leads] for ecg in ecgs]
-    times, dt, _ = common_analysis.get_time(times, dt, t_end, n_vcg=len(ecgs))
+    times, dt, _ = tools_python.get_time(times, dt, t_end, n_vcg=len(ecgs))
     ecg_grad = [[np.gradient(ecg_lead, dt[0]) for ecg_lead in ecgs_lead] for ecgs_lead in ecgs_leads]
-    ecg_grad_norm = [[common_analysis.normalise_signal(ecg_grad_leads) for ecg_grad_leads in ecg_grad_ecgs]
+    ecg_grad_norm = [[tools_maths.normalise_signal(ecg_grad_leads) for ecg_grad_leads in ecg_grad_ecgs]
                      for ecg_grad_ecgs in ecg_grad]
 
     # Find last peak in gradient (with the limitations imposed by only looking for a single peak within the range
@@ -416,8 +417,9 @@ def get_twave_end(ecgs: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]
                  for (t_ecg, ecg_lead_ecg, ecg_grad_ecg, i_max_ecg) in zip(times, ecgs_leads, ecg_grad, i_maxgradient)]
 
     if plot_result:
-        ecg_lead_names = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'RA', 'LA', 'RL', 'LL']
-        vcg_lead_names = ['x', 'y', 'z']
+        print("Not coded yet")
+        # ecg_lead_names = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'RA', 'LA', 'RL', 'LL']
+        # vcg_lead_names = ['x', 'y', 'z']
         # if any(key in ecg_lead_names for key in leads):
         #     figs_ecg = list()
         #     axes_ecg = list()

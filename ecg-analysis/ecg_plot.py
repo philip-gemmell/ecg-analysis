@@ -8,16 +8,19 @@ import common_analysis as ca
 # matplotlib.use('Agg')
 
 
-def plot(ecg: Union[List[dict], dict],
-         time: np.ndarray = None,
+def plot(ecgs: Union[List[dict], dict],
+         times: np.ndarray = None,
          dt: Union[int, float] = 2,
-         legend: Optional[List[str]] = None,
-         linewidth: float = 3,
-         qrs_limits: Union[list, float, None] = None,
+         legend_ecg: Optional[List[str]] = None,
+         linewidths_ecg: float = 3,
+         limits: Union[list, float, None] = None,
+         legend_limits: Optional[List[str]] = None,
          plot_sequence: Optional[List[str]] = None,
          single_fig: bool = True,
-         colours: Union[List[str], List[List[float]], List[Tuple[float]], None] = None,
-         linestyles: Optional[List[str]] = None,
+         colours_ecg: Union[List[str], List[List[float]], List[Tuple[float]], None] = None,
+         linestyles_ecg: Optional[List[str]] = '-',
+         colours_limits: Union[List[str], List[List[float]], List[Tuple[float]], None] = None,
+         linestyles_limits: Optional[List[str]] = None,
          fig: Optional[plt.figure] = None,
          ax=None) -> tuple:
     """
@@ -25,29 +28,36 @@ def plot(ecg: Union[List[dict], dict],
 
     Parameters
     ----------
-    ecg : dict or list
+    ecgs : dict or list
         Dictionary or list of dictionaries for ECG data, with dictionary keys corresponding to the trace name
-    time : np.ndarray
+    times : np.ndarray
         Time data for the ECG (given as opposed to dt), default=None
     dt : int or float, optional
         Time interval at which data is recorded, given as opposed to t, default=2
-    legend : list of str, optional
-        List of names for each given set of ECG data e.g. ['BCL=300ms', 'BCL=600ms']
-    linewidth : float, optional
+    legend_ecg : list of str, optional
+        List of names for each given set of ECG data e.g. ['BCL=300ms', 'BCL=600ms'], default=None
+    linewidths_ecg : float, optional
         Width to use for plotting lines, default=3
-    qrs_limits : float or list of float, optional
+    limits : float or list of float, optional
         Optional temporal limits (e.g. QRS limits) to add to ECG plots. Can add multiple limits, which will be
         plotted identically on all axes
+    legend_limits : list of str, optional
+        List of names for each given set of limits e.g. ['QRS start', 'QRS end'], default=None
     plot_sequence : list of str, optional
         Sequence in which to plot the ECG traces. Will default to: V1, V2, V3, V4, V5, V6, LI, LII, LIII, aVR, aVL, aVF
     single_fig : bool, optional
         If true, will plot all axes on a single figure window. If false, will plot each axis on a separate figure
         window. Default is True
-    colours : str or list of str or list of list/tuple of float, optional
+    colours_ecg : str or list of str or list of list/tuple of float, optional
         Colours to be used to plot ECG traces. Can provide as either string (e.g. 'b') or as RGB values (floats). Will
-        default to common_analysis.get_plot_colours()
-    linestyles : str or list, optional
-        Linestyles to be used to plot ECG traces. Will default to '-'
+        default to ca.get_plot_colours()
+    linestyles_ecg : str or list, optional
+        Linestyles to be used to plot ECG traces. Will default to ca.get_plot_lines()
+    colours_limits : str or list of str or list of list/tuple of float, optional
+        Colours to be used to plot limits. Can provide as either string (e.g. 'b') or as RGB values (floats). Will
+        default to ca.get_plot_colours()
+    linestyles_limits : str or list, optional
+        Linestyles to be used to plot limits. Will default to ca.get_plot_lines()
     fig : optional
         If given, will plot data on existing figure window
     ax: optional
@@ -76,97 +86,54 @@ def plot(ecg: Union[List[dict], dict],
         fig, ax = __init_axes(plot_sequence, single_fig)
     else:
         assert ((fig is not None) and (ax is not None)), 'Fig and ax handles must be passed simultaneously'
-    ecg, legend = __process_inputs(ecg, legend)
 
-    if colours is None:
-        colours = ca.get_plot_colours(len(ecg))
-    elif isinstance(colours, list):
-        assert len(colours) == len(ecg), "Length of colour plotting list must be same as length of ECG data"
-    elif isinstance(colours, str):
-        colours = [colours for _ in ecg]
-    else:
-        raise TypeError('colours variable not entered correctly, and not planned for.')
+    if not isinstance(ecgs, list):
+        ecgs = [ecgs]
+    n_ecgs = len(ecgs)
 
-    if linestyles is None:
-        linestyles = ['-' for _ in ecg]
-    elif isinstance(linestyles, list):
-        assert len(linestyles) == len(ecg), "Length of linestyle list must be same as length of ECG data"
-    elif isinstance(linestyles, str):
-        linestyles = [linestyles for _ in ecg]
+    if limits is None:
+        n_limits = 1
     else:
-        raise TypeError('linestyles variable not entered correctly, and not planned for.')
+        n_limits = len(limits)
+
+    legend_ecg = ca.convert_input_to_list(legend_ecg, n_list=n_ecgs)
+    legend_limits = ca.convert_input_to_list(legend_limits, n_list=n_limits)
+
+    colours_ecg = ca.convert_input_to_list(colours_ecg, n_list=n_ecgs, default_entry='colour')
+    colours_limits = ca.convert_input_to_list(colours_limits, n_list=n_limits, default_entry='colour')
+    if linestyles_ecg is None:
+        linestyles_ecg = ca.convert_input_to_list(linestyles_ecg, n_list=n_ecgs, default_entry='line')
+    else:
+        linestyles_ecg = ca.convert_input_to_list(linestyles_ecg, n_list=n_ecgs, default_entry=linestyles_ecg)
+    linestyles_limits = ca.convert_input_to_list(linestyles_limits, n_list=n_limits, default_entry='line')
+    linewidths_ecg = ca.convert_input_to_list(linewidths_ecg, n_list=n_ecgs)
 
     # Plot data
-    if time is None:
-        time = list()
-        for sim_ecg in ecg:
-            # time.append([i*dt for i in range(len(ecg[0]['V1']))])
-            time.append(np.arange(0, dt*(len(sim_ecg['V1'])), dt))
-    else:
-        for sim_time, sim_ecg in zip(time, ecg):
-            assert(len(sim_time) == len(sim_ecg['V1']))
-    for (sim_time, sim_ecg, sim_label, sim_colour, sim_linestyle) in zip(time, ecg, legend, colours, linestyles):
-        for key in plot_sequence:
-            try:
-                ax[key].plot(sim_time, sim_ecg[key], linewidth=linewidth, label=sim_label, color=sim_colour,
-                             linestyle=sim_linestyle)
-            except ValueError:
-                breakpoint()
+    times, _, _ = ca.get_time(time=times, dt=dt, t_end=dt * (len(ecgs[0]['V1'])), n_vcg=n_ecgs)
 
-    # Add QRS limits, if supplied
-    if qrs_limits is not None:
-        if isinstance(qrs_limits, float):
-            qrs_limits = [qrs_limits]
+    for (time, ecg, label, colour, linestyle, linewidth) in zip(times, ecgs, legend_ecg, colours_ecg, linestyles_ecg,
+                                                                linewidths_ecg):
+        for key in plot_sequence:
+            ax[key].plot(time, ecg[key], label=label, color=colour, linestyle=linestyle, linewidth=linewidth)
+
+    # Add limits, if supplied
+    if limits is not None:
+        if isinstance(limits, float):
+            limits = [limits]
 
         # Cycle through each limit provided, e.g. QRS start, QRS end...
-        for qrs_limit in qrs_limits:
-            __plot_limits(ax, qrs_limit, colours, linestyles)
+        for qrs_limit in limits:
+            # __plot_limits(ax=ax, limits=qrs_limit, colours=colours_ecg, linestyles=linestyles_ecg)
+            for (limit, label, colour, linestyle) in zip(limits, legend_limits, colours_limits, linestyles_limits):
+                for key in ax:
+                    ax[key].axvline(limit, label=label, color=colour, alpha=0.5, linestyle=linestyle)
 
     # Add legend, title and axis labels
-    if legend[0] is not None:
+    if legend_ecg[0] is not None or legend_limits[0] is not None:
         plt.rc('text', usetex=True)
         plt.legend(bbox_to_anchor=(1.04, 1.1), loc="center left")
 
     return fig, ax
-
-
-def __process_inputs(ecg: Union[List[dict], dict],
-                     legend: Union[None, List[str]]) -> Tuple[List[dict], Union[List[str], List[None]]]:
-    """
-    Process input arguments
-
-    Ensure ECG data is presented as list of traces (so subsequent data can always expect the same data input, i.e. a
-    list of traces to plot rather than just a single trace). Also processes the legend argument, to ensure that it is a
-    list of equal length
-
-    Parameters
-    ----------
-    ecg : list of dict or dict
-        ECG data for plotting. Presented as either dict of ECG outputs, or as a list of similar dictionaries
-    legend : None or list
-        Legend to be used for plotting. If none, no legend entries will be plotted. If a list, it must be of the same
-        length as the list provided for ecg
-
-    Returns
-    -------
-    ecg : list
-        Correctly formatted list of ECG data
-    legend : list
-        Correctly formatted list of legend entries
-
-    Raises
-    ------
-    AssertionError
-        Check that list lengths are the same
-    """
-
-    if not isinstance(ecg, list):
-        ecg = [ecg]
-    if legend is None:
-        legend = [None for _ in range(len(ecg))]
-    else:
-        assert len(legend) == len(ecg), "Length of legend entries must be same as lenght of ECG entries"
-    return ecg, legend
 
 
 def __init_axes(plot_sequence: List[str],

@@ -28,8 +28,7 @@ def plot_xyz_components(vcg: Union[np.ndarray, List[np.ndarray]],
                         linestyles: Optional[List[str]] = None,
                         limit_colours: Optional[List[List[float]]] = None,
                         limit_linestyles: Optional[List[str]] = None) -> tuple:
-    """
-    Plot x, y, z components of VCG data
+    """Plot x, y, z components of VCG data
 
     Multiple options given for layout of resulting plot
 
@@ -81,7 +80,9 @@ def plot_xyz_components(vcg: Union[np.ndarray, List[np.ndarray]],
 
     """
 
-    qrs_limits = __set_metric_to_metrics(qrs_limits)
+    if not isinstance(qrs_limits[0], list):
+        qrs_limits = [qrs_limits]
+
     vcg, colours, linestyles, legend, layout, qrs_limits, limit_colours, limit_linestyles = \
         __process_inputs_plot_xyz_components(vcg, colours, linestyles, legend, layout, qrs_limits, limit_colours,
                                              limit_linestyles)

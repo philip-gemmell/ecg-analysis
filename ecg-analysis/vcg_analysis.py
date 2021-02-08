@@ -9,49 +9,6 @@ import tools_python
 import set_midwallFibrosis as smF
 
 
-def convert_ecg_to_vcg(ecg: Union[List[dict], dict]) -> List[np.ndarray]:
-    """
-    Convert ECG data to vectorcardiogram (VCG) data using the Kors matrix method
-
-    Parameters
-    ----------
-    ecg : list of dict or list
-        List of ECG dict data, or ECG dict data directly, with dict keys corresponding to ECG outputs
-
-    Returns
-    -------
-    vcg: list of np.ndarray
-        List of VCG output data
-
-    References
-    ----------
-    Kors JA, van Herpen G, Sittig AC, van Bemmel JH.
-        Reconstruction of the Frank vectorcardiogram from standard electrocardiographic leads: diagnostic comparison
-        of different methods
-        Eur Heart J. 1990 Dec;11(12):1083-92.
-    """
-
-    kors = np.array([[0.38, -0.07, 0.11],
-                     [-0.07, 0.93, -0.23],
-                     [-0.13, 0.06, -0.43],
-                     [0.05, -0.02, -0.06],
-                     [-0.01, -0.05, -0.14],
-                     [0.14, 0.06, -0.20],
-                     [0.06, -0.17, -0.11],
-                     [0.54, 0.13, 0.31]])
-
-    if isinstance(ecg, dict):
-        ecg = [ecg]
-
-    vcg = list()
-    for sim_ecg in ecg:
-        ecg_matrix = np.array([sim_ecg['LI'], sim_ecg['LII'], sim_ecg['V1'], sim_ecg['V2'], sim_ecg['V3'],
-                               sim_ecg['V4'], sim_ecg['V5'], sim_ecg['V6']])
-        vcg.append(np.dot(ecg_matrix.transpose(), kors))
-
-    return vcg
-
-
 def get_qrs_start_end(vcg: Union[list, np.ndarray],
                       time: List = None,
                       dt: float = 2,
@@ -63,8 +20,7 @@ def get_qrs_start_end(vcg: Union[list, np.ndarray],
                       filter_sv: bool = True,
                       t_end: float = 200,
                       matlab_match: bool = False) -> Tuple[List[float], List[float], List[float]]:
-    """
-    Calculate the extent of the VCG QRS complex on the basis of max derivative
+    """Calculate the extent of the VCG QRS complex on the basis of max derivative
 
     Calculate the start and end points, and hence duration, of the QRS complex of a list of VCGs. It does this by
     finding the time at which the spatial velocity of the VCG exceeds a threshold value (the start time), then searches
@@ -376,8 +332,7 @@ def get_qrs_area(vcg: Union[List[np.ndarray], np.ndarray], qrs_start: Optional[L
 def get_azimuth_elevation(vcg: Union[List[np.ndarray], np.ndarray],
                           t_start: Optional[List[float]] = None,
                           t_end: Optional[List[float]] = None) -> Tuple[List[Iterable[float]], List[Iterable[float]]]:
-    """
-    Calculate azimuth and elevation angles for a specified section of the VCG.
+    """Calculate azimuth and elevation angles for a specified section of the VCG.
 
     Will calculate the azimuth and elevation angles for the VCG at each recorded point, potentially within specified
     limits (e.g. start/end of QRS)

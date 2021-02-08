@@ -171,6 +171,17 @@ def convert_input_to_list(input_data: Any,
     -------
     output : list
         Formatted output
+
+    Notes
+    -----
+    If the data are already provided as a list and list_depth==1, function will simply check that the list is of the
+    correct length. If list_depth==2, will check that deepest level of nesting has the correct length.
+
+    If the data are not in list form, will:
+        (a) if default_entry==None, will replicate input_data to match n_vcg, e.g. '-' becomes ['-', '-',...]
+        (b) if default_entry=='colour', will return list of RBG values for colours
+        (c) if default_entry=='line', will return list of line entries
+        (d) for any other value of default_entry, will reproduce that value
     """
 
     if isinstance(input_data, list):

@@ -2,7 +2,7 @@ import sys
 import re
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Tuple, Union, Optional
+from typing import List, Union, Optional
 
 import general_analysis
 
@@ -14,7 +14,8 @@ from carputils.carpio import igb  # type: ignore
 
 def read_ecg_from_igb(phie_file: Union[List[str], str],
                       electrode_file: Optional[str] = None,
-                      normalise: bool = True) -> List[Dict[str, np.ndarray]]:
+                      normalise: bool = True,
+                      dt: float = 2) -> List[pd.DataFrame]:
     """Translate the phie.igb file(s) to 10-lead, 12-trace ECG data
 
     Extracts the complete mesh data from the phie.igb file using CARPutils, before then extracting only those nodes that
@@ -30,10 +31,12 @@ def read_ecg_from_igb(phie_file: Union[List[str], str],
         10-lead ECG. Default given in get_electrode_phie function.
     normalise : bool, optional
         Whether or not to normalise the ECG signals on a per-lead basis, default=True
+    dt : float, optional
+        Time interval from which to construct the time data to associate with the ECG, default=2
 
     Returns
     -------
-    ecg : list(dict)
+    ecgs : list(dict)
         List of dictionaries with Vm data for each of the labelled leads (the dictionary keys are the names of the
         leads)
     """
@@ -44,16 +47,21 @@ def read_ecg_from_igb(phie_file: Union[List[str], str],
 
     electrode_data = [get_electrode_phie(data_tmp, electrode_file) for data_tmp in data]
 
-    ecg = [get_ecg_from_electrodes(elec_tmp) for elec_tmp in electrode_data]
+    ecgs = [get_ecg_from_electrodes(elec_tmp) for elec_tmp in electrode_data]
+
+    # Add time data
+    for ecg in ecgs:
+        ecg['t'] = [i*dt for i in range(len(ecg))]
+        ecg.set_index('t', inplace=True)
 
     if normalise:
-        return [general_analysis.normalise_signal(sim_ecg) for sim_ecg in ecg]
+        return [general_analysis.normalise_signal(sim_ecg) for sim_ecg in ecgs]
     else:
-        return ecg
+        return ecgs
 
 
 def read_ecg_from_dat(ecg_files: Union[List[str], str],
-                      normalise: bool = True) -> Tuple[List[dict], List[np.ndarray]]:
+                      normalise: bool = True) -> List[pd.DataFrame]:
     """Read ECG data from .dat file
 
     Parameters
@@ -74,12 +82,10 @@ def read_ecg_from_dat(ecg_files: Union[List[str], str],
         ecg_files = [ecg_files]
 
     ecgs = list()
-    times = list()
     for ecg_file in ecg_files:
         ecgdata = np.loadtxt(ecg_file, dtype=float)
-        times.append(ecgdata[:, 0])
 
-        ecg = dict()
+        ecg = pd.DataFrame()
         # Limb Leads
         ecg['LI'] = ecgdata[:, 1]
         ecg['LII'] = ecgdata[:, 2]
@@ -96,16 +102,19 @@ def read_ecg_from_dat(ecg_files: Union[List[str], str],
         ecg['V5'] = ecgdata[:, 11]
         ecg['V6'] = ecgdata[:, 12]
 
+        ecg['t'] = ecgdata[:, 0]
+        ecg.set_index('t', inplace=True)
+
         ecgs.append(ecg)
 
     if normalise:
         ecgs = [general_analysis.normalise_signal(ecg) for ecg in ecgs]
 
-    return ecgs, times
+    return ecgs
 
 
 def read_ecg_from_csv(ecg_files: Union[List[str], str],
-                      normalise: bool = True) -> Tuple[List[dict], List[np.ndarray]]:
+                      normalise: bool = True) -> List[pd.DataFrame]:
     """Extract ECG data from CSV file exported from St Jude Medical ECG recording
 
     Parameters
@@ -117,16 +126,13 @@ def read_ecg_from_csv(ecg_files: Union[List[str], str],
 
     Returns
     -------
-    ecg : dict
+    ecg : list of pd.DataFrame
         Extracted data for the 12-lead ECG
-    times : np.ndarray
-        Time data associated with the ECG data
     """
     if isinstance(ecg_files, str):
         ecg_files = [ecg_files]
 
     ecgs = list()
-    times = list()
     for ecg_file in ecg_files:
         line_count = 0
         with open(ecg_file, 'r') as pFile:
@@ -143,9 +149,7 @@ def read_ecg_from_csv(ecg_files: Union[List[str], str],
         n_rows_read, _ = ecgdata.shape
         assert n_rows_read == n_rows, "Mismatch between expected data and read data"
 
-        times.append(ecgdata['t_ref'].values)
-
-        ecg = dict()
+        ecg = pd.DataFrame()
         # Limb Leads
         ecg['LI'] = ecgdata['I'].values
         ecg['LII'] = ecgdata['II'].values
@@ -162,15 +166,18 @@ def read_ecg_from_csv(ecg_files: Union[List[str], str],
         ecg['V5'] = ecgdata['V5'].values
         ecg['V6'] = ecgdata['V6'].values
 
+        ecg['t'] = ecgdata['t_ref'].values
+        ecg.set_index('t', inplace=True)
+
         ecgs.append(ecg)
 
     if normalise:
         ecgs = [general_analysis.normalise_signal(ecg) for ecg in ecgs]
 
-    return ecgs, times
+    return ecgs
 
 
-def get_electrode_phie(phie_data: np.ndarray, electrode_file: Optional[str] = None) -> dict:
+def get_electrode_phie(phie_data: np.ndarray, electrode_file: Optional[str] = None) -> pd.DataFrame:
     """Extract phi_e data corresponding to ECG electrode locations
 
     Parameters
@@ -185,8 +192,8 @@ def get_electrode_phie(phie_data: np.ndarray, electrode_file: Optional[str] = No
 
     Returns
     -------
-    electrode_data : dict
-        Dictionary of phie data for each node, with the dictionary key labelling which node it is.
+    electrode_data : pd.DataFrame
+        Dataframe of phie data for each node, with the dictionary key labelling which node it is.
 
     """
 
@@ -197,33 +204,33 @@ def get_electrode_phie(phie_data: np.ndarray, electrode_file: Optional[str] = No
     # Extract node locations for ECG data, then pull data corresponding to those nodes
     pts_electrodes = np.loadtxt(electrode_file, usecols=(1,), dtype=int)
 
-    electrode_data = {'V1': phie_data[pts_electrodes[0], :],
-                      'V2': phie_data[pts_electrodes[1], :],
-                      'V3': phie_data[pts_electrodes[2], :],
-                      'V4': phie_data[pts_electrodes[3], :],
-                      'V5': phie_data[pts_electrodes[4], :],
-                      'V6': phie_data[pts_electrodes[5], :],
-                      'RA': phie_data[pts_electrodes[6], :],
-                      'LA': phie_data[pts_electrodes[7], :],
-                      'RL': phie_data[pts_electrodes[8], :],
-                      'LL': phie_data[pts_electrodes[9], :]}
+    electrode_data = pd.DataFrame({'V1': phie_data[pts_electrodes[0], :],
+                                   'V2': phie_data[pts_electrodes[1], :],
+                                   'V3': phie_data[pts_electrodes[2], :],
+                                   'V4': phie_data[pts_electrodes[3], :],
+                                   'V5': phie_data[pts_electrodes[4], :],
+                                   'V6': phie_data[pts_electrodes[5], :],
+                                   'RA': phie_data[pts_electrodes[6], :],
+                                   'LA': phie_data[pts_electrodes[7], :],
+                                   'RL': phie_data[pts_electrodes[8], :],
+                                   'LL': phie_data[pts_electrodes[9], :]})
 
     return electrode_data
 
 
-def get_ecg_from_electrodes(electrode_data: dict) -> dict:
+def get_ecg_from_electrodes(electrode_data: pd.DataFrame) -> pd.DataFrame:
     """Converts electrode phi_e data to ECG lead data
 
     Takes dictionary of phi_e data for 10-lead ECG, and converts these data to standard ECG trace data
 
     Parameters
     ----------
-    electrode_data : dict
+    electrode_data : pd.DataFrame
         Dictionary with keys corresponding to lead locations
 
     Returns
     -------
-    ecg : dict
+    ecg : pd.DataFrame
         Dictionary with keys corresponding to the ECG traces
     """
 
@@ -231,7 +238,7 @@ def get_ecg_from_electrodes(electrode_data: dict) -> dict:
     wct = electrode_data['LA'] + electrode_data['RA'] + electrode_data['LL']
 
     # V leads
-    ecg = dict()
+    ecg = pd.DataFrame()
     ecg['V1'] = electrode_data['V1'] - wct / 3
     ecg['V2'] = electrode_data['V2'] - wct / 3
     ecg['V3'] = electrode_data['V3'] - wct / 3

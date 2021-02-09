@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt  # type: ignore
 import numpy as np  # type: ignore
+import pandas as pd
 from typing import Union, Optional, List, Tuple
 
 import tools_python
@@ -8,9 +9,7 @@ import tools_python
 # matplotlib.use('Agg')
 
 
-def plot(ecgs: Union[List[dict], dict],
-         times: np.ndarray = None,
-         dt: Union[int, float] = 2,
+def plot(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
          legend_ecg: Optional[List[str]] = None,
          linewidths_ecg: float = 3,
          limits: Union[list, float, None] = None,
@@ -28,12 +27,9 @@ def plot(ecgs: Union[List[dict], dict],
 
     Parameters
     ----------
-    ecgs : dict or list
-        Dictionary or list of dictionaries for ECG data, with dictionary keys corresponding to the trace name
-    times : np.ndarray
-        Time data for the ECG (given as opposed to dt), default=None
-    dt : int or float, optional
-        Time interval at which data is recorded, given as opposed to t, default=2
+    ecgs : pd.DataFrame or list of pd.DataFrame
+        Dataframe or list of dataframes for ECG data, with keys corresponding to the trace name and index to the time
+        data
     legend_ecg : list of str, optional
         List of names for each given set of ECG data e.g. ['BCL=300ms', 'BCL=600ms'], default=None
     linewidths_ecg : float, optional
@@ -108,13 +104,10 @@ def plot(ecgs: Union[List[dict], dict],
     linestyles_limits = tools_python.convert_input_to_list(linestyles_limits, n_list=n_limits, default_entry='line')
     linewidths_ecg = tools_python.convert_input_to_list(linewidths_ecg, n_list=n_ecgs)
 
-    # Plot data
-    times, _, _ = tools_python.get_time(time=times, dt=dt, t_end=dt * (len(ecgs[0]['V1'])), n_vcg=n_ecgs)
-
-    for (time, ecg, label, colour, linestyle, linewidth) in zip(times, ecgs, legend_ecg, colours_ecg, linestyles_ecg,
-                                                                linewidths_ecg):
+    for (ecg, label, colour, linestyle, linewidth) in zip(ecgs, legend_ecg, colours_ecg, linestyles_ecg,
+                                                          linewidths_ecg):
         for key in plot_sequence:
-            ax[key].plot(time, ecg[key], label=label, color=colour, linestyle=linestyle, linewidth=linewidth)
+            ax[key].plot(ecg.index, ecg[key], label=label, color=colour, linestyle=linestyle, linewidth=linewidth)
 
     # Add limits, if supplied
     if limits is not None:

@@ -1040,10 +1040,9 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
 
     fig, ax, colours = __plot_spatial_velocity_prep_axes(len(vcg), fig)
     if sv is None and (time_sv is None or time_sv[0] is None):
-        time_sv, sv, _, _ = vcg_analysis.get_spatial_velocity(vcg=vcg, time=time_vcg, t_end=t_end, dt=dt,
-                                                              filter_sv=filter_sv)
+        time_sv, sv, _, _ = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
     elif sv is None:
-        _, sv, _, _ = vcg_analysis.get_spatial_velocity(vcg=vcg, time=time_vcg, t_end=t_end, dt=dt, filter_sv=filter_sv)
+        _, sv, _, _ = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
     else:
         for sim_time, sim_sv in zip(time_sv, sv):
             assert len(sim_time) == len(sim_sv)
@@ -1215,7 +1214,7 @@ def __plot_spatial_velocity_get_plot_data(sv: List[List[float]],
                                           filter_sv: bool) -> Tuple[List[float], List[List[float]]]:
     """ Prepare spatial velocity """
     if sv is None:
-        x_val, sv, _, _ = vcg_analysis.get_spatial_velocity(vcg=vcg, t_end=t_end, dt=dt, filter_sv=filter_sv)
+        x_val, sv, _, _ = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
     else:
         x_val = list()
         for sim_sv in sv:

@@ -1,70 +1,37 @@
 import numpy as np
+import pandas as pd
+from sklearn import preprocessing
 from typing import List, Dict, Tuple, Union, Optional
 
 import tools_maths
 import tools_python
 
 
-def get_vcg_from_ecg(ecg: Union[List[dict], dict]) -> List[np.ndarray]:
-    """Convert ECG data to vectorcardiogram (VCG) data using the Kors matrix method
-
-    Parameters
-    ----------
-    ecg : list of dict or list
-        List of ECG dict data, or ECG dict data directly, with dict keys corresponding to ECG outputs
-
-    Returns
-    -------
-    vcg: list of np.ndarray
-        List of VCG output data
-
-    References
-    ----------
-    Kors JA, van Herpen G, Sittig AC, van Bemmel JH.
-        Reconstruction of the Frank vectorcardiogram from standard electrocardiographic leads: diagnostic comparison
-        of different methods
-        Eur Heart J. 1990 Dec;11(12):1083-92.
-    """
-
-    kors = np.array([[0.38, -0.07, 0.11],
-                     [-0.07, 0.93, -0.23],
-                     [-0.13, 0.06, -0.43],
-                     [0.05, -0.02, -0.06],
-                     [-0.01, -0.05, -0.14],
-                     [0.14, 0.06, -0.20],
-                     [0.06, -0.17, -0.11],
-                     [0.54, 0.13, 0.31]])
-
-    if isinstance(ecg, dict):
-        ecg = [ecg]
-
-    vcg = list()
-    for sim_ecg in ecg:
-        ecg_matrix = np.array([sim_ecg['LI'], sim_ecg['LII'], sim_ecg['V1'], sim_ecg['V2'], sim_ecg['V3'],
-                               sim_ecg['V4'], sim_ecg['V5'], sim_ecg['V6']])
-        vcg.append(np.dot(ecg_matrix.transpose(), kors))
-
-    return vcg
-
-
-def normalise_signal(ecg: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+def normalise_signal(signal: pd.DataFrame) -> pd.DataFrame:
     """Normalise ECG leads, so that the maximum value is either 1 or the minimum value is -1
 
     Parameters
     ----------
-    ecg: dict of np.ndarray
+    signal: pd.DataFrame
         ECG data
 
     Returns
     -------
-    ecg: dict of np.ndarray
+    ecg: pd.DataFrame
         Normalised ECG data
     """
 
-    for key in ecg:
-        ecg[key] = np.divide(ecg[key], np.amax(np.absolute(ecg[key])))
+    # for key in ecg_dict:
+    #     ecg_dict[key] = np.divide(ecg_dict[key], np.amax(np.absolute(ecg_dict[key])))
+    # for key in signal:
+    #     signal[key] = signal[key]/signal[key].abs().max()
+    columns = signal.keys()
+    index = signal.index
+    minmax = preprocessing.MaxAbsScaler()
+    scaled_signal = minmax.fit_transform(signal.values)
+    signal = pd.DataFrame(scaled_signal, columns=columns, index=index)
 
-    return ecg
+    return signal
 
 
 def get_signal_rms(signals: List[Dict[str, List[float]]]) -> List[List[float]]:

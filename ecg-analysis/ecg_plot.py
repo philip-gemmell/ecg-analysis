@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt  # type: ignore
-import numpy as np  # type: ignore
 import pandas as pd
 from typing import Union, Optional, List, Tuple
 
@@ -34,9 +33,9 @@ def plot(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
         List of names for each given set of ECG data e.g. ['BCL=300ms', 'BCL=600ms'], default=None
     linewidths_ecg : float, optional
         Width to use for plotting lines, default=3
-    limits : float or list of float, optional
+    limits : float or list of float or pd.DataFrame, optional
         Optional temporal limits (e.g. QRS limits) to add to ECG plots. Can add multiple limits, which will be
-        plotted identically on all axes
+        plotted identically on all axes. If provided as a dataframe, will plot the limits on the relevant axis
     legend_limits : list of str, optional
         List of names for each given set of limits e.g. ['QRS start', 'QRS end'], default=None
     plot_sequence : list of str, optional
@@ -111,13 +110,18 @@ def plot(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
 
     # Add limits, if supplied
     if limits is not None:
-        if isinstance(limits, float):
-            limits = [limits]
-
-        # Cycle through each limit provided, e.g. QRS start, QRS end...
-        for (limit, label, colour, linestyle) in zip(limits, legend_limits, colours_limits, linestyles_limits):
+        if isinstance(limits, pd.DataFrame):
             for key in ax:
-                ax[key].axvline(limit, label=label, color=colour, alpha=0.5, linestyle=linestyle)
+                ax[key].axvline(limits[key].values)
+            print()
+        else:
+            if isinstance(limits, float):
+                limits = [limits]
+
+            # Cycle through each limit provided, e.g. QRS start, QRS end...
+            for (limit, label, colour, linestyle) in zip(limits, legend_limits, colours_limits, linestyles_limits):
+                for key in ax:
+                    ax[key].axvline(limit, label=label, color=colour, alpha=0.5, linestyle=linestyle)
 
     # Add legend, title and axis labels
     if legend_ecg[0] is not None or legend_limits[0] is not None:

@@ -1,37 +1,9 @@
 import numpy as np
+import scipy.signal
 import pandas as pd
-from sklearn import preprocessing
-from typing import List, Dict, Tuple, Union, Optional
+from typing import List, Dict, Union, Optional
 
 import tools_maths
-import tools_python
-
-
-def normalise_signal(signal: pd.DataFrame) -> pd.DataFrame:
-    """Normalise ECG leads, so that the maximum value is either 1 or the minimum value is -1
-
-    Parameters
-    ----------
-    signal: pd.DataFrame
-        ECG data
-
-    Returns
-    -------
-    ecg: pd.DataFrame
-        Normalised ECG data
-    """
-
-    # for key in ecg_dict:
-    #     ecg_dict[key] = np.divide(ecg_dict[key], np.amax(np.absolute(ecg_dict[key])))
-    # for key in signal:
-    #     signal[key] = signal[key]/signal[key].abs().max()
-    columns = signal.keys()
-    index = signal.index
-    minmax = preprocessing.MaxAbsScaler()
-    scaled_signal = minmax.fit_transform(signal.values)
-    signal = pd.DataFrame(scaled_signal, columns=columns, index=index)
-
-    return signal
 
 
 def get_signal_rms(signals: List[Dict[str, List[float]]]) -> List[List[float]]:
@@ -76,39 +48,31 @@ def get_signal_rms(signals: List[Dict[str, List[float]]]) -> List[List[float]]:
     return signals_rms
 
 
-def get_twave_end(signals: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]],
+def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
                   leads: Union[str, List[str]] = 'LII',
-                  times: Union[List[np.ndarray], np.ndarray, None] = None,
-                  dt: Union[List[float], float] = 2,
-                  t_end: Union[List[float], float] = 200,
                   i_distance: int = 200,
-                  filter_signal: bool = False,
+                  filter_signal: Optional[str] = None,
                   return_median: bool = True,
                   remove_outliers: bool = True,
-                  plot_result: bool = False) -> Union[List[float], List[List[float]]]:
+                  plot_result: bool = False) -> List[pd.DataFrame]:
     """ Return the time point at which it is estimated that the T-wave has been completed
 
     Parameters
     ----------
-    signals : dict of np.ndarray
+    ecgs : pd.DataFrame or list of pd.DataFrame
         Signal data, either ECG or VCG
     leads : str, optional
         Which lead to check for the T-wave - usually this is either 'LII' or 'V5', but can be set to a list of
         various leads. If set to 'global', then all T-wave values will be calculated. Will return all values unless
         return_average flag is set. Default 'LII'
-    times : np.ndarray, optional
-        Time data associated with ECG (provided instead of dt, t_end), default=None
-    dt : float, optional
-        Time interval between recording points in the ECG (provided with t_end instead of time), default=2
-    t_end : float, optional
-        Duration of the ECG recording (provided with dt instead of time), default=200
     i_distance : int, optional
         Distance between peaks in the gradient, i.e. will direct that the function will only find the points of
         maximum gradient (representing T-wave, etc.) with a minimum distance given here (in terms of indices,
-        rather than time). Helps prevent being overly sensitive to 'wobbles' in the signal. Default=200
-    filter_signal: bool, optional
-        Whether or not to apply a Butterworth filter to the ECG data to try and simplify the task of finding the
-        actual T-wave gradient, default=False
+        rather than time). Helps prevent being overly sensitive to 'wobbles' in the ecg. Default=200
+    filter_signal: {'butterworth', 'savitzky-golay'}, optional
+        Whether or not to apply a filter to the data prior to trying to find the actual T-wave gradient. Can pass 
+        either a Butterworth filter or a Savitzky-Golay filter, in which case the required kwargs for each can be 
+        provided. Default=None (no filter applied)
     return_median : bool, optional
         Whether or not to return an average of the leads requested, default=True
     remove_outliers : bool, optional
@@ -119,7 +83,7 @@ def get_twave_end(signals: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarr
 
     Returns
     -------
-    twave_end : list of float or list of list of float
+    twave_ends : list of float or list of list of float
         Time value for when T-wave is estimated to have ended. This will be returned as either:
             [t1, t2, t3,...] for [ecg1, ecg2, ecg3,...]
                 if only a single lead is given or return_average is true
@@ -138,77 +102,88 @@ def get_twave_end(signals: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarr
         https://doi.org/10.1371/journal.pone.0184352
     """
 
-    if isinstance(signals, dict):
-        signals = [signals]
+    if isinstance(ecgs, pd.DataFrame):
+        ecgs = [ecgs]
 
     if leads == 'global':
-        leads = signals[0].keys()
+        leads = ecgs[0].columns
     elif not isinstance(leads, list):
         leads = [leads]
-    for signal in signals:
+
+    for ecg in ecgs:
         for lead in leads:
-            assert lead in signal, 'Lead not present in ECG'
-    if len(leads) > 1 and not return_median:
-        print("Lead output: {}".format(leads))
+            assert lead in ecg, 'Lead not present in ECG'
+    
+    if filter_signal is not None:
+        assert filter_signal in ['butterworth', 'savitzky-golay'], "Unknown value for filter_signal passed"
 
     # Extract ECG data for the required leads, then calculate the gradient and the normalised gradient
-    if filter_signal:
-        signals_leads = [[tools_maths.filter_egm(signal[lead]) for lead in leads] for signal in signals]
-    else:
-        signals_leads = [[signal[lead] for lead in leads] for signal in signals]
-    times, dt, _ = tools_python.get_time(times, dt, t_end, n_vcg=len(signals))
-    signals_grad = [[np.gradient(signal_lead, dt[0]) for signal_lead in signals_lead] for signals_lead in signals_leads]
-    signals_grad_norm = [[tools_maths.normalise_signal(signal_grad_lead) for signal_grad_lead in signal_grad]
-                         for signal_grad in signals_grad]
+    ecgs_leads = [ecg[leads] for ecg in ecgs]
+    if filter_signal == 'butterworth':
+        ecgs_leads = [tools_maths.filter_butterworth(ecg) for ecg in ecgs_leads]
+    elif filter_signal == 'savitzky-golay':
+        ecgs_leads = [tools_maths.filter_savitzkygolay(ecg) for ecg in ecgs_leads]
+    ecgs_grad = [pd.DataFrame(index=ecg.index, columns=ecg.columns) for ecg in ecgs_leads]
+    ecgs_grad_normalised = [pd.DataFrame(index=ecg.index, columns=ecg.columns) for ecg in ecgs_leads]
+    for i_ecg, ecg in enumerate(ecgs_leads):
+        for col in ecg:
+            ecgs_grad[i_ecg].loc[:, col] = np.gradient(ecg[col], ecg.index)
+            ecgs_grad_normalised[i_ecg].loc[:, col] = tools_maths.normalise_signal(np.gradient(ecg[col], ecg.index))
 
     # Find last peak in gradient (with the limitations imposed by only looking for a single peak within the range
-    # defined by i_distance, to minimise the effect of 'wibbles in the signal), then by basic trig find the
+    # defined by i_distance, to minimise the effect of 'wibbles in the ecg), then by basic trig find the
     # x-intercept (which is used as the T-wave end point)
     # noinspection PyUnresolvedReferences
-    i_maxgrad = [[scipy.signal.find_peaks(signal_grad_norm_lead, distance=i_distance)[0][-1]
-                  for signal_grad_norm_lead in signal_grad_norm]
-                 for signal_grad_norm in signals_grad_norm]
-    twave_end = [[t_signal[i_max_lead] - (signal_lead[i_max_lead] / signal_grad_lead[i_max_lead])
-                  for (signal_lead, signal_grad_lead, i_max_lead) in zip(signal_leads, signal_grad, i_max_signal)]
-                 for (t_signal, signal_leads, signal_grad, i_max_signal) in zip(times, signals_leads, signals_grad,
-                                                                                i_maxgrad)]
+    i_tpeak = [pd.DataFrame(columns=ecg.columns, index=[0]) for ecg in ecgs_leads]
+    i_tpeak_full = [pd.DataFrame(columns=ecg.columns, index=[0]) for ecg in ecgs_leads]
+    twave_ends = [pd.DataFrame(columns=ecg.columns, index=[0]) for ecg in ecgs_leads]
+    for i_ecg, ecg in enumerate(ecgs_leads):
+        for col in ecg:
+            i_tpeak_temp = scipy.signal.find_peaks(ecgs_grad_normalised[i_ecg][col], distance=i_distance)[0][-1]
+            i_tpeak_full_temp = scipy.signal.find_peaks(ecgs_grad_normalised[i_ecg][col], distance=i_distance)[0]
+            t_tpeak_temp = ecg.index[i_tpeak_temp]
+            twave_end_temp = t_tpeak_temp - (ecg.loc[t_tpeak_temp, col] / ecgs_grad[i_ecg].loc[t_tpeak_temp, col])
+            i_tpeak[i_ecg].loc[0, col] = i_tpeak_temp
+            i_tpeak_full[i_ecg].loc[0, col] = i_tpeak_full_temp
+            twave_ends[i_ecg].loc[0, col] = twave_end_temp
 
-    if plot_result:
-        print("Not coded yet")
-        # ecg_lead_names = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'RA', 'LA', 'RL', 'LL']
-        # vcg_lead_names = ['x', 'y', 'z']
-        # if any(key in ecg_lead_names for key in leads):
-        #     figs_ecg = list()
-        #     axes_ecg = list()
-        #     for ecg in ecgs:
-        #         fig_ecg_temp, ax_ecg_temp = ep.plot(ecg)
-        #         figs_ecg.append(fig_ecg_temp)
-        #         axes_ecg.append(ax_ecg_temp)
-        # if any(key in vcg_lead_names for key in leads):
-        #     figs_vcg = list()
-        #     axes_vcg = list()
-        #     for ecg in ecgs:
-        #         fig_vcg_temp, ax_vcg_temp = vp.plot_spatial_velocity(ecg.values())
-        #         figs_vcg.append(fig_vcg_temp)
-        #         axes_vcg.append(ax_vcg_temp)
-
-    if len(leads) == 1:
-        twave_end = [twave[0] for twave in twave_end]
-    elif return_median:
-        twave_end_median = [np.median(twave) for twave in twave_end]
-        if remove_outliers:
-            for i_sim, sim_twave_end in enumerate(twave_end):
-                median_val = np.median(sim_twave_end)
-                stddev_val = np.std(sim_twave_end)
+    if return_median:
+        for i_twave, twave_end in enumerate(twave_ends):
+            twave_end_median = np.median(twave_end)
+            if remove_outliers:
+                twave_end_std = np.std(twave_end.values)
                 while True:
-                    no_outliers = [i for i in sim_twave_end if abs(i - median_val) <= 2 * stddev_val]
-                    if len(no_outliers) == len(sim_twave_end):
+                    no_outliers = pd.DataFrame(np.abs((twave_end-twave_end_median)) < 2*twave_end_std)
+                    if all(no_outliers.values[0]):
                         break
                     else:
-                        sim_twave_end = no_outliers
-                        median_val = np.median(sim_twave_end)
-                        stddev_val = np.std(sim_twave_end)
-                twave_end_median[i_sim] = median_val
-        twave_end = twave_end_median
+                        twave_end = twave_end[no_outliers]
+                        twave_end.dropna(axis='columns', inplace=True)
+                        twave_end_median = np.median(twave_end)
+                        twave_end_std = np.std(twave_end.values)
+            twave_ends[i_twave].loc[0, 'median'] = twave_end_median
 
-    return twave_end
+    if plot_result:
+        import matplotlib.pyplot as plt
+        import tools_plotting
+        colours = tools_plotting.get_plot_colours(len(ecgs))
+        for (ecg, twave_end, i_peak, i_peak_full, ecg_grad_normalised, colour) in zip(ecgs, twave_ends, i_tpeak,
+                                                                                      i_tpeak_full,
+                                                                                      ecgs_grad_normalised, colours):
+            fig = plt.figure()
+            axes = dict()
+            i_ax = 1
+            for lead in leads:
+                axes[lead] = fig.add_subplot(2, 6, i_ax)
+                axes[lead].set_title(lead)
+                i_ax += 1
+                axes[lead].plot(ecg.index, ecg[lead], color=colour, linestyle='-')
+                axes[lead].plot(ecg.index, ecg_grad_normalised[lead], color=colour, linestyle='--')
+                axes[lead].axhline(0, color='k')
+                axes[lead].axvline(twave_end[lead].values, color='k')
+                t_peak = ecg.index[i_peak[lead].values[0]]
+                t_peak_full = ecg.index[i_peak_full[lead][0]]
+                axes[lead].plot(t_peak_full, ecg[lead][t_peak_full], 's', markerfacecolor='none', markeredgecolor='g')
+                axes[lead].plot(t_peak, ecg[lead][t_peak], 'o', markerfacecolor='none', markeredgecolor='r')
+
+    return twave_ends

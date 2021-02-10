@@ -63,6 +63,8 @@ def get_qrs_start_end(vcg: Union[List[pd.DataFrame], pd.DataFrame],
                       matlab_match: bool = False) -> Tuple[List[float], List[float], List[float]]:
     """Calculate the extent of the VCG QRS complex on the basis of max derivative
 
+    TODO: Check whether i_qrs_start variable is needed, or can be simplified using DataFrame function
+
     Calculate the start and end points, and hence duration, of the QRS complex of a list of VCGs. It does this by
     finding the time at which the spatial velocity of the VCG exceeds a threshold value (the start time), then searches
     backwards from the end of the VCG to find when this threshold is exceeded (the end time); the start and end
@@ -223,14 +225,14 @@ def get_spatial_velocity(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
             sim_time = vcg.index.values[:-5]
             sim_sv = sim_sv[5:]
             if filter_sv:
-                sim_sv = tools_maths.filter_egm(sim_sv, sample_freq, low_p, order)
+                sim_sv = tools_maths.filter_butterworth(sim_sv, low_p, order)
             threshold_start = max(sim_sv)*threshold_frac_start
             threshold_end = max(sim_sv)*threshold_frac_end
         else:
             sim_time = vcg.index.values[:-velocity_offset]
             threshold_start = max(sim_sv)*threshold_frac_start
             if filter_sv:
-                sv_filtered = tools_maths.filter_egm(sim_sv, sample_freq, low_p, order)
+                sv_filtered = tools_maths.filter_butterworth(sim_sv, low_p, order)
             else:
                 sv_filtered = sim_sv
             i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
@@ -241,7 +243,7 @@ def get_spatial_velocity(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
                 threshold_start = max(sim_sv) * threshold_frac_start
 
                 if filter_sv:
-                    sv_filtered = tools_maths.filter_egm(sim_sv, sample_freq, low_p, order)
+                    sv_filtered = tools_maths.filter_butterworth(sim_sv, sample_freq, low_p, order)
                 else:
                     sv_filtered = sim_sv
                 i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]

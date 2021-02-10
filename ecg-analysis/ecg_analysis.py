@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from typing import List, Union, Optional
 
-import general_analysis
+import tools_maths
 
 # Add carputils functions (https://git.opencarp.org/openCARP/carputils)
 # sys.path.append('/home/pg16/software/carputils/')
@@ -55,7 +55,7 @@ def read_ecg_from_igb(phie_file: Union[List[str], str],
         ecg.set_index('t', inplace=True)
 
     if normalise:
-        return [general_analysis.normalise_signal(sim_ecg) for sim_ecg in ecgs]
+        return [tools_maths.normalise_signal(sim_ecg) for sim_ecg in ecgs]
     else:
         return ecgs
 
@@ -108,7 +108,7 @@ def read_ecg_from_dat(ecg_files: Union[List[str], str],
         ecgs.append(ecg)
 
     if normalise:
-        ecgs = [general_analysis.normalise_signal(ecg) for ecg in ecgs]
+        ecgs = [tools_maths.normalise_signal(ecg) for ecg in ecgs]
 
     return ecgs
 
@@ -172,7 +172,7 @@ def read_ecg_from_csv(ecg_files: Union[List[str], str],
         ecgs.append(ecg)
 
     if normalise:
-        ecgs = [general_analysis.normalise_signal(ecg) for ecg in ecgs]
+        ecgs = [tools_maths.normalise_signal(ecg) for ecg in ecgs]
 
     return ecgs
 

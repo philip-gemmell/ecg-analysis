@@ -5,6 +5,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from matplotlib.collections import LineCollection
 import numpy as np
+import pandas as pd
 from math import sin, cos, acos, atan2
 import warnings
 from typing import List, Tuple, Optional, Union
@@ -965,7 +966,7 @@ def plot_arc3d(vector1: List[float],
     return fig
 
 
-def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
+def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
                           sv: Optional[List[List[float]]] = None,
                           qrs_limits: Optional[List[List[float]]] = None,
                           fig: plt.figure = None,
@@ -985,7 +986,7 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
 
     Parameters
     ----------
-    vcg : np.ndarray or list of np.ndarray
+    vcg : pd.DataFrame or list of pd.DataFrame
         VCG data
     sv : list of list of float, optional
         Spatial velocity data. Only required to be given here if special parameters wish to be given, otherwise it
@@ -1023,10 +1024,9 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
     """
 
     # Check input arguments are correctly formatted
-    if isinstance(vcg, np.ndarray):
-        n_vcg = 1
-    else:
-        n_vcg = len(vcg)
+    if isinstance(vcg, pd.DataFrame):
+        vcg = [vcg]
+    n_vcg = len(vcg)
     vcg = tools_python.convert_input_to_list(vcg, n_list=n_vcg)
     qrs_limits = tools_python.convert_input_to_list(qrs_limits, n_list=n_vcg, list_depth=2)
     legend_vcg = tools_python.convert_input_to_list(legend_vcg, n_list=n_vcg)
@@ -1040,31 +1040,23 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
 
     fig, ax, colours = __plot_spatial_velocity_prep_axes(len(vcg), fig)
     if sv is None and (time_sv is None or time_sv[0] is None):
-        time_sv, sv, _, _ = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
+        sv, _, _ = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
     elif sv is None:
-        _, sv, _, _ = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
-    else:
-        for sim_time, sim_sv in zip(time_sv, sv):
-            assert len(sim_time) == len(sim_sv)
+        sv, _, _ = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
 
     """ Plot spatial velocity and VCG components"""
     i_colour_init = get_i_colour(ax['sv'])
     i_colour = i_colour_init
-    if time_vcg is None or time_vcg[0] is None:
-        time_vcg = [list(range(0, sim_t_end + sim_dt, sim_dt)) for (sim_dt, sim_t_end) in zip(dt, t_end)]
-    for sim_time, sim_vcg in zip(time_vcg, vcg):
-        assert len(sim_time) == len(sim_vcg), "VCG and time data are different lengths"
     h_lines = list()
-    for (sim_time_sv, sim_sv, sim_time_vcg, sim_vcg, sim_label) in zip(time_sv, sv, time_vcg, vcg, legend_vcg):
-        ax['x'].plot(sim_time_vcg, sim_vcg[:, 0])
-        ax['y'].plot(sim_time_vcg, sim_vcg[:, 1])
-        ax['z'].plot(sim_time_vcg, sim_vcg[:, 2])
-        h_lines.append(ax['sv'].plot(sim_time_sv, sim_sv))
+    for (sim_sv, sim_vcg, sim_label) in zip(sv, vcg, legend_vcg):
+        for lead in ['x', 'y', 'z']:
+            ax[lead].plot(sim_vcg.index, sim_vcg[lead])
+        h_lines.append(ax['sv'].plot(sim_sv.index, sim_sv))
         i_colour += 1
 
     """ Plot QRS limits, if provided """
     h_limits = list()
-    if qrs_limits is not None:
+    if qrs_limits[0] is not None:
         # Cycle through each limit provided, e.g. QRS start, QRS end...
         for (qrs_limit, limits_linestyle) in zip(qrs_limits, limits_linestyles):
             i_colour = i_colour_init
@@ -1099,8 +1091,8 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
         if legend_vcg[0] is not None:
             ax['sv'].add_artist(leg_vcg)
 
-    if legend_limits is not None:
-        print()
+    # if legend_limits is not None:
+    #     print()
 
     return fig, ax
 
@@ -1205,21 +1197,6 @@ def __plot_spatial_velocity_prep_axes(len_vcg: int,
     ax['z'].set_xlabel('Time (ms)')
 
     return fig, ax, colours
-
-
-def __plot_spatial_velocity_get_plot_data(sv: List[List[float]],
-                                          vcg: List[np.ndarray],
-                                          t_end: float,
-                                          dt: float,
-                                          filter_sv: bool) -> Tuple[List[float], List[List[float]]]:
-    """ Prepare spatial velocity """
-    if sv is None:
-        x_val, sv, _, _ = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
-    else:
-        x_val = list()
-        for sim_sv in sv:
-            x_val.append([(i * dt) + 2 for i in range(len(sim_sv))])
-    return x_val, sv
 
 
 def get_i_colour(axis_handle):

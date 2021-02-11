@@ -251,7 +251,7 @@ def get_spatial_velocity(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
                     import matplotlib.pyplot as plt
                     fig = plt.figure()
                     ax = fig.add_subplot(1, 1, 1)
-                    ax.plot(vcg.index.values[:-velocity_offset], sim_sv_orig, linewidth=3)
+                    ax.plot(vcg.index.values[:-velocity_offset], sim_sv_orig)
                     ax.set_xlabel('Time')
                     ax.set_ylabel('Spatial Velocity')
                     ax.axhline(max(sim_sv) * threshold_frac_start, label='Threshold={}'.format(threshold_frac_start))

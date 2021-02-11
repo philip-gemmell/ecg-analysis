@@ -10,7 +10,7 @@ import tools_python
 
 def plot(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
          legend_ecg: Optional[List[str]] = None,
-         linewidths_ecg: float = 3,
+         linewidths_ecg: float = 2,
          limits: Union[list, float, None] = None,
          legend_limits: Optional[List[str]] = None,
          plot_sequence: Optional[List[str]] = None,
@@ -106,7 +106,7 @@ def plot(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
     for (ecg, label, colour, linestyle, linewidth) in zip(ecgs, legend_ecg, colours_ecg, linestyles_ecg,
                                                           linewidths_ecg):
         for key in plot_sequence:
-            ax[key].plot(ecg.index, ecg[key], label=label, color=colour, linestyle=linestyle, linewidth=linewidth)
+            ax[key].plot(ecg.index, ecg[key])
 
     # Add limits, if supplied
     if limits is not None:

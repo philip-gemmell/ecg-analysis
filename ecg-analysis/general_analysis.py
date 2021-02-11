@@ -4,6 +4,7 @@ import pandas as pd
 from typing import List, Dict, Union, Optional
 
 import tools_maths
+import tools_python
 
 
 def get_signal_rms(signals: List[Dict[str, List[float]]]) -> List[List[float]]:
@@ -52,6 +53,7 @@ def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
                   leads: Union[str, List[str]] = 'LII',
                   i_distance: int = 200,
                   filter_signal: Optional[str] = None,
+                  baseline_adjust: Union[float, List[float], None] = None,
                   return_median: bool = True,
                   remove_outliers: bool = True,
                   plot_result: bool = False) -> List[pd.DataFrame]:
@@ -69,10 +71,14 @@ def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
         Distance between peaks in the gradient, i.e. will direct that the function will only find the points of
         maximum gradient (representing T-wave, etc.) with a minimum distance given here (in terms of indices,
         rather than time). Helps prevent being overly sensitive to 'wobbles' in the ecg. Default=200
-    filter_signal: {'butterworth', 'savitzky-golay'}, optional
+    filter_signal : {'butterworth', 'savitzky-golay'}, optional
         Whether or not to apply a filter to the data prior to trying to find the actual T-wave gradient. Can pass 
         either a Butterworth filter or a Savitzky-Golay filter, in which case the required kwargs for each can be 
         provided. Default=None (no filter applied)
+    baseline_adjust : float or list of float, optional
+        Point from which to calculate the adjusted baseline for calculating the T-wave, rather than using the
+        zeroline. In line with Hermans et al., this is usually the start of the QRS complex, with the baseline
+        calculated as the median amplitude of the 30ms before this point.
     return_median : bool, optional
         Whether or not to return an average of the leads requested, default=True
     remove_outliers : bool, optional
@@ -83,23 +89,16 @@ def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
 
     Returns
     -------
-    twave_ends : list of float or list of list of float
-        Time value for when T-wave is estimated to have ended. This will be returned as either:
-            [t1, t2, t3,...] for [ecg1, ecg2, ecg3,...]
-                if only a single lead is given or return_average is true
-            [[t1a, t1b,...], [t2a, t2b,...],...] for [ecg1, ecg,...] in leads [a, b,...]
-                if multiple leads are given and return_average is false
+    twave_ends : list of pd.DataFrame
+        Time value for when T-wave is estimated to have ended.
 
     References
     ----------
-    The measurement of the QT interval
-        Postema PG, Wilde AA.
-        Curr Cardiol Rev. 2014 Aug;10(3):287-94.
-        doi: 10.2174/1573403x10666140514103612. PMID: 24827793; PMCID: PMC4040880.
-    The development and validation of an easy to use automatic QT-interval algorithm
-        Hermans BJM, Vink AS, Bennis FC, Filippini LH, Meijborg VMF, Wilde AAM, Pison L, Postema PG, Delhaas T
-        PLoS ONE, 12(9), 1–14 (2017)
-        https://doi.org/10.1371/journal.pone.0184352
+    .. [1] Postema PG, Wilde AA, "The measurement of the QT interval," Curr Cardiol Rev. 2014 Aug;10(3):287-94.
+           doi:10.2174/1573403x10666140514103612. PMID: 24827793; PMCID: PMC4040880.
+    .. [2] Hermans BJM, Vink AS, Bennis FC, Filippini LH, Meijborg VMF, Wilde AAM, Pison L, Postema PG, Delhaas T,
+           "The development and validation of an easy to use automatic QT-interval algorithm,"
+           PLoS ONE, 12(9), 1–14 (2017), https://doi.org/10.1371/journal.pone.0184352
     """
 
     if isinstance(ecgs, pd.DataFrame):
@@ -126,9 +125,21 @@ def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
     ecgs_grad = [pd.DataFrame(index=ecg.index, columns=ecg.columns) for ecg in ecgs_leads]
     ecgs_grad_normalised = [pd.DataFrame(index=ecg.index, columns=ecg.columns) for ecg in ecgs_leads]
     for i_ecg, ecg in enumerate(ecgs_leads):
-        for col in ecg:
-            ecgs_grad[i_ecg].loc[:, col] = np.gradient(ecg[col], ecg.index)
-            ecgs_grad_normalised[i_ecg].loc[:, col] = tools_maths.normalise_signal(np.gradient(ecg[col], ecg.index))
+        for lead in ecg:
+            ecgs_grad[i_ecg].loc[:, lead] = np.gradient(ecg[lead], ecg.index)
+            ecgs_grad_normalised[i_ecg].loc[:, lead] = tools_maths.normalise_signal(np.gradient(ecg[lead], ecg.index))
+
+    # Calculate the baseline required for T-wave end interpolation
+    baseline_adjust = tools_python.convert_input_to_list(baseline_adjust, n_list=len(ecgs), default_entry=0)
+    baseline_vals = [pd.DataFrame(columns=ecg.columns, index=[0]) for ecg in ecgs_leads]
+    for i_ecg, ecg_leads in enumerate(ecgs_leads):
+        if baseline_adjust[i_ecg] == 0:
+            for lead in ecg_leads:
+                baseline_vals[i_ecg].loc[0, lead] = 0
+        else:
+            baseline_start = max(0, baseline_adjust[i_ecg]-30)
+            for lead in ecg_leads:
+                baseline_vals[i_ecg].loc[0, lead] = np.median(ecg_leads[lead][baseline_start:baseline_adjust[i_ecg]])
 
     # Find last peak in gradient (with the limitations imposed by only looking for a single peak within the range
     # defined by i_distance, to minimise the effect of 'wibbles in the ecg), then by basic trig find the
@@ -138,15 +149,18 @@ def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
     i_tpeak_full = [pd.DataFrame(columns=ecg.columns, index=[0]) for ecg in ecgs_leads]
     twave_ends = [pd.DataFrame(columns=ecg.columns, index=[0]) for ecg in ecgs_leads]
     for i_ecg, ecg in enumerate(ecgs_leads):
-        for col in ecg:
-            i_tpeak_temp = scipy.signal.find_peaks(ecgs_grad_normalised[i_ecg][col], distance=i_distance)[0][-1]
-            i_tpeak_full_temp = scipy.signal.find_peaks(ecgs_grad_normalised[i_ecg][col], distance=i_distance)[0]
+        for lead in ecg:
+            i_tpeak_temp = scipy.signal.find_peaks(ecgs_grad_normalised[i_ecg][lead], distance=i_distance)[0][-1]
+            i_tpeak_full_temp = scipy.signal.find_peaks(ecgs_grad_normalised[i_ecg][lead], distance=i_distance)[0]
             t_tpeak_temp = ecg.index[i_tpeak_temp]
-            twave_end_temp = t_tpeak_temp - (ecg.loc[t_tpeak_temp, col] / ecgs_grad[i_ecg].loc[t_tpeak_temp, col])
-            i_tpeak[i_ecg].loc[0, col] = i_tpeak_temp
-            i_tpeak_full[i_ecg].loc[0, col] = i_tpeak_full_temp
-            twave_ends[i_ecg].loc[0, col] = twave_end_temp
+            baseline_val_temp = baseline_vals[i_ecg].loc[0, lead]
+            ecg_grad_temp = ecgs_grad[i_ecg].loc[t_tpeak_temp, lead]
+            twave_end_temp = t_tpeak_temp + ((baseline_val_temp-ecg.loc[t_tpeak_temp, lead]) / ecg_grad_temp)
+            i_tpeak[i_ecg].loc[0, lead] = i_tpeak_temp
+            i_tpeak_full[i_ecg].loc[0, lead] = i_tpeak_full_temp
+            twave_ends[i_ecg].loc[0, lead] = twave_end_temp
 
+    exclude_column = list()
     if return_median:
         for i_twave, twave_end in enumerate(twave_ends):
             twave_end_median = np.median(twave_end)
@@ -158,32 +172,63 @@ def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
                         break
                     else:
                         twave_end = twave_end[no_outliers]
+                        exclude_column.append(twave_end[twave_end.columns[twave_end.isna().any()]].columns[0])
                         twave_end.dropna(axis='columns', inplace=True)
                         twave_end_median = np.median(twave_end)
                         twave_end_std = np.std(twave_end.values)
             twave_ends[i_twave].loc[0, 'median'] = twave_end_median
 
     if plot_result:
-        import matplotlib.pyplot as plt
-        import tools_plotting
-        colours = tools_plotting.get_plot_colours(len(ecgs))
-        for (ecg, twave_end, i_peak, i_peak_full, ecg_grad_normalised, colour) in zip(ecgs, twave_ends, i_tpeak,
-                                                                                      i_tpeak_full,
-                                                                                      ecgs_grad_normalised, colours):
-            fig = plt.figure()
-            axes = dict()
-            i_ax = 1
-            for lead in leads:
-                axes[lead] = fig.add_subplot(2, 6, i_ax)
-                axes[lead].set_title(lead)
-                i_ax += 1
-                axes[lead].plot(ecg.index, ecg[lead], color=colour, linestyle='-')
-                axes[lead].plot(ecg.index, ecg_grad_normalised[lead], color=colour, linestyle='--')
-                axes[lead].axhline(0, color='k')
-                axes[lead].axvline(twave_end[lead].values, color='k')
+        import ecg_plot as ep
+        import vcg_plot as vp
+        from sklearn import preprocessing
+
+        for (ecg, twave_end, i_peak, i_peak_full,
+             ecg_grad_normalised, baseline_val) in zip(ecgs, twave_ends, i_tpeak, i_tpeak_full, ecgs_grad_normalised,
+                                                       baseline_vals):
+            # Generate plots and axes for leads, as required
+            ecg_leads = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'LI', 'LII', 'LIII', 'aVR', 'aVL', 'aVF']
+            vcg_leads = ['x', 'y', 'z']
+            axes_ecg, axes_vcg = {}, {}
+            if any([lead in ecg_leads for lead in leads]):
+                _, axes_ecg = ep.plot(ecg)
+            if any([lead in vcg_leads for lead in leads]):
+                _, axes_vcg = vp.plot_spatial_velocity(ecg)
+            axes = {**axes_ecg, **axes_vcg}
+            for i_lead, lead in enumerate(leads):
+                # Create axes and plot ECG trace
+                # if lead in exclude_column:
+                #     axes[lead].set_title(lead)
+                # else:
+                #     axes[lead].set_title('*'+lead)
+
+                # Rescale the gradient to maximise the plotting range shown, then plot in background
+                rescale = preprocessing.MinMaxScaler((min(ecg[lead]), max(ecg[lead])))
+                ecg_grad_plot = rescale.fit_transform(ecg_grad_normalised[lead].values[:, None])
+                axes[lead].fill_between(ecg.index, min(ecg[lead]), ecg_grad_plot.flatten(), color='C0',
+                                        alpha=0.3)
+
+                # Add baseline used to calculate T-wave end, and vertical line to show the calculated T-wave end (and,
+                # if calculated, the median value)
+                axes[lead].axhline(baseline_val[lead].values, color='k')
+                if lead in exclude_column:
+                    axes[lead].axvline(twave_end[lead].values, color='r')
+                else:
+                    axes[lead].axvline(twave_end[lead].values, color='k')
+                if 'median' in twave_end:
+                    axes[lead].axvline(twave_end['median'].values, color='k', linestyle='--')
+
+                # Add markers for the maximum gradient points, with special labelling for the gradient relevant for
+                # the T-wave
                 t_peak = ecg.index[i_peak[lead].values[0]]
                 t_peak_full = ecg.index[i_peak_full[lead][0]]
-                axes[lead].plot(t_peak_full, ecg[lead][t_peak_full], 's', markerfacecolor='none', markeredgecolor='g')
-                axes[lead].plot(t_peak, ecg[lead][t_peak], 'o', markerfacecolor='none', markeredgecolor='r')
+                axes[lead].plot(t_peak_full, ecg[lead][t_peak_full], marker='s', markerfacecolor='none',
+                                markeredgecolor='g', linestyle='none')
+                axes[lead].plot(t_peak_full, ecg_grad_plot[i_peak_full[lead][0]], marker='.', markerfacecolor='none',
+                                markeredgecolor='g', linestyle='none')
+                axes[lead].plot(t_peak, ecg[lead][t_peak], marker='o', markerfacecolor='none', markeredgecolor='r',
+                                linestyle='none')
+            if 'sv' in axes:
+                axes['sv'].axvline(twave_end['median'].values, color='k', linestyle='--')
 
     return twave_ends

@@ -170,3 +170,28 @@ def normalise_signal(data: Union[np.ndarray, pd.DataFrame]) -> Union[np.ndarray,
         minmax = preprocessing.MaxAbsScaler()
         data = minmax.fit_transform(data.values)
         return pd.DataFrame(data, columns=columns, index=index)
+
+
+def get_median(data: pd.DataFrame,
+               remove_outliers: bool = True) -> pd.DataFrame:
+    """ Add the median value of data to a dataframe
+
+    TODO: Complete this code if required (currently only potentially useful for T-wave analysis)
+    """
+
+    exclude_column = list()
+    twave_end_median = np.median(data)
+    if remove_outliers:
+        twave_end_std = np.std(data.values)
+        while True:
+            no_outliers = pd.DataFrame(np.abs((data - twave_end_median)) < 2 * twave_end_std)
+            if all(no_outliers.values[0]):
+                break
+            else:
+                data = data[no_outliers]
+                exclude_column.append(data[data.columns[data.isna().any()]].columns[0])
+                data.dropna(axis='columns', inplace=True)
+                twave_end_median = np.median(data)
+                twave_end_std = np.std(data.values)
+    data.loc[0, 'median'] = twave_end_median
+    return data

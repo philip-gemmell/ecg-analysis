@@ -5,6 +5,7 @@ import pandas as pd
 from typing import List, Union, Optional
 
 import tools_maths
+import general_analysis
 
 # Add carputils functions (https://git.opencarp.org/openCARP/carputils)
 # sys.path.append('/home/pg16/software/carputils/')
@@ -235,16 +236,16 @@ def get_ecg_from_electrodes(electrode_data: pd.DataFrame) -> pd.DataFrame:
     """
 
     # Wilson Central Terminal
-    wct = electrode_data['LA'] + electrode_data['RA'] + electrode_data['LL']
+    wct = (electrode_data['LA'] + electrode_data['RA'] + electrode_data['LL']) / 3
 
     # V leads
     ecg = pd.DataFrame()
-    ecg['V1'] = electrode_data['V1'] - wct / 3
-    ecg['V2'] = electrode_data['V2'] - wct / 3
-    ecg['V3'] = electrode_data['V3'] - wct / 3
-    ecg['V4'] = electrode_data['V4'] - wct / 3
-    ecg['V5'] = electrode_data['V5'] - wct / 3
-    ecg['V6'] = electrode_data['V6'] - wct / 3
+    ecg['V1'] = electrode_data['V1'] - wct
+    ecg['V2'] = electrode_data['V2'] - wct
+    ecg['V3'] = electrode_data['V3'] - wct
+    ecg['V4'] = electrode_data['V4'] - wct
+    ecg['V5'] = electrode_data['V5'] - wct
+    ecg['V6'] = electrode_data['V6'] - wct
 
     # Eindhoven limb leads
     ecg['LI'] = electrode_data['LA'] - electrode_data['RA']
@@ -257,3 +258,59 @@ def get_ecg_from_electrodes(electrode_data: pd.DataFrame) -> pd.DataFrame:
     ecg['aVF'] = electrode_data['LL'] - 0.5 * (electrode_data['LA'] + electrode_data['RA'])
 
     return ecg
+
+
+def get_qrs_start(ecgs: Union[pd.DataFrame, List[pd.DataFrame]],
+                  unipolar_only: bool = True,
+                  plot_result: bool = False) -> List[float]:
+    """Calculates start of QRS complex using method of Hermans et al. (2017)
+
+    Calculates the start of the QRS complex by a simplified version of the work presented in [1]_, wherein the point of
+    maximum second derivative of the ECG RMS signal is used as the start of the QRS complex
+
+    Parameters
+    ----------
+    ecgs : pd.DataFrame or list of pd.DataFrame
+        ECG data to analyse
+    unipolar_only : bool, optional
+        Whether to use only unipolar leads to calculate RMS, default=True
+    plot_result : bool, optional
+        Whether to plot the results for error-checking, default=False
+
+    Returns
+    -------
+    qrs_starts : list of float
+        QRS start times
+
+    Notes
+    -----
+    For further details of the action of unipolar_only, see general_analysis.get_signal_rms
+
+    It is faster to use scipy.ndimage.laplace() rather than np.gradient(np.gradient)), but preliminary checks
+    indicated some edge problems that might throw off the results.
+
+    References
+    ----------
+    .. [1] Hermans BJM, Vink AS, Bennis FC, Filippini LH, Meijborg VMF, Wilde AAM, Pison L, Postema PG, Delhaas T,
+           "The development and validation of an easy to use automatic QT-interval algorithm,"
+           PLoS ONE, 12(9), 1–14 (2017), https://doi.org/10.1371/journal.pone.0184352"""
+
+    if isinstance(ecgs, pd.DataFrame):
+        ecgs = [ecgs]
+
+    ecgs_rms = general_analysis.get_signal_rms(ecgs, unipolar_only=unipolar_only)
+    ecgs_grad = [pd.Series(np.gradient(np.gradient(ecg_rms)), index=ecg_rms.index) for ecg_rms in ecgs_rms]
+    qrs_starts = [ecg_grad[ecg_grad == ecg_grad.max()].index[0] for ecg_grad in ecgs_grad]
+
+    if plot_result:
+        import matplotlib.pyplot as plt
+        for (ecg_rms, ecg_grad, qrs_start) in zip(ecgs_rms, ecgs_grad, qrs_starts):
+            fig, ax = plt.subplots(2, 1, sharex=True)
+            ax[0].plot(ecg_rms)
+            ax[0].set_ylabel('ECG_{RMS}')
+            ax[1].plot(ecg_grad)
+            ax[1].set_ylabel('ECG Sec Der')
+            ax[0].axvline(qrs_start, color='k', linestyle='--')
+            ax[1].axvline(qrs_start, color='k', linestyle='--')
+
+    return qrs_starts

@@ -1,24 +1,27 @@
 import numpy as np
 import scipy.signal
 import pandas as pd
-from typing import List, Dict, Union, Optional
+from typing import List, Union, Optional
 
 import tools_maths
 import tools_python
 
 
-def get_signal_rms(signals: List[Dict[str, List[float]]]) -> List[List[float]]:
+def get_signal_rms(signals: Union[pd.DataFrame, List[pd.DataFrame]],
+                   unipolar_only: bool = True) -> List[List[float]]:
     """Calculate the ECG(RMS) of the ECG as a scalar
 
     Parameters
     ----------
-    signals: list of dict
-        ECG data
+    signals: list of pd.DataFrame or pd.DataFrame
+        ECG or VCG data to process
+    unipolar_only : bool, optional
+        Whether to use only unipolar leads to calculate RMS, default=True
 
     Returns
     -------
     signals_rms : list of list of float
-        Scalar RMS ECG data
+        Scalar RMS ECG or VCG data
 
     Notes
     -----
@@ -26,8 +29,12 @@ def get_signal_rms(signals: List[Dict[str, List[float]]]) -> List[List[float]]:
 
     .. math:: \sqrt{\frac{1}{n}\sum_{i=1}^n (\textnormal{ECG}_i^2(t))}
 
-    for all leads available from the signal (12 for ECG, 3 for VCG). This is a slight alteration (for simplicity) on
-    the method presented in Hermans et al.
+    for all leads available from the signal (12 for ECG, 3 for VCG). If unipolar_only is set to true, then ECG RMS is
+    calculated using only 'unipolar' leads. This uses V1-6, and the non-augmented limb leads (VF, VL and VR)
+
+    ..math:: VF = LL-V_{WCT} = \frac{2}{3}aVF
+    ..math:: VL = LA-V_{WCT} = \frac{2}{3}aVL
+    ..math:: VR = RA-V_{WCT} = \frac{2}{3}aVR
 
     References
     ----------
@@ -37,14 +44,22 @@ def get_signal_rms(signals: List[Dict[str, List[float]]]) -> List[List[float]]:
         https://doi.org/10.1371/journal.pone.0184352
     """
 
-    if isinstance(signals, dict):
+    if isinstance(signals, pd.DataFrame):
         signals = [signals]
 
     signals_rms = list()
     for signal in signals:
-        ecg_squares = [[x ** 2 for x in signal[key]] for key in signal]
-        signal_rms = [sum(x) for x in zip(*ecg_squares)]
-        signals_rms.append([x / 9 for x in signal_rms])
+        signal_rms = signal.copy()
+        if unipolar_only and ('V1' in signal_rms.columns):
+            signal_rms['VF'] = (2/3)*signal_rms['aVF']
+            signal_rms['VL'] = (2/3)*signal_rms['aVL']
+            signal_rms['VR'] = (2/3)*signal_rms['aVR']
+            signal_rms.drop(['aVF', 'aVL', 'aVR', 'LI', 'LII', 'LIII'], axis=1, inplace=True)
+        n_leads = len(signal_rms.columns)
+        for key in signal_rms:
+            signal_rms.loc[:, key] = signal_rms[key]**2
+        signal_rms = np.sqrt(signal_rms.sum(axis=1)/n_leads)
+        signals_rms.append(signal_rms)
 
     return signals_rms
 
@@ -188,6 +203,7 @@ def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
             i_peak = i_peaks[i_ecg]
             ecg_grad_normalised = ecgs_grad_normalised[i_ecg]
             baseline_val = baseline_vals[i_ecg]
+            exclude_column = exclude_columns[i_ecg]
 
             # Generate plots and axes for leads, as required
             ecg_leads = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'LI', 'LII', 'LIII', 'aVR', 'aVL', 'aVF']
@@ -199,7 +215,7 @@ def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
                 _, axes_vcg = vp.plot_spatial_velocity(ecg)
             axes = {**axes_ecg, **axes_vcg}
 
-            for i_lead, lead in enumerate(leads):
+            for lead in leads:
                 # Rescale the gradient to maximise the plotting range shown, then plot in background
                 rescale = preprocessing.MinMaxScaler((min(ecg[lead]), max(ecg[lead])))
                 ecg_grad_plot = rescale.fit_transform(ecg_grad_normalised[lead].values[:, None])
@@ -209,7 +225,7 @@ def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
                 # Add baseline used to calculate T-wave end, and vertical line to show the calculated T-wave end (and,
                 # if calculated, the median value)
                 axes[lead].axhline(baseline_val[lead].values, color='k')
-                if lead in exclude_columns:
+                if lead in exclude_column:
                     axes[lead].axvline(twave_end[lead].values, color='r')
                 else:
                     axes[lead].axvline(twave_end[lead].values, color='k')
@@ -228,5 +244,10 @@ def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
                                 linestyle='none')
             if 'sv' in axes:
                 axes['sv'].axvline(twave_end['median'].values, color='k', linestyle='--')
+            for lead in exclude_column:
+                if lead in ecg_leads:
+                    axes[lead].set_title(lead, color='r')
+                elif lead in vcg_leads:
+                    axes[lead].set_ylabel('VCG ('+lead+')', color='r')
 
     return twave_ends

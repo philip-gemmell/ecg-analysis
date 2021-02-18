@@ -107,6 +107,10 @@ def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
     twave_ends : list of pd.DataFrame
         Time value for when T-wave is estimated to have ended.
 
+    Notes
+    -----
+    Calculates the end of the T-wave as the time at which the T-wave's maximum gradient tangent returns to the baseline.
+
     References
     ----------
     .. [1] Postema PG, Wilde AA, "The measurement of the QT interval," Curr Cardiol Rev. 2014 Aug;10(3):287-94.
@@ -159,7 +163,7 @@ def get_twave_end(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
                 baseline_vals[i_ecg].loc[0, lead] = np.median(ecg_leads[lead][baseline_start:baseline_adjust[i_ecg]])
 
     # Find last peak in gradient (with the limitations imposed by only looking for a single peak within the range
-    # defined by i_distance, to minimise the effect of 'wibbles in the ecg), then by basic trig find the
+    # defined by i_distance, to minimise the effect of 'wibbles' in the ecg), then by basic trig find the
     # x-intercept (which is used as the T-wave end point)
     # noinspection PyUnresolvedReferences
     i_peaks = [pd.DataFrame(columns=ecg.columns, index=[0]) for ecg in ecgs_leads]

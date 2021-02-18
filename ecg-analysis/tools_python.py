@@ -159,7 +159,8 @@ def convert_input_to_list(input_data: Any,
     input_data : Any
         Input argument to be checked
     n_list : int, optional
-        Number of entries required in input, default=1
+        Number of entries required in input; if set to -1, will not perform any checks beyond 'depth' of lists,
+        default=1
     list_depth : int
         Number of nested lists required. If just a simple list of e.g. VCGs, then will be 1 ([vcg1, vcg2,...]). If a
         list of lists (e.g. [[qrs_start1, qrs_start2,...], [qrs_end1, qrs_end2,...]), then 2.
@@ -187,10 +188,18 @@ def convert_input_to_list(input_data: Any,
     if isinstance(input_data, list):
         if list_depth == 1:
             # Simplest option - just want a list of equal length to the variable of interest
-            assert len(input_data) == n_list, "Incorrect number of entries in input_data"
+            if n_list != -1:
+                assert len(input_data) == n_list, "Incorrect number of entries in input_data"
         elif list_depth == 2:
+            if n_list == -1:
+                if not isinstance(input_data[0], list):
+                    return [input_data]
+                else:
+                    return input_data
+
             # More complicated - we require data to be passed in form [[x1a, x1b,...],[x2a,x2b,...],...],
-            # where the length of [xna, xnb,...] is equal to the variable of interest
+            # where the length of [xna, xnb,...] is equal to the variable of interest. For example, for n ECG traces,
+            # we wish to plot QRS start ([x1a, x1b,...]), QRS end ([x2a, x2b,...]) and so on
             for i_input_data in range(len(input_data)):
                 # This is the instance where there is only a single variable of interest, i.e. we require the data to
                 # be reformatted from [x1a, x2a, x3a,...] to [[x1a],[x2a],[x3a],...]
@@ -210,6 +219,17 @@ def convert_input_to_list(input_data: Any,
             return tools_plotting.get_plot_lines(n=n_list)
         else:
             return [default_entry for _ in range(n_list)]
+
+
+def get_i_colour(axis_handle) -> int:
+    """ Get index appropriate to colour value to plot on a figure (will be 0 if brand new figure) """
+    if axis_handle is None:
+        return 0
+    else:
+        if len(axis_handle.lines) == 0:
+            return 0
+        else:
+            return len(axis_handle.lines)-1
 
 
 def deprecated_convert_time_to_index(qrs_start: Optional[float] = None,

@@ -973,10 +973,6 @@ def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
                           legend_vcg: Union[List[str], str, None] = None,
                           legend_limits: Union[List[str], str, None] = None,
                           limits_linestyles: Optional[List[str]] = None,
-                          time_vcg: Optional[np.ndarray] = None,
-                          time_sv: Optional[np.ndarray] = None,
-                          t_end: Union[float, List[float]] = 200,
-                          dt: Union[float, List[float]] = 2,
                           filter_sv: bool = True) -> Tuple:
     """ Plot the spatial velocity for given VCG data
 
@@ -1004,14 +1000,6 @@ def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
         Labels to apply to the limits, default=None
     limits_linestyles : list of str
         Linestyles to apply to the different limits being supplied, default=None (will plot as straight lines)
-    time_vcg : np.ndarray, optional
-        Time variable for the VCG data NOT THE SPATIAL VELOCITY DATA; provided instead of dt and t_end, default=None
-    time_sv : np.ndarray, optional
-        Time variable for the spatial velocity data, default=None
-    t_end : int, optional
-        Duration of the data, default=200
-    dt : int, optional
-        Time step between successive data points, default=2
     filter_sv : bool, optional
         Whether or not to apply filtering to spatial velocity prior to finding the start/end points for the
         threshold, default=True
@@ -1033,19 +1021,49 @@ def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
     legend_limits = tools_python.convert_input_to_list(legend_limits, n_list=len(qrs_limits))
     limits_linestyles = tools_python.convert_input_to_list(limits_linestyles, n_list=len(qrs_limits),
                                                            default_entry='line')
-    time_vcg = tools_python.convert_input_to_list(time_vcg, n_list=n_vcg)
-    time_sv = tools_python.convert_input_to_list(time_sv, n_list=n_vcg)
-    dt = tools_python.convert_input_to_list(dt, n_list=n_vcg)
-    t_end = tools_python.convert_input_to_list(t_end, n_list=n_vcg)
+    # Prepare figures and aces
+    if fig is None:
+        fig = plt.figure()
+        ax = dict()
+        gs = gridspec.GridSpec(3, 3)
+        ax['sv'] = fig.add_subplot(gs[:, :-1])
+        ax['x'] = fig.add_subplot(gs[0, -1])
+        ax['y'] = fig.add_subplot(gs[1, -1])
+        ax['z'] = fig.add_subplot(gs[2, -1])
+        plt.setp(ax['x'].get_xticklabels(), visible=False)
+        plt.setp(ax['y'].get_xticklabels(), visible=False)
+        gs.update(hspace=0.05)
+        colours = tools_plotting.get_plot_colours(n_vcg)
+    else:
+        ax = dict()
+        ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z = fig.get_axes()
+        ax['sv'] = ax_sv
+        ax['x'] = ax_vcg_x
+        ax['y'] = ax_vcg_y
+        ax['z'] = ax_vcg_z
+        colours = tools_plotting.get_plot_colours(len(ax_sv.lines) + n_vcg)
+        """ If too many lines already exist on the plot, need to recolour them all to prevent cross-talk """
+        if len(ax_sv.lines) + n_vcg > 10:
+            for key in ax:
+                lines = ax[key].get_lines()
+                i_vcg = 0
+                for line in lines:
+                    line.set_color(colours[i_vcg])
+                    i_vcg += 1
 
-    fig, ax, colours = __plot_spatial_velocity_prep_axes(len(vcg), fig)
-    if sv is None and (time_sv is None or time_sv[0] is None):
-        sv, _, _ = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
-    elif sv is None:
+    """ Add labels to axes """
+    ax['sv'].set_xlabel('Time (ms)')
+    ax['sv'].set_ylabel('Spatial velocity')
+    ax['x'].set_ylabel('VCG (x)')
+    ax['y'].set_ylabel('VCG (y)')
+    ax['z'].set_ylabel('VCG (z)')
+    ax['z'].set_xlabel('Time (ms)')
+
+    if sv is None:
         sv, _, _ = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
 
     """ Plot spatial velocity and VCG components"""
-    i_colour_init = get_i_colour(ax['sv'])
+    i_colour_init = tools_python.get_i_colour(ax['sv'])
     i_colour = i_colour_init
     h_lines = list()
     for (sim_sv, sim_vcg, sim_label) in zip(sv, vcg, legend_vcg):
@@ -1095,119 +1113,6 @@ def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
     #     print()
 
     return fig, ax
-
-
-def __plot_spatial_velocity_preprocess_inputs(vcg: Union[np.ndarray, List[np.ndarray]],
-                                              qrs_limits: Optional[List[List[float]]],
-                                              legend_vcg: Union[str, List[str], None],
-                                              legend_limits: Union[str, List[str], None],
-                                              limits_linestyles: Optional[List[str]],
-                                              time: Union[np.ndarray, List[np.ndarray], None],
-                                              dt: Union[float, List[float]],
-                                              t_end: Union[float, List[float]])\
-        -> Tuple[List[np.ndarray], Optional[List[List[float]]], List[Optional[str]], List[Optional[str]], List[str],
-                 List[np.ndarray], List[float], List[float]]:
-    """ Preprocess other inputs """
-    if isinstance(vcg, np.ndarray):
-        vcg = [vcg]
-
-    if qrs_limits is not None:
-        assert isinstance(qrs_limits, list), "QRS limits variable passed incorrectly"
-        assert isinstance(qrs_limits[0], list), "QRS limits variable passed incorrectly"
-        for qrs_limit in qrs_limits:
-            assert len(qrs_limit) == len(vcg)
-
-    if isinstance(legend_vcg, str):
-        assert len(vcg) == 1, "Only one legend entry passed for multiple VCG entries"
-        legend_vcg = [legend_vcg]
-    elif legend_vcg is None:
-        if len(vcg) > 1:
-            legend_vcg = [str(i) for i in range(len(vcg))]
-        else:
-            legend_vcg = [None for _ in range(len(vcg))]
-    else:
-        assert len(legend_vcg) == len(vcg), "legend and vcg are of different lengths"
-
-    if legend_limits is not None:
-        if isinstance(legend_limits, list):
-            assert len(legend_limits) == len(qrs_limits)
-
-    if limits_linestyles is None:
-        if qrs_limits is not None:
-            limits_linestyles = ['-' for _ in range(len(qrs_limits))]
-    else:
-        assert len(limits_linestyles) >= len(qrs_limits)
-
-    if not isinstance(time, list):
-        time = [time for _ in range(len(vcg))]
-    else:
-        assert len(time) == len(vcg), "Time and VCG variables not the same length"
-
-    if isinstance(dt, (int, float)):
-        dt = [dt for _ in range(len(vcg))]
-    else:
-        assert len(dt) == len(vcg), "dt and VCG variables not the same length"
-
-    if isinstance(t_end, (int, float)):
-        t_end = [t_end for _ in range(len(vcg))]
-    else:
-        assert len(t_end) == len(vcg), "t_end and VCG variables not the same length"
-
-    return vcg, qrs_limits, legend_vcg, legend_limits, limits_linestyles, time, dt, t_end
-
-
-def __plot_spatial_velocity_prep_axes(len_vcg: int,
-                                      fig: plt.figure) -> Tuple:
-    """ Prepare figure and axes """
-    if fig is None:
-        fig = plt.figure()
-        ax = dict()
-        gs = gridspec.GridSpec(3, 3)
-        ax['sv'] = fig.add_subplot(gs[:, :-1])
-        ax['x'] = fig.add_subplot(gs[0, -1])
-        ax['y'] = fig.add_subplot(gs[1, -1])
-        ax['z'] = fig.add_subplot(gs[2, -1])
-        plt.setp(ax['x'].get_xticklabels(), visible=False)
-        plt.setp(ax['y'].get_xticklabels(), visible=False)
-        gs.update(hspace=0.05)
-        colours = tools_plotting.get_plot_colours(len_vcg)
-    else:
-        ax = dict()
-        ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z = fig.get_axes()
-        ax['sv'] = ax_sv
-        ax['x'] = ax_vcg_x
-        ax['y'] = ax_vcg_y
-        ax['z'] = ax_vcg_z
-        colours = tools_plotting.get_plot_colours(len(ax_sv.lines) + len_vcg)
-        """ If too many lines already exist on the plot, need to recolour them all to prevent cross-talk """
-        if len(ax_sv.lines) + len_vcg > 10:
-            for key in ax:
-                lines = ax[key].get_lines()
-                i_vcg = 0
-                for line in lines:
-                    line.set_color(colours[i_vcg])
-                    i_vcg += 1
-
-    """ Add labels to axes """
-    ax['sv'].set_xlabel('Time (ms)')
-    ax['sv'].set_ylabel('Spatial velocity')
-    ax['x'].set_ylabel('VCG (x)')
-    ax['y'].set_ylabel('VCG (y)')
-    ax['z'].set_ylabel('VCG (z)')
-    ax['z'].set_xlabel('Time (ms)')
-
-    return fig, ax, colours
-
-
-def get_i_colour(axis_handle):
-    """ Get index appropriate to colour value to plot on a figure (will be 0 if brand new figure) """
-    if axis_handle is None:
-        return 0
-    else:
-        if len(axis_handle.lines) == 0:
-            return 0
-        else:
-            return len(axis_handle.lines)-1
 
 
 def plot_metric_change(metrics: List[List[List[float]]],
@@ -1318,10 +1223,10 @@ def plot_metric_change(metrics: List[List[List[float]]],
     legend_z = ['None', r'0.5 \textrightarrow 0.7', r'0.4 \textrightarrow 0.8', r'0.3 \textrightarrow 0.9']
 
     """ Assert correct data has been passed (insofar that it is of the right length!) """
-    metrics = __set_metric_to_metrics(metrics)
-    metrics_phi = __set_metric_to_metrics(metrics_phi)
-    metrics_rho = __set_metric_to_metrics(metrics_rho)
-    metrics_z = __set_metric_to_metrics(metrics_z)
+    metrics = tools_python.convert_input_to_list(metrics, n_list=-1, list_depth=2)
+    metrics_phi = tools_python.convert_input_to_list(metrics_phi, n_list=-1, list_depth=2)
+    metrics_rho = tools_python.convert_input_to_list(metrics_rho, n_list=-1, list_depth=2)
+    metrics_z = tools_python.convert_input_to_list(metrics_z, n_list=-1, list_depth=2)
 
     if metrics_lv is None:
         metrics_lv = [True, False]
@@ -1467,14 +1372,6 @@ def plot_metric_change(metrics: List[List[List[float]]],
             ax[key].set_ylim(ax_limits)
 
     return fig, ax
-
-
-def __set_metric_to_metrics(metric: Union[List, List[List[float]]]):
-    """ Function to change single list of metrics to list of one entry if required (so loops work correctly) """
-    if not isinstance(metric[0], list):
-        return [metric]
-    else:
-        return metric
 
 
 def plot_metric_change_barplot(metrics_cont: List[List[float]],

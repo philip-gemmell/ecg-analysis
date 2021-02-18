@@ -227,7 +227,7 @@ def get_spatial_velocity(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
         sim_sv_orig = sim_sv.copy()
         while i_qrs_start == 0:
             sim_sv = sim_sv.iloc[1:]
-            threshold_start = max(sim_sv) * threshold_frac_start
+            threshold_start = sim_sv.max().values*threshold_frac_start
 
             if filter_sv:
                 sv_filtered = tools_maths.filter_butterworth(sim_sv, sample_freq, low_p, order)
@@ -241,7 +241,7 @@ def get_spatial_velocity(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
                 ax.plot(sim_sv_orig)
                 ax.set_xlabel('Time')
                 ax.set_ylabel('Spatial Velocity')
-                ax.axhline(max(sim_sv) * threshold_frac_start, label='Threshold={}'.format(threshold_frac_start))
+                ax.axhline(sim_sv.max().values*threshold_frac_start, label='Threshold={}'.format(threshold_frac_start))
                 ax.legend()
                 raise Exception('More than 50ms of trace removed - try changing threshold_frac_start')
         threshold_end = sim_sv.max().values * threshold_frac_end

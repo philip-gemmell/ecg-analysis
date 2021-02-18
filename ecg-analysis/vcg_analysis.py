@@ -176,18 +176,18 @@ def get_spatial_velocity(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
         Absolute values for the threshold for a given spatial velocity trace, rather than the relative values
         originally input
 
+    Notes
+    -----
+    Calculation of spatial velocity based on [1]_, [2]_, [3]_
+
     References
     ----------
-    Calculation of spatial velocity based on:
-    Kors JA, van Herpen G.
-        Methodology of QT-interval measurement in the modular ECG analysis system (MEANS)
-        Ann Noninvasive Electrocardiol. 2009 Jan;14 Suppl 1:S48-53. doi: 10.1111/j.1542-474X.2008.00261.x.
-    Xue JQ
-        Robust QT Interval Estimation—From Algorithm to Validation
-        Ann Noninvasive Electrocardiol. 2009 Jan;14 Suppl 1:S35-41. doi: 10.1111/j.1542-474X.2008.00264.x.
-    Sörnmo L
-        A model-based approach to QRS delineation
-        Comput Biomed Res. 1987 Dec;20(6):526-42.
+    .. [1] Kors JA, van Herpen G, "Methodology of QT-interval measurement in the modular ECG analysis system (MEANS)"
+           Ann Noninvasive Electrocardiol. 2009 Jan;14 Suppl 1:S48-53. doi: 10.1111/j.1542-474X.2008.00261.x.
+    .. [2] Xue JQ, "Robust QT Interval Estimation—From Algorithm to Validation"
+           Ann Noninvasive Electrocardiol. 2009 Jan;14 Suppl 1:S35-41. doi: 10.1111/j.1542-474X.2008.00264.x.
+    .. [3] Sörnmo L, "A model-based approach to QRS delineation"
+           Comput Biomed Res. 1987 Dec;20(6):526-42.
     """
     if isinstance(vcgs, pd.DataFrame):
         vcgs = [vcgs]
@@ -204,23 +204,29 @@ def get_spatial_velocity(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
 
         # Calculates Euclidean distance based on spatial velocity in x, y and z directions, i.e. will calculate
         # sqrt(x^2+y^2+z^2) to get total spatial velocity
-        sim_sv = np.linalg.norm(dvcg, axis=1)
+
+        # Calculate the time appropriate to the spatial velocity - cuts time off from each side equally, with a bias
+        # towards cutting the tail values. If len(vcg)=n, then:
+        # If velocity_offset=1 => len(sv)=n-1 => time_sv=time_vcg[:-1]
+        # If velocity_offset=2 => len(sv)=n-2 => time_sv=time_vcg[1:-1]
+        pre_cut = math.floor(velocity_offset/2)
+        end_cut = velocity_offset-pre_cut
+
+        sim_sv = pd.DataFrame(np.linalg.norm(dvcg, axis=1), index=vcg.index.values[pre_cut:-end_cut], columns=['sv'])
 
         # Determine threshold for QRS complex, then find start of QRS complex. Iteratively remove more of the plot if
         # the 'start' is found to be 0 (implies it is still getting confused by the preceding wave). Alternatively, just
         # cut off the first 10ms of the beat (original Matlab method)
         sample_freq = 1000/np.mean(np.diff(vcg.index))
-        sim_time = vcg.index.values[:-velocity_offset]
-        threshold_start = max(sim_sv)*threshold_frac_start
+        threshold_start = sim_sv.max().values*threshold_frac_start
         if filter_sv:
             sv_filtered = tools_maths.filter_butterworth(sim_sv, low_p, order)
         else:
-            sv_filtered = sim_sv
+            sv_filtered = sim_sv.copy()
         i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
-        sim_sv_orig = sim_sv
+        sim_sv_orig = sim_sv.copy()
         while i_qrs_start == 0:
-            sim_sv = sim_sv[1:]
-            sim_time = sim_time[1:]
+            sim_sv = sim_sv.iloc[1:]
             threshold_start = max(sim_sv) * threshold_frac_start
 
             if filter_sv:
@@ -228,19 +234,18 @@ def get_spatial_velocity(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
             else:
                 sv_filtered = sim_sv
             i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
-            if sim_time[0] > 50:
+            if sim_sv.index[0] > 50:
                 import matplotlib.pyplot as plt
                 fig = plt.figure()
                 ax = fig.add_subplot(1, 1, 1)
-                ax.plot(vcg.index.values[:-velocity_offset], sim_sv_orig)
+                ax.plot(sim_sv_orig)
                 ax.set_xlabel('Time')
                 ax.set_ylabel('Spatial Velocity')
                 ax.axhline(max(sim_sv) * threshold_frac_start, label='Threshold={}'.format(threshold_frac_start))
                 ax.legend()
                 raise Exception('More than 50ms of trace removed - try changing threshold_frac_start')
-        threshold_end = max(sim_sv) * threshold_frac_end
+        threshold_end = sim_sv.max().values * threshold_frac_end
         sim_sv = sv_filtered
-        sim_sv = pd.DataFrame(sim_sv, index=sim_time, columns=['sv'])
         sv.append(sim_sv)
         threshold_start_full.append(threshold_start)
         threshold_end_full.append(threshold_end)

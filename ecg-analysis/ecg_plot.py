@@ -120,6 +120,8 @@ def plot(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
 
             # Cycle through each limit provided, e.g. QRS start, QRS end...
             for (limit, label, colour, linestyle) in zip(limits, legend_limits, colours_limits, linestyles_limits):
+                if isinstance(limit, pd.Series):
+                    limit = limit.values
                 for key in ax:
                     ax[key].axvline(limit, label=label, color=colour, alpha=0.5, linestyle=linestyle)
 

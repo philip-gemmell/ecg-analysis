@@ -109,6 +109,7 @@ def get_qrs_start_end(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
                                                               threshold_frac_start=threshold_frac_start,
                                                               threshold_frac_end=threshold_frac_end,
                                                               filter_sv=filter_sv, low_p=low_p, order=order)
+
     qrs_start = list()
     qrs_end = list()
     qrs_duration = list()
@@ -217,20 +218,19 @@ def get_spatial_velocity(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
         # Determine threshold for QRS complex, then find start of QRS complex. Iteratively remove more of the plot if
         # the 'start' is found to be 0 (implies it is still getting confused by the preceding wave). Alternatively, just
         # cut off the first 10ms of the beat (original Matlab method)
-        sample_freq = 1000/np.mean(np.diff(vcg.index))
+        sim_sv_orig = sim_sv.copy()
         threshold_start = sim_sv.max().values*threshold_frac_start
         if filter_sv:
-            sv_filtered = tools_maths.filter_butterworth(sim_sv, low_p, order)
+            sv_filtered = tools_maths.filter_butterworth(sim_sv, freq_filter=low_p, order=order)
         else:
             sv_filtered = sim_sv.copy()
         i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
-        sim_sv_orig = sim_sv.copy()
         while i_qrs_start == 0:
             sim_sv = sim_sv.iloc[1:]
             threshold_start = sim_sv.max().values*threshold_frac_start
 
             if filter_sv:
-                sv_filtered = tools_maths.filter_butterworth(sim_sv, sample_freq, low_p, order)
+                sv_filtered = tools_maths.filter_butterworth(sim_sv, freq_filter=low_p, order=order)
             else:
                 sv_filtered = sim_sv
             i_qrs_start = np.where(sv_filtered > threshold_start)[0][0]
@@ -244,7 +244,7 @@ def get_spatial_velocity(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
                 ax.axhline(sim_sv.max().values*threshold_frac_start, label='Threshold={}'.format(threshold_frac_start))
                 ax.legend()
                 raise Exception('More than 50ms of trace removed - try changing threshold_frac_start')
-        threshold_end = sim_sv.max().values * threshold_frac_end
+        threshold_end = sim_sv.max().values*threshold_frac_end
         sim_sv = sv_filtered
         sv.append(sim_sv)
         threshold_start_full.append(threshold_start)

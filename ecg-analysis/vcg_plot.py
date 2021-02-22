@@ -1060,7 +1060,7 @@ def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
     ax['z'].set_xlabel('Time (ms)')
 
     if sv is None:
-        sv, _, _ = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
+        sv = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
 
     """ Plot spatial velocity and VCG components"""
     i_colour_init = tools_python.get_i_colour(ax['sv'])

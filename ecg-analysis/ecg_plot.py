@@ -113,7 +113,6 @@ def plot(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
         if isinstance(limits, pd.DataFrame):
             for key in ax:
                 ax[key].axvline(limits[key].values)
-            print()
         else:
             if isinstance(limits, float):
                 limits = [limits]

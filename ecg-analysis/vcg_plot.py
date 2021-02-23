@@ -578,6 +578,7 @@ def __add_colourbar(limits: List[float],
     # from matplotlib import colors.Normalize
 
     cmap = plt.get_cmap(colourmap, n_elements)
+    # noinspection PyUnresolvedReferences
     norm = mpl.colors.Normalize(vmin=limits[0], vmax=limits[1])
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array(np.ndarray([]))
@@ -968,11 +969,12 @@ def plot_arc3d(vector1: List[float],
 
 def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
                           sv: Optional[List[List[float]]] = None,
-                          qrs_limits: Optional[List[List[float]]] = None,
+                          limits: Optional[List[List[float]]] = None,
                           fig: plt.figure = None,
                           legend_vcg: Union[List[str], str, None] = None,
                           legend_limits: Union[List[str], str, None] = None,
                           limits_linestyles: Optional[List[str]] = None,
+                          limits_colours: Optional[List[str]] = None,
                           filter_sv: bool = True) -> Tuple:
     """ Plot the spatial velocity for given VCG data
 
@@ -987,7 +989,7 @@ def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
     sv : list of list of float, optional
         Spatial velocity data. Only required to be given here if special parameters wish to be given, otherwise it
         will be calculated using default parameters (default)
-    qrs_limits : list of list of float, optional
+    limits : list of list of float, optional
         A series of 'limits' to be plotted on the figure with the VCG and spatial plot. Presented as a list of the
         same length of the VCG data, with the required limits within:
             e.g. [[QRS_start1, QRS_start2, ...], [QRS_end1, QRS_end2, ...], ...]
@@ -998,16 +1000,19 @@ def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
         Labels to apply to the VCG/SV data, default=None
     legend_limits : str or list of str, optional
         Labels to apply to the limits, default=None
-    limits_linestyles : list of str
-        Linestyles to apply to the different limits being supplied, default=None (will plot as straight lines)
+    limits_linestyles : list of str, optional
+        Linestyles to apply to the different limits being supplied, default=None (will use varying linestyles based
+        on tools_plotting.get_plot_lines)
+    limits_colours : list of str, optional
+        Colours to apply to the different limits being supplied, default=None (will use varying colours based on
+        tools_plotting.get_plot_colours)
     filter_sv : bool, optional
         Whether or not to apply filtering to spatial velocity prior to finding the start/end points for the
         threshold, default=True
 
     Returns
     -------
-    fig
-    ax
+    fig, ax
         Handles to the figure and axes generated
     """
 
@@ -1016,11 +1021,13 @@ def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
         vcg = [vcg]
     n_vcg = len(vcg)
     vcg = tools_python.convert_input_to_list(vcg, n_list=n_vcg)
-    qrs_limits = tools_python.convert_input_to_list(qrs_limits, n_list=n_vcg, list_depth=2)
+    limits = tools_python.convert_input_to_list(limits, n_list=n_vcg, list_depth=2)
     legend_vcg = tools_python.convert_input_to_list(legend_vcg, n_list=n_vcg)
-    legend_limits = tools_python.convert_input_to_list(legend_limits, n_list=len(qrs_limits))
-    limits_linestyles = tools_python.convert_input_to_list(limits_linestyles, n_list=len(qrs_limits),
+    legend_limits = tools_python.convert_input_to_list(legend_limits, n_list=len(limits))
+    limits_linestyles = tools_python.convert_input_to_list(limits_linestyles, n_list=len(limits),
                                                            default_entry='line')
+    limits_colours = tools_python.convert_input_to_list(limits_colours, n_list=len(limits), default_entry='colour')
+
     # Prepare figures and aces
     if fig is None:
         fig = plt.figure()
@@ -1033,7 +1040,7 @@ def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
         plt.setp(ax['x'].get_xticklabels(), visible=False)
         plt.setp(ax['y'].get_xticklabels(), visible=False)
         gs.update(hspace=0.05)
-        colours = tools_plotting.get_plot_colours(n_vcg)
+        # colours = tools_plotting.get_plot_colours(n_vcg)
     else:
         ax = dict()
         ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z = fig.get_axes()
@@ -1074,23 +1081,25 @@ def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
 
     """ Plot QRS limits, if provided """
     h_limits = list()
-    if qrs_limits[0] is not None:
+    if limits[0] is not None:
         # Cycle through each limit provided, e.g. QRS start, QRS end...
-        for (qrs_limit, limits_linestyle) in zip(qrs_limits, limits_linestyles):
-            i_colour = i_colour_init
+        for (qrs_limit, limits_linestyle, limits_colour) in zip(limits, limits_linestyles, limits_colours):
+            # i_colour = i_colour_init
             add_limit_handle = True
 
             # Plot limits for each given VCG
             for sim_qrs_limit in qrs_limit:
                 for key in ax:
                     if key == 'sv' and add_limit_handle:
-                        h_limits.append(ax[key].axvline(sim_qrs_limit, color=colours[i_colour], alpha=0.8,
+                        if not isinstance(sim_qrs_limit, float):
+                            sim_qrs_limit = sim_qrs_limit.values
+                        h_limits.append(ax[key].axvline(sim_qrs_limit, color=limits_colour, alpha=0.8,
                                                         linestyle=limits_linestyle, label=None))
                         add_limit_handle = False
                     else:
-                        ax[key].axvline(sim_qrs_limit, color=colours[i_colour], alpha=0.8,
+                        ax[key].axvline(sim_qrs_limit, color=limits_colour, alpha=0.8,
                                         linestyle=limits_linestyle, label=None)
-                i_colour += 1
+                # i_colour += 1
 
     """ Add legend_vcg and legend_limits """
     if legend_vcg[0] is not None:

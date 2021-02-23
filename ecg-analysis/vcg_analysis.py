@@ -59,7 +59,10 @@ def get_qrs_start_end(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
                       order: int = 2,
                       threshold_frac_start: float = 0.22,
                       threshold_frac_end: float = 0.54,
-                      filter_sv: bool = True) -> Tuple[List[float], List[float], List[float]]:
+                      filter_sv: bool = True,
+                      qrs_window: float = 180,
+                      ecgs: Union[List[pd.DataFrame], pd.DataFrame, None] = None) -> Tuple[List[float], List[float],
+                                                                                           List[float]]:
     """Calculate the extent of the VCG QRS complex on the basis of max derivative
 
     TODO: Check whether i_qrs_start variable is needed, or can be simplified using DataFrame function
@@ -86,6 +89,12 @@ def get_qrs_start_end(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
         Fraction of maximum spatial velocity to trigger end of QRS detection, default=0.15
     filter_sv : bool, optional
         Whether or not to apply filtering to spatial velocity prior to finding the start/end points for the threshold
+    qrs_window : float, optional
+        Default size of 'window' in which to search for end of QRS complex, default=180ms
+    ecgs : list of pd.DataFrame or pd.DataFrame, optional
+        ECG data associated with VCG data. Only used if having trouble establishing QRS start, in which case will be
+        used to plot ECG data to allow user to determine whether or not the QRS is occurring at the start of the
+        simulation, or whether there is a more deep-seated issue with the data.
 
     Returns
     -------
@@ -99,6 +108,10 @@ def get_qrs_start_end(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
 
     if isinstance(vcgs, pd.DataFrame):
         vcgs = [vcgs]
+    if ecgs is not None:
+        if isinstance(ecgs, pd.DataFrame):
+            ecgs = [ecgs]
+        assert len(ecgs) == len(vcgs)
     assert 0 < threshold_frac_start < 1, "threshold_frac_start must be between 0 and 1"
     assert 0 < threshold_frac_end < 1, "threshold_frac_end must be between 0 and 1"
 
@@ -107,11 +120,12 @@ def get_qrs_start_end(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
     qrs_start = list()
     qrs_end = list()
     qrs_duration = list()
-    for sim_sv in sv:
+    for i_sim, sim_sv in enumerate(sv):
         # Determine threshold for QRS complex, then find start of QRS complex. Iteratively remove more of the plot if
-        # the 'start' is found to be 0 (implies it is still getting confused by the preceding wave). Alternatively, just
-        # cut off the first 10ms of the beat (original Matlab method)
+        # the 'start' is found to be 0 (implies it is still getting confused by the preceding wave,
+        # but inspection flag added to allow if just very early QRS).
         sim_sv_orig = sim_sv.copy()
+        # noinspection PyArgumentList
         threshold_start = sim_sv.max().values * threshold_frac_start
         i_qrs_start = np.where(sim_sv > threshold_start)[0][0]
         while i_qrs_start == 0:
@@ -121,25 +135,93 @@ def get_qrs_start_end(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
             i_qrs_start = np.where(sim_sv > threshold_start)[0][0]
             if sim_sv.index[0] > 50:
                 import matplotlib.pyplot as plt
-                fig = plt.figure()
-                ax = fig.add_subplot(1, 1, 1)
+                # Figure won't plot if using the Qt5Agg backend, for some reason (see
+                # https://github.com/matplotlib/matplotlib/issues/9206 for discussion, but that says it's fixed).
+                # Unable to change backend in any meaningful way to resolve this dispute, so forced to use a block on
+                # the plt.show() command
+                import ecg_plot as ep
+                _ = ep.plot(ecgs[i_sim])
+                fig, ax = plt.subplots(1, 1)
                 ax.plot(sim_sv_orig)
                 ax.set_xlabel('Time')
                 ax.set_ylabel('Spatial Velocity')
                 ax.axhline(sim_sv.max().values * threshold_frac_start,
                            label='Threshold={}'.format(threshold_frac_start))
                 ax.legend()
-                raise Exception('More than 50ms of trace removed - try changing threshold_frac_start')
-        qrs_start.append(sim_sv.index[i_qrs_start])
+                print("Hack applied here - need to close the figure window in order to continue with the program.")
+                plt.show(block=True)
+                qrs_early = ''
+                while not (qrs_early.lower() == 'y' or qrs_early.lower() == 'n' or ',' in qrs_early):
+                    qrs_early = input('More than 50ms of trace removed - do you wish to :'
+                                      '\n\tset start to 0 (y), '
+                                      '\n\tset values to NaN (n),'
+                                      '\n\tspecify a cut-off and new threshold (ms to remove, threshold_value)?')
+                if qrs_early.lower() == 'n':
+                    warnings.warn('QRS unable to be calculated - setting to NaN.')
+                    i_qrs_start = np.nan
+                elif qrs_early.lower() == 'y':
+                    sim_sv = sim_sv_orig.copy()
+                    i_qrs_start = 0
+                    break
+                elif ',' in qrs_early:
+                    qrs_early = qrs_early.split(',')
+                    assert len(qrs_early) == 2
+                    qrs_early = [float(qrs_early_temp) for qrs_early_temp in qrs_early]
+                    assert sim_sv_orig.index[0] <= qrs_early[0] < sim_sv_orig.index[-1]
+                    # noinspection PyArgumentList
+                    assert sim_sv_orig.min().values <= qrs_early[1] <= sim_sv_orig.max().values
+                    sim_sv = sim_sv_orig.loc[qrs_early[0]:, :]
+                    i_qrs_start = np.where(sim_sv > qrs_early[1])[0][0]
 
-        threshold_end = sim_sv.max().values * threshold_frac_end
-        i_qrs_end = len(sim_sv) - (np.where(np.flip(sim_sv.values) > threshold_end)[0][0] - 1)
-        qrs_end.append(sim_sv.index[i_qrs_end])
+        if np.isnan(i_qrs_start):
+            qrs_start.append(np.nan)
+            qrs_end.append(np.nan)
+            qrs_duration.append(np.nan)
+        else:
+            qrs_start.append(sim_sv.index[i_qrs_start])
 
-        qrs_duration.append(qrs_end[-1] - qrs_start[-1])
+            # noinspection PyArgumentList
+            threshold_end = sim_sv.max().values * threshold_frac_end
+            try:
+                # Set window for QRS complex, then find when threshold_end is exceeded (searching backwards from end
+                # of window)
+                sim_sv_temp = sim_sv.loc[qrs_start[-1]:qrs_start[-1]+qrs_window, :]
+                qrs_end_temp = sim_sv_temp[sim_sv_temp > threshold_end]
+                qrs_end_temp.dropna(axis=0, inplace=True)
+                qrs_end.append(qrs_end_temp.index[-1])
+                # i_qrs_end = len(sim_sv) - (np.where(np.flip(sim_sv.values) > threshold_end)[0][0] - 1)
+                # qrs_end.append(sim_sv.index[i_qrs_end])
+            except IndexError:
+                # Figure won't plot if using the Qt5Agg backend, for some reason (see
+                # https://github.com/matplotlib/matplotlib/issues/9206 for discussion, but that says it's fixed).
+                # Unable to change backend in any meaningful way to resolve this dispute, so forced to use a block on
+                # the plt.show() command
+                import matplotlib.pyplot as plt
+                import ecg_plot as ep
+                _ = ep.plot(ecgs[i_sim])
+                fig, ax = plt.subplots(1, 1)
+                ax.plot(sim_sv)
+                ax.set_xlabel('Time')
+                ax.set_ylabel('Spatial Velocity')
+                ax.axhline(threshold_start, color='k', linestyle='--')
+                ax.axhline(threshold_end, color='k', linestyle='-')
+                ax.axvline(sim_sv.index[i_qrs_start], color='k', linestyle='--')
+                print("Hack applied here - need to close the figure window in order to continue with the program.")
+                plt.show(block=True)
 
-        assert i_qrs_start < i_qrs_end, "i_qrs_start >= i_qrs_end"
-        assert i_qrs_end <= len(sim_sv), "i_qrs_end >= len(sv)"
+                qrs_late = ''
+                while not (qrs_late.lower() == 'n'):
+                    qrs_late = input('Struggling to find QRS end - do you wish to:'
+                                     '\n\tset values to NaN (n),')
+                if qrs_late.lower() == 'n':
+                    warnings.warn('QRS unable to be calculated - setting to NaN.')
+                    qrs_end.append(np.nan)
+
+            qrs_duration.append(qrs_end[-1] - qrs_start[-1])
+
+            if not np.isnan(qrs_end[-1]):
+                assert qrs_start[-1] < qrs_end[-1], "qrs_start {} >= qrs_end[-1] {}".format(qrs_start[-1], qrs_end[-1])
+                assert qrs_end[-1] <= sim_sv_orig.index[-1], "i_qrs_end >= len(sv)"
 
     return qrs_start, qrs_end, qrs_duration
 

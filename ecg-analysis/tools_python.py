@@ -186,6 +186,7 @@ def convert_input_to_list(input_data: Any,
     """
 
     if isinstance(input_data, list):
+        input_data = input_data.copy()  # Prevent changes to original input data (which may affect future iterations!)
         if list_depth == 1:
             # Simplest option - just want a list of equal length to the variable of interest
             if n_list != -1:

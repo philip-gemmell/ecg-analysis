@@ -56,6 +56,7 @@ def get_plot_lines(n: int = 4) -> Union[List[tuple], List[str]]:
         return['-', '--', '-.', ':']
     elif n < 15:
         lines = list()
+        lines.append('-')
         dash_gap = 2
         i_lines = 0
         while i_lines < 5:

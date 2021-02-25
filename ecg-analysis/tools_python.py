@@ -149,6 +149,7 @@ def convert_index_to_time(idx: int,
 
 def convert_input_to_list(input_data: Any,
                           n_list: int = 1,
+                          n_list2: int = -1,
                           list_depth: int = 1,
                           default_entry: Any = None) -> list:
     """Convert a given input to a list of inputs of required length. If already a list, will confirm that it's the
@@ -161,6 +162,8 @@ def convert_input_to_list(input_data: Any,
     n_list : int, optional
         Number of entries required in input; if set to -1, will not perform any checks beyond 'depth' of lists,
         default=1
+    n_list2 : int, optional
+        Number of entries for secondary input; if set to -1, will not perform any checks
     list_depth : int
         Number of nested lists required. If just a simple list of e.g. VCGs, then will be 1 ([vcg1, vcg2,...]). If a
         list of lists (e.g. [[qrs_start1, qrs_start2,...], [qrs_end1, qrs_end2,...]), then 2.
@@ -176,7 +179,11 @@ def convert_input_to_list(input_data: Any,
     Notes
     -----
     If the data are already provided as a list and list_depth==1, function will simply check that the list is of the
-    correct length. If list_depth==2, will check that deepest level of nesting has the correct length.
+    correct length. If list_depth==2, will check that deepest level of nesting has the correct length; if n_list2 is
+    provided, it will check the top level of the list is of the correct length. This is used, for example,
+    when several different limits are provided for several different VCGs, and a legend is needed. Thus, if there are n
+    different VCGs to be plotted, and each has m different limits to be plotted, the legend can be checked to be of
+    the form [[x11, x21,...,xn1], [x12, x22,...,xn2],...[x1m, x2m,...xnm]]
 
     If the data are not in list form, will:
         (a) if default_entry==None, will replicate input_data to match n_vcg, e.g. '-' becomes ['-', '-',...]
@@ -186,31 +193,32 @@ def convert_input_to_list(input_data: Any,
     """
 
     if isinstance(input_data, list):
-        input_data = input_data.copy()  # Prevent changes to original input data (which may affect future iterations!)
+        output_data = input_data.copy()  # Prevent changes to original input data (which may affect future iterations!)
         if list_depth == 1:
             # Simplest option - just want a list of equal length to the variable of interest
             if n_list != -1:
-                assert len(input_data) == n_list, "Incorrect number of entries in input_data"
+                assert len(output_data) == n_list, "Incorrect number of entries in input_data"
         elif list_depth == 2:
-            if n_list == -1:
-                if not isinstance(input_data[0], list):
-                    return [input_data]
-                else:
-                    return input_data
-
             # More complicated - we require data to be passed in form [[x1a, x1b,...],[x2a,x2b,...],...],
             # where the length of [xna, xnb,...] is equal to the variable of interest. For example, for n ECG traces,
             # we wish to plot QRS start ([x1a, x1b,...]), QRS end ([x2a, x2b,...]) and so on
-            for i_input_data in range(len(input_data)):
-                # This is the instance where there is only a single variable of interest, i.e. we require the data to
-                # be reformatted from [x1a, x2a, x3a,...] to [[x1a],[x2a],[x3a],...]
-                if not isinstance(input_data[i_input_data], list):
-                    input_data[i_input_data] = [input_data[i_input_data]]
-            for inner_data in input_data:
-                assert len(inner_data) == n_list, "inner_data of input incorrectly formatted"
+            if not isinstance(output_data[0], list):
+                if n_list == 1:
+                    # This is the instance where there is only a single variable of interest, i.e. we require the data
+                    # to be reformatted from [x1a, x2a, x3a,...] to [[x1a],[x2a],[x3a],...]
+                    output_data = [[output_data1] for output_data1 in output_data]
+                else:
+                    output_data = [output_data]
+
+            if n_list != -1:
+                for inner_data in output_data:
+                    assert len(inner_data) == n_list,\
+                        "inner_data of input incorrectly formatted (len(inner_data)=={})".format(len(inner_data))
+            if n_list2 != -1:
+                assert len(output_data) == n_list2, "Incompatible length for top level of list provided"
         else:
             raise Exception("Not coded for this eventuality...")
-        return input_data
+        return output_data
     else:
         if default_entry is None:
             return [input_data for _ in range(n_list)]

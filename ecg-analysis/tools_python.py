@@ -218,16 +218,22 @@ def convert_input_to_list(input_data: Any,
                 assert len(output_data) == n_list2, "Incompatible length for top level of list provided"
         else:
             raise Exception("Not coded for this eventuality...")
-        return output_data
     else:
         if default_entry is None:
-            return [input_data for _ in range(n_list)]
+            output_data = [input_data for _ in range(n_list)]
         elif default_entry == 'colour':
-            return tools_plotting.get_plot_colours(n=n_list)
+            output_data = tools_plotting.get_plot_colours(n=n_list)
         elif default_entry == 'line':
-            return tools_plotting.get_plot_lines(n=n_list)
+            output_data = tools_plotting.get_plot_lines(n=n_list)
         else:
-            return [default_entry for _ in range(n_list)]
+            output_data = [default_entry for _ in range(n_list)]
+
+        # Adjust the nesting of these default lists depending on requirements
+        list_embed = list_depth-1
+        while list_embed > 0:
+            output_data = [output_data]
+            list_embed -= 1
+    return output_data
 
 
 def get_i_colour(axis_handle) -> int:

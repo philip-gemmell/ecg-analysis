@@ -1,4 +1,3 @@
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
@@ -210,15 +209,13 @@ def plot_xyz_components(vcgs: Union[pd.DataFrame, List[pd.DataFrame]],
     return fig, ax
 
 
-def plot_2d(vcg_x: np.ndarray,
-            vcg_y: np.ndarray,
-            xlabel: str = 'VCG (x)',
-            ylabel: str = 'VCG (y)',
+def plot_2d(vcg: pd.DataFrame,
+            x_plot: str = 'x',
+            y_plot: str = 'y',
             linestyle: str = '-',
             colourmap: str = 'viridis',
             linewidth: float = 3,
-            axis_limits: Optional[Union[List[float], float]] = None,
-            time_limits: Optional[List[float]] = None,
+            axis_limits: Union[List[float], float, None] = None,
             fig: Optional[plt.figure] = None) -> plt.figure:
     """
     Plot x vs y (or y vs z, or other combination) for VCG trace, with line colour shifting to show time progression.
@@ -227,12 +224,10 @@ def plot_2d(vcg_x: np.ndarray,
 
     Parameters
     ----------
-    vcg_x : list of float
-        VCG data to be plotted along the x-axis of the output
-    vcg_y : list of float
-        VCG data to be plotted along the y-axis of the output
-    xlabel, ylabel : str, optional
-        Label to apply to the x/y-axis, default='VCG (x)'/'VCG (y)'
+    vcg : pd.DataFrame
+        VCG data to be plotted
+    x_plot, y_plot : str, optional
+        Which components of VCG to plot, default='x', 'y'
     linestyle : str, optional
         Linestyle to apply to the plot, default='-'
     colourmap : str, optional
@@ -241,8 +236,6 @@ def plot_2d(vcg_x: np.ndarray,
         Linewidth to use, default=3
     axis_limits : list of float or float, optional
         Limits to apply to the axes, default=None
-    time_limits : list of float, optional
-        Start and end time of data. If given, will add a colourbar to the plot, default=None
     fig : plt.figure, optional
         Handle to pre-existing figure (if present) on which to plot data, default=None
 
@@ -250,8 +243,10 @@ def plot_2d(vcg_x: np.ndarray,
     -------
     fig : plt.figure
         Handle to output figure window
-
     """
+
+    assert x_plot in vcg.columns, "x_plot value not valid for VCG data"
+    assert y_plot in vcg.columns, "y_plot value not valid for VCG data"
 
     if fig is None:
         fig = plt.figure()
@@ -260,16 +255,16 @@ def plot_2d(vcg_x: np.ndarray,
         ax = fig.gca()
 
     # Prepare line segments for plotting
-    t = np.linspace(0, 1, vcg_x.shape[0])
-    points = np.array([vcg_x, vcg_y]).transpose().reshape(-1, 1, 2)
+    points = np.array([vcg[x_plot], vcg[y_plot]]).transpose().reshape(-1, 1, 2)
     segs = np.concatenate([points[:-1], points[1:]], axis=1)
     lc = LineCollection(segs, cmap=plt.get_cmap(colourmap), linestyle=linestyle, linewidths=linewidth)
-    lc.set_array(t)
+    lc.set_array(vcg.index.values)
 
     # Add the collection to the plot
     ax.add_collection(lc)
     # Line collections don't auto-scale the plot - set it up for a square plot
-    __set_axis_limits([vcg_x, vcg_y], ax, unit_min=False, axis_limits=axis_limits)
+    tools_plotting.set_axis_limits([vcg['x'].values, vcg['y'].values], ax,
+                                   unit_min=False, axis_limits=axis_limits)
 
     # Change the positioning of the axes
     # Move left y-axis and bottom x-axis to centre, passing through (0,0)
@@ -285,13 +280,13 @@ def plot_2d(vcg_x: np.ndarray,
     ax.yaxis.set_ticks_position('left')
 
     # Move the labels to the edges of the plot
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel, rotation='horizontal')
+    ax.set_xlabel('VCG ('+x_plot+')')
+    ax.set_ylabel('VCG ('+y_plot+')', rotation='horizontal')
     ax.xaxis.set_label_coords(1.05, 0.5)
     ax.yaxis.set_label_coords(0.5, 1.02)
 
-    if time_limits is not None:
-        __add_colourbar(time_limits, colourmap, vcg_x.shape[0])
+    t_start, t_end = vcg.index[0], vcg.index[-1]
+    tools_plotting.add_colourbar([t_start, t_end], colourmap, vcg.shape[0])
 
     return fig
 
@@ -348,14 +343,14 @@ def plot_3d(vcg: np.ndarray,
     ax.add_collection3d(lc)
 
     # Set axis limits (not automatic for line collections)
-    __set_axis_limits([vcg_x, vcg_y, vcg_z], ax, axis_limits=axis_limits)
+    tools_plotting.set_axis_limits([vcg_x, vcg_y, vcg_z], ax, axis_limits=axis_limits)
 
     ax.set_xlabel('VCG (x)')
     ax.set_ylabel('VCG (y)')
     ax.set_zlabel('VCG (z)')
 
     if time_limits is not None:
-        __add_colourbar(time_limits, colourmap, vcg_x.shape[0])
+        tools_plotting.add_colourbar(time_limits, colourmap, vcg_x.shape[0])
 
     return fig
 
@@ -433,32 +428,6 @@ def animate_3d(vcg: np.ndarray,
     anim.save(output_file, fps=30, extra_args=['-vcodec', 'libx264'])
 
     plt.show()
-    return None
-
-
-def __add_colourbar(limits: List[float],
-                    colourmap: str,
-                    n_elements: int) -> None:
-    """ Add arbitrary colourbar to a figure.
-
-    Parameters
-    ----------
-    limits : list of float
-        Numerical limits to apply
-    colourmap : str
-        Colourmap to be used
-    n_elements : int
-        Number of entries to be made in the colourmap index
-    """
-
-    # from matplotlib import colors.Normalize
-
-    cmap = plt.get_cmap(colourmap, n_elements)
-    # noinspection PyUnresolvedReferences
-    norm = mpl.colors.Normalize(vmin=limits[0], vmax=limits[1])
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array(np.ndarray([]))
-    plt.colorbar(sm)
     return None
 
 
@@ -569,52 +538,6 @@ def plot_xyz_vector(vector: Optional[List[float]] = None,
     ax.set_zlabel('VCG (z)')
 
     return fig
-
-
-def __set_axis_limits(data: List[np.ndarray],
-                      ax,
-                      unit_min: bool = True,
-                      axis_limits: Optional[Union[List[float], float]] = None) -> None:
-    """ Set axis limits (not automatic for line collections, so needs to be done manually)
-
-    Parameters
-    ----------
-    data : list of np.ndarray
-        Data that has been plotted
-    ax
-        Handles to the axes that need to be adjusted
-    unit_min : bool, optional
-        Whether to have the axes set to, as a minimum, unit length
-    axis_limits : list of float or float, optional
-        Min/max values for axes, either as one value (i.e. min=-max), or two separate values. Same axis limits will
-        be applied to all dimensions
-    """
-    if axis_limits is None:
-        ax_min = min([i.min() for i in data])
-        ax_max = max([i.max() for i in data])
-        if abs(ax_min) > abs(ax_max):
-            ax_max = -ax_min
-        else:
-            ax_min = -ax_max
-        if unit_min:
-            if ax_max < 1:
-                ax_min = -1
-                ax_max = 1
-    else:
-        if isinstance(axis_limits, list):
-            ax_min = axis_limits[0]
-            ax_max = axis_limits[1]
-        else:
-            if axis_limits < 0:
-                axis_limits = -axis_limits
-            ax_min = -axis_limits
-            ax_max = axis_limits
-    ax.set_xlim(ax_min, ax_max)
-    ax.set_ylim(ax_min, ax_max)
-    if len(data) == 3:
-        ax.set_zlim(ax_min, ax_max)
-    ax.set_aspect('equal', adjustable='box')
-    return None
 
 
 def add_unit_sphere(ax) -> None:

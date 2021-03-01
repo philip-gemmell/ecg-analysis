@@ -31,11 +31,11 @@ def get_plot_colours(n: int = 10, colourmap: Optional[str] = None) -> List[Tuple
             colourmap = 'viridis'
 
     if n < 11:
-        cmap = cm.get_cmap(colourmap)
-        return [cmap(i) for i in np.linspace(0, 1, 10)]
+        cmap = cm.get_cmap(colourmap, lut=10)
+        return [cmap(i) for i in range(n)]
     else:
-        cmap = cm.get_cmap(colourmap, n)
-        return [cmap(i) for i in np.linspace(0, 1, n)]
+        cmap = cm.get_cmap(colourmap, lut=n)
+        return [cmap(i) for i in range(n)]
 
 
 def get_plot_lines(n: int = 4) -> Union[List[tuple], List[str]]:
@@ -53,7 +53,8 @@ def get_plot_lines(n: int = 4) -> Union[List[tuple], List[str]]:
     """
 
     if n <= 4:
-        return['-', '--', '-.', ':']
+        basic_linestyles = ['-', '--', '-.', ':']
+        return [basic_linestyles[i] for i in range(n)]
     elif n < 15:
         lines = list()
         lines.append('-')

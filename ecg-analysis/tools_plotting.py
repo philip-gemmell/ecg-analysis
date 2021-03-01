@@ -1,5 +1,7 @@
 import numpy as np
+import matplotlib as mpl
 import matplotlib.cm as cm
+import matplotlib.pyplot as plt
 from typing import List, Tuple, Union, Optional
 
 
@@ -155,4 +157,87 @@ def write_colourmap_to_xml(start_data: float,
         pFile.write('\t</ColorMap>\n')
         pFile.write('</ColorMaps>')
 
+    return None
+
+
+def set_axis_limits(data: List[np.ndarray],
+                    ax,
+                    unit_min: bool = True,
+                    axis_limits: Optional[Union[List[float], float]] = None,
+                    pad_percent: float = 0.01) -> None:
+    """Set axis limits (not automatic for line collections, so needs to be done manually)
+
+    Parameters
+    ----------
+    data : list of np.ndarray
+        Data that has been plotted
+    ax
+        Handles to the axes that need to be adjusted
+    unit_min : bool, optional
+        Whether to have the axes set to, as a minimum, unit length
+    axis_limits : list of float or float, optional
+        Min/max values for axes, either as one value (i.e. min=-max), or two separate values. Same axis limits will
+        be applied to all dimensions
+    pad_percent : float, optional
+        Percentage 'padding' to add to the ranges, to try and ensure that the edges of linewidths are not cut off,
+        default=0.01
+    """
+    assert 0 < pad_percent < 0.1, "pad_percent is set to 'unusual' values..."
+
+    if axis_limits is None:
+        ax_min = min([i.min() for i in data])
+        ax_max = max([i.max() for i in data])
+        if abs(ax_min) > abs(ax_max):
+            ax_max = -ax_min
+        else:
+            ax_min = -ax_max
+        if unit_min:
+            if ax_max < 1:
+                ax_min = -1
+                ax_max = 1
+    else:
+        if isinstance(axis_limits, list):
+            ax_min = axis_limits[0]
+            ax_max = axis_limits[1]
+        else:
+            if axis_limits < 0:
+                axis_limits = -axis_limits
+            ax_min = -axis_limits
+            ax_max = axis_limits
+    pad_value = (ax_max-ax_min)*pad_percent
+    ax.set_xlim(ax_min-pad_value, ax_max+pad_value)
+    ax.set_ylim(ax_min-pad_value, ax_max+pad_value)
+    if len(data) == 3:
+        ax.set_zlim(ax_min, ax_max)
+    ax.set_aspect('equal', adjustable='box')
+    return None
+
+
+def add_colourbar(limits: List[float],
+                  colourmap: str,
+                  n_elements: int) -> None:
+    """Add arbitrary colourbar to a figure, for instances when an automatic colorbar isn't available
+
+    Parameters
+    ----------
+    limits : list of float
+        Numerical limits to apply
+    colourmap : str
+        Colourmap to be used
+    n_elements : int
+        Number of entries to be made in the colourmap index
+
+    Notes
+    -----
+    This is useful for instances suchs as when LineCollections are used to plot line that changes colour during the
+    plotting process, as LineCollections do not enable an automatic colorbar to be added to the plot. This function
+    adds a dummy colorbar to replace that.
+    """
+
+    cmap = plt.get_cmap(colourmap, n_elements)
+    # noinspection PyUnresolvedReferences
+    norm = mpl.colors.Normalize(vmin=limits[0], vmax=limits[1])
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array(np.ndarray([]))
+    plt.colorbar(sm)
     return None

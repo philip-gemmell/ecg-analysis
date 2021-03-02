@@ -263,8 +263,7 @@ def plot_2d(vcg: pd.DataFrame,
     # Add the collection to the plot
     ax.add_collection(lc)
     # Line collections don't auto-scale the plot - set it up for a square plot
-    tools_plotting.set_axis_limits([vcg['x'].values, vcg['y'].values], ax,
-                                   unit_min=False, axis_limits=axis_limits)
+    tools_plotting.set_axis_limits(ax, data=vcg.loc[:, [x_plot, y_plot]], unit_min=False, axis_limits=axis_limits)
 
     # Change the positioning of the axes
     # Move left y-axis and bottom x-axis to centre, passing through (0,0)
@@ -286,24 +285,23 @@ def plot_2d(vcg: pd.DataFrame,
     ax.yaxis.set_label_coords(0.5, 1.02)
 
     t_start, t_end = vcg.index[0], vcg.index[-1]
-    tools_plotting.add_colourbar([t_start, t_end], colourmap, vcg.shape[0])
+    tools_plotting.add_colourbar(limits=[t_start, t_end], fig=fig, colourmap=colourmap, n_elements=vcg.shape[0])
 
     return fig
 
 
-def plot_3d(vcg: np.ndarray,
+def plot_3d(vcg: pd.DataFrame,
             linestyle: str = '-',
             colourmap: str = 'viridis',
-            linewidth: float = 3,
+            linewidth: float = 3.0,
             axis_limits: Optional[Union[List[float], float]] = None,
-            time_limits: Optional[List[float]] = None,
             fig: Optional[plt.figure] = None) -> plt.figure:
     """
     Plot the evolution of VCG in 3D space
 
     Parameters
     ----------
-    vcg : np.ndarray
+    vcg : pd.DataFrame
         VCG data
     linestyle : str, optional
         Linestyle to plot data, default='-'
@@ -313,8 +311,6 @@ def plot_3d(vcg: np.ndarray,
         Linewidth to use, default=3
     axis_limits : list of float or float, optional
         Limits to apply to the axes
-    time_limits : list of float, optional
-        Start and end time of data. If given, will add a colourbar to the plot
     fig : plt.figure, optional
         Handle to existing figure (if exists)
 
@@ -323,12 +319,9 @@ def plot_3d(vcg: np.ndarray,
     fig : plt.figure
         Figure handle
     """
-
-    vcg_x, vcg_y, vcg_z = __get_xyz_from_vcg(vcg)
-
     # Prepare line segments for plotting
-    t = np.linspace(0, 1, vcg_x.shape[0])  # "time" variable
-    points = np.array([vcg_x, vcg_y, vcg_z]).transpose().reshape(-1, 1, 3)
+    t = np.linspace(0, 1, vcg.shape[0])  # "time" variable
+    points = vcg.values.reshape(-1, 1, 3)
     segs = np.concatenate([points[:-1], points[1:]], axis=1)
     lc = Line3DCollection(segs, cmap=plt.get_cmap(colourmap), linestyle=linestyle, linewidths=linewidth)
     lc.set_array(t)
@@ -336,21 +329,23 @@ def plot_3d(vcg: np.ndarray,
     if fig is None:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
+        # fig, ax = plt.subplots(1, 1, projection='3d')
     else:
         ax = fig.gca()
 
     # add the collection to the plot
     ax.add_collection3d(lc)
 
-    # Set axis limits (not automatic for line collections)
-    tools_plotting.set_axis_limits([vcg_x, vcg_y, vcg_z], ax, axis_limits=axis_limits)
+    t_start, t_end = vcg.index[0], vcg.index[-1]
+    tools_plotting.add_colourbar(limits=[t_start, t_end], fig=fig, colourmap=colourmap, n_elements=vcg.shape[0])
 
     ax.set_xlabel('VCG (x)')
     ax.set_ylabel('VCG (y)')
     ax.set_zlabel('VCG (z)')
 
-    if time_limits is not None:
-        tools_plotting.add_colourbar(time_limits, colourmap, vcg_x.shape[0])
+    # Set axis limits (not automatic for line collections)
+    tools_plotting.set_axis_limits(ax, data=vcg, axis_limits=axis_limits)
+    tools_plotting.add_xyz_axes(fig, ax)
 
     return fig
 
@@ -385,12 +380,10 @@ def animate_3d(vcg: np.ndarray,
 
     from matplotlib import animation
 
-    vcg_x, vcg_y, vcg_z = __get_xyz_from_vcg(vcg)
-
     # Extract limits
     if limits is None:
-        max_lim = max(max(vcg_x), max(vcg_y), max(vcg_z))
-        min_lim = min(min(vcg_x), min(vcg_y), min(vcg_z))
+        max_lim = vcg.max().max()
+        min_lim = vcg.min().min()
         limits = [min_lim, max_lim]
 
     # Process inputs to ensure the correct formats are used.
@@ -400,7 +393,7 @@ def animate_3d(vcg: np.ndarray,
     # Set up figure and axes
     fig = plt.figure()
     ax = Axes3D(fig)
-    add_xyz_axes(ax, axis_limits=limits, symmetrical_axes=False, equal_limits=False, unit_axes=False)
+    tools_plotting.add_xyz_axes(ax, axis_limits=limits, symmetrical_axes=False, equal_limits=False, unit_axes=False)
     line, = ax.plot([], [], lw=3)
 
     # initialization function: plot the background of each frame
@@ -411,8 +404,8 @@ def animate_3d(vcg: np.ndarray,
     # animation function.  This is called sequentially
     def animate(i):
         # Prepare line segments for plotting
-        t = np.linspace(0, 1, vcg_x[:i].shape[0])  # "time" variable
-        points = np.array([vcg_x[:i], vcg_y[:i], vcg_z[:i]]).transpose().reshape(-1, 1, 3)
+        t = np.linspace(0, 1, vcg['x'][:i].shape[0])  # "time" variable
+        points = np.array([vcg['x'][:i], vcg['y'][:i], vcg['z'][:i]]).transpose().reshape(-1, 1, 3)
         segs = np.concatenate([points[:-1], points[1:]], axis=1)
         lc = Line3DCollection(segs, cmap=plt.get_cmap(colourmap), linestyle=linestyle, linewidths=linewidth)
         lc.set_array(t)
@@ -420,7 +413,7 @@ def animate_3d(vcg: np.ndarray,
         return line,
 
     # call the animator.  blit=True means only re-draw the parts that have changed.
-    anim = animation.FuncAnimation(fig, animate, init_func=init, frames=len(vcg_x), interval=30, blit=True)
+    anim = animation.FuncAnimation(fig, animate, init_func=init, frames=vcg.shape[0], interval=30, blit=True)
 
     # save the animation as an mp4.  This requires ffmpeg or mencoder to be installed.  The extra_args ensure that the
     # x264 codec is used, so that the video can be embedded in html5.  You may need to adjust this for your system: for
@@ -429,21 +422,6 @@ def animate_3d(vcg: np.ndarray,
 
     plt.show()
     return None
-
-
-def __get_xyz_from_vcg(vcg: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """ Extract individual elements of VCG (x, y, z). """
-
-    if vcg.shape[0] == 3:
-        vcg_x = vcg[0, :]
-        vcg_y = vcg[1, :]
-        vcg_z = vcg[2, :]
-    else:
-        vcg_x = vcg[:, 0]
-        vcg_y = vcg[:, 1]
-        vcg_z = vcg[:, 2]
-
-    return vcg_x, vcg_y, vcg_z
 
 
 def plot_xyz_vector(vector: Optional[List[float]] = None,
@@ -554,158 +532,6 @@ def add_unit_sphere(ax) -> None:
     z = np.cos(v)
     ax.plot_wireframe(x, y, z, color="k", linewidth=0.5, alpha=0.25)
     return None
-
-
-def add_xyz_axes(ax: Axes3D,
-                 axis_limits: Optional[Union[float, List[float], List[List[float]]]] = None,
-                 symmetrical_axes: bool = False,
-                 equal_limits: bool = False,
-                 unit_axes: bool = False) -> None:
-    """ Plot dummy axes (can't move splines in 3D plots)
-
-    Parameters
-    ----------
-    ax
-        Axis handles
-    axis_limits : float or list of float or list of list of float, optional
-        Axis limits, either same for all dimensions (min=-max), or individual limits ([min, max]), or individual limits
-        for each dimension
-    symmetrical_axes : bool, optional
-        Apply same limits to x, y and z axes
-    equal_limits : bool, optional
-        Set axis minimum to minus axis maximum (or vice versa)
-    unit_axes : bool, optional
-        Apply minimum of -1 -> 1 for axis limits
-    """
-
-    """ Construct dummy 3D axes - make sure they're equal sizes """
-    # Extract all current axis properties before we start plotting anything new and changing them!
-    x_min, x_max = ax.get_xlim()
-    y_min, y_max = ax.get_ylim()
-    z_min, z_max = ax.get_zlim()
-    ax_min = min([x_min, y_min, z_min])
-    ax_max = max([x_max, y_max, z_max])
-    if equal_limits:
-        x_min, x_max = __set_symmetrical_axis_limits(x_min, x_max, unit_axes=unit_axes)
-        y_min, y_max = __set_symmetrical_axis_limits(y_min, y_max, unit_axes=unit_axes)
-        z_min, z_max = __set_symmetrical_axis_limits(z_min, z_max, unit_axes=unit_axes)
-        ax_min, ax_max = __set_symmetrical_axis_limits(ax_min, ax_max, unit_axes=unit_axes)
-    if symmetrical_axes:
-        x_min = ax_min
-        y_min = ax_min
-        z_min = ax_min
-        x_max = ax_max
-        y_max = ax_max
-        z_max = ax_max
-    if axis_limits is not None:
-        if not isinstance(axis_limits, list):
-            if axis_limits < 0:
-                axis_limits = -axis_limits
-            if -axis_limits > min([x_min, y_min, z_min]):
-                warnings.warn('Lower limit provided greater than automatic.')
-            if axis_limits < max([x_max, y_max, z_max]):
-                warnings.warn('Upper limit provided less than automatic.')
-            x_min = -axis_limits
-            x_max = axis_limits
-            y_min = -axis_limits
-            y_max = axis_limits
-            z_min = -axis_limits
-            z_max = axis_limits
-        elif not isinstance(axis_limits[0], list):
-            # If same axis limits applied to all 3 dimensions
-            if axis_limits[0] > min([x_min, y_min, z_min]):
-                warnings.warn('Lower limit provided greater than automatic.')
-            if axis_limits[1] < max([x_max, y_max, z_max]):
-                warnings.warn('Upper limit provided less than automatic.')
-            x_min = axis_limits[0]
-            x_max = axis_limits[1]
-            y_min = axis_limits[0]
-            y_max = axis_limits[1]
-            z_min = axis_limits[0]
-            z_max = axis_limits[1]
-        else:
-            # Different axis limits provided for each dimension
-            x_min = axis_limits[0][0]
-            x_max = axis_limits[0][1]
-            y_min = axis_limits[1][0]
-            y_max = axis_limits[1][1]
-            z_min = axis_limits[2][0]
-            z_max = axis_limits[2][1]
-    ax.set_xlim(x_min, x_max)
-    ax.set_ylim(y_min, y_max)
-    ax.set_zlim(z_min, z_max)
-    x_ticks = ax.get_xticks()
-    y_ticks = ax.get_yticks()
-    z_ticks = ax.get_zticks()
-    x_ticks = x_ticks[(x_ticks >= x_min) & (x_ticks <= x_max)]
-    y_ticks = y_ticks[(y_ticks >= y_min) & (y_ticks <= y_max)]
-    z_ticks = z_ticks[(z_ticks >= z_min) & (z_ticks <= z_max)]
-
-    # Plot splines
-    ax.plot([0, 0], [0, 0], [x_min, x_max], 'k', linewidth=1.5)
-    ax.plot([0, 0], [y_min, y_max], [0, 0], 'k', linewidth=1.5)
-    ax.plot([z_min, z_max], [0, 0], [0, 0], 'k', linewidth=1.5)
-
-    # Import tick markers (use only those tick markers for the longest axis, as the changes are made to encourage a
-    # square set of axes)
-    x_tick_range = (x_max-x_min)/100
-    y_tick_range = (y_max-y_min)/100
-    z_tick_range = (z_max-z_min)/100
-    for x_tick in x_ticks:
-        ax.plot([x_tick, x_tick], [-x_tick_range, x_tick_range], [0, 0], 'k', linewidth=1.5)
-    for y_tick in y_ticks:
-        ax.plot([-y_tick_range, y_tick_range], [y_tick, y_tick], [0, 0], 'k', linewidth=1.5)
-    for z_tick in z_ticks:
-        ax.plot([0, 0], [-z_tick_range, z_tick_range], [z_tick, z_tick], 'k', linewidth=1.5)
-
-    # Label tick markers (only at the extremes, to prevent a confusing plot)
-    ax.text(x_ticks[0], -x_tick_range*12, 0, x_ticks[0], None)
-    ax.text(x_ticks[-1], -x_tick_range*12, 0, x_ticks[-1], None)
-    ax.text(y_tick_range*4, y_ticks[0], 0, y_ticks[0], None)
-    ax.text(y_tick_range*4, y_ticks[-1], 0, y_ticks[-1], None)
-    ax.text(z_tick_range*4, 0, z_ticks[0], z_ticks[0], None)
-    ax.text(z_tick_range*4, 0, z_ticks[-1], z_ticks[-1], None)
-
-    # Import axis labels
-    ax.text(x_max+x_tick_range, 0, 0, ax.get_xlabel(), None)
-    ax.text(0, y_max+y_tick_range, 0, ax.get_ylabel(), None)
-    ax.text(0, 0, z_max+z_tick_range*4, ax.get_zlabel(), None)
-
-    # Remove original axes, and eliminate whitespace
-    ax.set_axis_off()
-    plt.subplots_adjust(left=-0.4, right=1.4, top=1.35, bottom=-0.4)
-    return None
-
-
-def __set_symmetrical_axis_limits(ax_min: float,
-                                  ax_max: float,
-                                  unit_axes: bool = False) -> Tuple[float, float]:
-    """Sets symmetrical limits for a series of axes
-
-    Parameters
-    ----------
-    ax_min : float
-        Minimum value for axes
-    ax_max : float
-        Maximum value for axes
-    unit_axes : bool, optional
-        Whether to apply a minimum axis range of [-1,1]
-
-    Returns
-    -------
-    ax_min, ax_max : float
-        Symmetrical axis limits, where ax_min=-ax_max
-    """
-    if abs(ax_min) > abs(ax_max):
-        ax_max = -ax_min
-    else:
-        ax_min = -ax_max
-
-    if unit_axes:
-        if ax_max < 1:
-            ax_max = 1
-            ax_min = -1
-    return ax_min, ax_max
 
 
 def plot_arc3d(vector1: List[float],

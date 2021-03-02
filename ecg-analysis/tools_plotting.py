@@ -1,7 +1,10 @@
 import numpy as np
+import pandas as pd
 import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
+import warnings
+from mpl_toolkits.mplot3d import Axes3D
 from typing import List, Tuple, Union, Optional
 
 
@@ -160,8 +163,8 @@ def write_colourmap_to_xml(start_data: float,
     return None
 
 
-def set_axis_limits(data: List[np.ndarray],
-                    ax,
+def set_axis_limits(ax,
+                    data: Optional[pd.DataFrame] = None,
                     unit_min: bool = True,
                     axis_limits: Optional[Union[List[float], float]] = None,
                     pad_percent: float = 0.01) -> None:
@@ -169,10 +172,10 @@ def set_axis_limits(data: List[np.ndarray],
 
     Parameters
     ----------
-    data : list of np.ndarray
-        Data that has been plotted
     ax
         Handles to the axes that need to be adjusted
+    data : pd.DataFrame, optional
+        Data that has been plotted, default=None
     unit_min : bool, optional
         Whether to have the axes set to, as a minimum, unit length
     axis_limits : list of float or float, optional
@@ -185,8 +188,14 @@ def set_axis_limits(data: List[np.ndarray],
     assert 0 < pad_percent < 0.1, "pad_percent is set to 'unusual' values..."
 
     if axis_limits is None:
-        ax_min = min([i.min() for i in data])
-        ax_max = max([i.max() for i in data])
+        if data is not None:
+            # noinspection PyArgumentList
+            ax_min = data.min().min()
+            # noinspection PyArgumentList
+            ax_max = data.max().max()
+        else:
+            ax_min = min([np.amin(temp_line.get_xydata()) for temp_line in ax.get_lines()])
+            ax_max = max([np.amax(temp_line.get_xydata()) for temp_line in ax.get_lines()])
         if abs(ax_min) > abs(ax_max):
             ax_max = -ax_min
         else:
@@ -207,37 +216,209 @@ def set_axis_limits(data: List[np.ndarray],
     pad_value = (ax_max-ax_min)*pad_percent
     ax.set_xlim(ax_min-pad_value, ax_max+pad_value)
     ax.set_ylim(ax_min-pad_value, ax_max+pad_value)
-    if len(data) == 3:
+    if data.shape[1] == 3:
         ax.set_zlim(ax_min, ax_max)
-    ax.set_aspect('equal', adjustable='box')
+        ax.set_aspect('auto', adjustable='box')
+    else:
+        ax.set_aspect('equal', adjustable='box')
     return None
 
 
 def add_colourbar(limits: List[float],
-                  colourmap: str,
-                  n_elements: int) -> None:
+                  fig: Optional[plt.figure] = None,
+                  colourmap: str = 'viridis',
+                  n_elements: int = 100) -> None:
     """Add arbitrary colourbar to a figure, for instances when an automatic colorbar isn't available
 
     Parameters
     ----------
     limits : list of float
         Numerical limits to apply
-    colourmap : str
-        Colourmap to be used
-    n_elements : int
-        Number of entries to be made in the colourmap index
+    fig : plt.figure, optional
+        Figure on which to plot the colourbar. If not provided (default=None), then will pick up the figure most
+        recently available
+    colourmap : str, optional
+        Colourmap to be used, default='viridis'
+    n_elements : int, optional
+        Number of entries to be made in the colourmap index, default=100
 
     Notes
     -----
-    This is useful for instances suchs as when LineCollections are used to plot line that changes colour during the
+    This is useful for instances such as when LineCollections are used to plot line that changes colour during the
     plotting process, as LineCollections do not enable an automatic colorbar to be added to the plot. This function
     adds a dummy colorbar to replace that.
     """
+
+    if fig is None:
+        fig = plt.gcf()
 
     cmap = plt.get_cmap(colourmap, n_elements)
     # noinspection PyUnresolvedReferences
     norm = mpl.colors.Normalize(vmin=limits[0], vmax=limits[1])
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array(np.ndarray([]))
-    plt.colorbar(sm)
+    fig.colorbar(sm)
     return None
+
+
+def add_xyz_axes(fig: plt.figure,
+                 ax: Axes3D,
+                 axis_limits: Optional[Union[float, List[float], List[List[float]]]] = None,
+                 symmetrical_axes: bool = False,
+                 equal_limits: bool = False,
+                 unit_axes: bool = False) -> None:
+    """ Plot dummy axes (can't move splines in 3D plots)
+
+    Parameters
+    ----------
+    fig : plt.figure
+        Figure handle
+    ax : Axes3D
+        Axis handle
+    axis_limits : float or list of float or list of list of float, optional
+        Axis limits, either same for all dimensions (min=-max), or individual limits ([min, max]), or individual limits
+        for each dimension
+    symmetrical_axes : bool, optional
+        Apply same limits to x, y and z axes
+    equal_limits : bool, optional
+        Set axis minimum to minus axis maximum (or vice versa)
+    unit_axes : bool, optional
+        Apply minimum of -1 -> 1 for axis limits
+    """
+
+    """ Construct dummy 3D axes - make sure they're equal sizes """
+    # Extract all current axis properties before we start plotting anything new and changing them!
+    x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
+    z_min, z_max = ax.get_zlim()
+    ax_min = min([x_min, y_min, z_min])
+    ax_max = max([x_max, y_max, z_max])
+    if equal_limits:
+        x_min, x_max = set_symmetrical_axis_limits(x_min, x_max, unit_axes=unit_axes)
+        y_min, y_max = set_symmetrical_axis_limits(y_min, y_max, unit_axes=unit_axes)
+        z_min, z_max = set_symmetrical_axis_limits(z_min, z_max, unit_axes=unit_axes)
+        ax_min, ax_max = set_symmetrical_axis_limits(ax_min, ax_max, unit_axes=unit_axes)
+    if symmetrical_axes:
+        x_min = ax_min
+        y_min = ax_min
+        z_min = ax_min
+        x_max = ax_max
+        y_max = ax_max
+        z_max = ax_max
+
+    # Adjust axis limits if requested
+    if axis_limits is not None:
+        if not isinstance(axis_limits, list):
+            if axis_limits < 0:
+                axis_limits = -axis_limits
+            if -axis_limits > min([x_min, y_min, z_min]):
+                warnings.warn('Lower limit provided greater than automatic.')
+            if axis_limits < max([x_max, y_max, z_max]):
+                warnings.warn('Upper limit provided less than automatic.')
+            x_min = -axis_limits
+            x_max = axis_limits
+            y_min = -axis_limits
+            y_max = axis_limits
+            z_min = -axis_limits
+            z_max = axis_limits
+        elif not isinstance(axis_limits[0], list):
+            # If same axis limits applied to all 3 dimensions
+            if axis_limits[0] > min([x_min, y_min, z_min]):
+                warnings.warn('Lower limit provided greater than automatic.')
+            if axis_limits[1] < max([x_max, y_max, z_max]):
+                warnings.warn('Upper limit provided less than automatic.')
+            x_min = axis_limits[0]
+            x_max = axis_limits[1]
+            y_min = axis_limits[0]
+            y_max = axis_limits[1]
+            z_min = axis_limits[0]
+            z_max = axis_limits[1]
+        else:
+            # Different axis limits provided for each dimension
+            x_min = axis_limits[0][0]
+            x_max = axis_limits[0][1]
+            y_min = axis_limits[1][0]
+            y_max = axis_limits[1][1]
+            z_min = axis_limits[2][0]
+            z_max = axis_limits[2][1]
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
+    ax.set_zlim(z_min, z_max)
+    x_ticks = ax.get_xticks()
+    y_ticks = ax.get_yticks()
+    z_ticks = ax.get_zticks()
+    x_ticks = x_ticks[(x_ticks >= x_min) & (x_ticks <= x_max)]
+    y_ticks = y_ticks[(y_ticks >= y_min) & (y_ticks <= y_max)]
+    z_ticks = z_ticks[(z_ticks >= z_min) & (z_ticks <= z_max)]
+
+    # Plot splines - limit them to the min/max tick rather than the automatic axes, as this is slightly prettier
+    ax.plot([0, 0], [0, 0], [x_ticks[0], x_ticks[-1]], 'k', linewidth=1.5)
+    ax.plot([0, 0], [y_ticks[0], y_ticks[-1]], [0, 0], 'k', linewidth=1.5)
+    ax.plot([z_ticks[0], z_ticks[-1]], [0, 0], [0, 0], 'k', linewidth=1.5)
+
+    # Import tick markers (use only those tick markers for the longest axis, as the changes are made to encourage a
+    # square set of axes)
+    x_tick_range = (x_max-x_min)/100
+    y_tick_range = (y_max-y_min)/100
+    z_tick_range = (z_max-z_min)/100
+    for x_tick in x_ticks:
+        ax.plot([x_tick, x_tick], [-x_tick_range, x_tick_range], [0, 0], 'k', linewidth=1.5)
+    for y_tick in y_ticks:
+        ax.plot([-y_tick_range, y_tick_range], [y_tick, y_tick], [0, 0], 'k', linewidth=1.5)
+    for z_tick in z_ticks:
+        ax.plot([0, 0], [-z_tick_range, z_tick_range], [z_tick, z_tick], 'k', linewidth=1.5)
+
+    # Label tick markers (only at the extremes, to prevent a confusing plot)
+    ax.text(x_ticks[0], -x_tick_range*12, 0, x_ticks[0], None)
+    ax.text(x_ticks[-1], -x_tick_range*12, 0, x_ticks[-1], None)
+    ax.text(y_tick_range*4, y_ticks[0], 0, y_ticks[0], None)
+    ax.text(y_tick_range*4, y_ticks[-1], 0, y_ticks[-1], None)
+    ax.text(z_tick_range*4, 0, z_ticks[0], z_ticks[0], None)
+    ax.text(z_tick_range*4, 0, z_ticks[-1], z_ticks[-1], None)
+
+    # Import axis labels
+    ax.text(x_max+x_tick_range, 0, 0, ax.get_xlabel(), None)
+    ax.text(0, y_max+y_tick_range, 0, ax.get_ylabel(), None)
+    ax.text(0, 0, z_max+z_tick_range*4, ax.get_zlabel(), None)
+
+    # Remove original axes, and eliminate whitespace
+    ax.set_axis_off()
+    plt.subplots_adjust(left=-0.4, right=1.4, top=1.4, bottom=-0.4)
+    if len(fig.axes) > 1:
+        # Assume the extra axis is for a colourbar we wish to preserve
+        cax = plt.axes([0.9, 0.1, 0.03, 0.8])
+        plt.colorbar(mappable=fig.axes[1].collections[0], cax=cax)
+    return None
+
+
+def set_symmetrical_axis_limits(ax_min: float,
+                                ax_max: float,
+                                unit_axes: bool = False) -> Tuple[float, float]:
+    """Sets symmetrical limits for a series of axes
+
+    TODO: fold functionality into set_axis_limits to avoid redundant functions
+
+    Parameters
+    ----------
+    ax_min : float
+        Minimum value for axes
+    ax_max : float
+        Maximum value for axes
+    unit_axes : bool, optional
+        Whether to apply a minimum axis range of [-1,1]
+
+    Returns
+    -------
+    ax_min, ax_max : float
+        Symmetrical axis limits, where ax_min=-ax_max
+    """
+    if abs(ax_min) > abs(ax_max):
+        ax_max = -ax_min
+    else:
+        ax_min = -ax_max
+
+    if unit_axes:
+        if ax_max < 1:
+            ax_max = 1
+            ax_min = -1
+    return ax_min, ax_max

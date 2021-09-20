@@ -9,6 +9,7 @@ matplotlib = "*"
 scipy = "*"
 pandas = "*"
 sklearn = "*"
+carputils = {editable = true, git = "https://git.opencarp.org/openCARP/carputils.git"}
 
 [dev-packages]
 ipython = "*"

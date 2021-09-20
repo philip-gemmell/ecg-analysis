@@ -4,14 +4,14 @@ import numpy as np
 import pandas as pd
 from typing import List, Union, Optional
 
+from carputils.carpio import igb  # type: ignore
+
 import tools_maths
 import general_analysis
 
 # Add carputils functions (https://git.opencarp.org/openCARP/carputils)
 # sys.path.append('/home/pg16/software/carputils/')
-sys.path.append('/home/philip/Documents/carputils/')
-from carputils.carpio import igb  # type: ignore
-
+# sys.path.append('/home/philip/Documents/carputils/')
 
 def read_ecg_from_igb(phie_file: Union[List[str], str],
                       electrode_file: Optional[str] = None,

@@ -1,6 +1,11 @@
 .idea
 .gitignore
 scar_highlight.xml
+qrst_validation.7z
+qrst_validation/
+qrst_validation_RMS.7z
+t-wave/
+t-wave.7z
 
 meshing/meshes
 meshing/__pycache__

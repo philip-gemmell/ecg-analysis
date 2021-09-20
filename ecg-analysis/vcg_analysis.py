@@ -253,7 +253,7 @@ def get_spatial_velocity(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
 
     Returns
     -------
-    sv : list of list of float
+    sv : list of pd.DataFrame
         Spatial velocity data, filtered according to input parameters
 
     Notes

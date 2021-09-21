@@ -158,7 +158,7 @@ def normalise_signal(data: Union[np.ndarray, pd.DataFrame]) -> Union[np.ndarray,
 
     Returns
     -------
-    normalised_data : np.ndarray
+    normalised_data : np.ndarray or pd.DataFrame
         Normalised signal
     """
 

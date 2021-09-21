@@ -359,7 +359,7 @@ def get_vcg_area(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
         if method == 'pythag':
             # Calculate area under x,y,z curves by trapezium rule, then combine
             dt = np.mean(np.diff(vcg_limited.index))
-            qrs_area_temp = np.trapz(vcg_limited, dx=dt, axis=0)
+            qrs_area_temp = np.trapz(vcg_limited, dx=float(dt), axis=0)
             vcg_areas.append(np.linalg.norm(qrs_area_temp))
         elif method == '3d':
             # Calculate the area under the curve in 3d space wrt to the origin.
@@ -519,7 +519,7 @@ def get_single_vcg_azimuth_elevation(vcg: pd.DataFrame,
 def get_dipole_magnitudes(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
                           t_start: Union[float, List[float]] = 0,
                           t_end: Union[float, List[float]] = -1) \
-        -> Tuple[List[List[float]], List[float], List[float], List[List[float]], List]:
+        -> Tuple[List[np.ndarray], List[float], List[float], List[List[float]], List]:
     """Calculates metrics relating to the magnitude of the weighted dipole of the VCG
 
     Returns the mean weighted dipole, maximum dipole magnitude,(x,y.z) components of the maximum dipole and the time
@@ -538,7 +538,7 @@ def get_dipole_magnitudes(vcgs: Union[List[pd.DataFrame], pd.DataFrame],
 
     Returns
     -------
-    dipole_magnitude : list of list of float
+    dipole_magnitude : list of np.ndarray
         Magnitude time courses for each VCG
     weighted_magnitude : list of float
         Mean magnitude of the VCG

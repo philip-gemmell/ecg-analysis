@@ -305,7 +305,7 @@ def get_qrs_start(ecgs: Union[pd.DataFrame, List[pd.DataFrame]],
     if plot_result:
         import matplotlib.pyplot as plt
         for (ecg_rms, ecg_grad, qrs_start) in zip(ecgs_rms, ecgs_grad, qrs_starts):
-            fig, ax = plt.subplots(2, 1, sharex=True)
+            fig, ax = plt.subplots(2, 1, sharex='all')
             ax[0].plot(ecg_rms)
             ax[0].set_ylabel('ECG_{RMS}')
             ax[1].plot(ecg_grad)

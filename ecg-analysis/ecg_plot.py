@@ -1,18 +1,16 @@
 import matplotlib.pyplot as plt  # type: ignore
-import numpy as np  # type: ignore
+import pandas as pd
 from typing import Union, Optional, List, Tuple
 
-import common_analysis as ca
+import tools_python
 
 # import matplotlib
 # matplotlib.use('Agg')
 
 
-def plot(ecgs: Union[List[dict], dict],
-         times: np.ndarray = None,
-         dt: Union[int, float] = 2,
+def plot(ecgs: Union[List[pd.DataFrame], pd.DataFrame],
          legend_ecg: Optional[List[str]] = None,
-         linewidths_ecg: float = 3,
+         linewidths_ecg: float = 2,
          limits: Union[list, float, None] = None,
          legend_limits: Optional[List[str]] = None,
          plot_sequence: Optional[List[str]] = None,
@@ -28,19 +26,16 @@ def plot(ecgs: Union[List[dict], dict],
 
     Parameters
     ----------
-    ecgs : dict or list
-        Dictionary or list of dictionaries for ECG data, with dictionary keys corresponding to the trace name
-    times : np.ndarray
-        Time data for the ECG (given as opposed to dt), default=None
-    dt : int or float, optional
-        Time interval at which data is recorded, given as opposed to t, default=2
+    ecgs : pd.DataFrame or list of pd.DataFrame
+        Dataframe or list of dataframes for ECG data, with keys corresponding to the trace name and index to the time
+        data
     legend_ecg : list of str, optional
         List of names for each given set of ECG data e.g. ['BCL=300ms', 'BCL=600ms'], default=None
     linewidths_ecg : float, optional
         Width to use for plotting lines, default=3
-    limits : float or list of float, optional
+    limits : float or list of float or pd.DataFrame, optional
         Optional temporal limits (e.g. QRS limits) to add to ECG plots. Can add multiple limits, which will be
-        plotted identically on all axes
+        plotted identically on all axes. If provided as a dataframe, will plot the limits on the relevant axis
     legend_limits : list of str, optional
         List of names for each given set of limits e.g. ['QRS start', 'QRS end'], default=None
     plot_sequence : list of str, optional
@@ -96,35 +91,36 @@ def plot(ecgs: Union[List[dict], dict],
     else:
         n_limits = len(limits)
 
-    legend_ecg = ca.convert_input_to_list(legend_ecg, n_list=n_ecgs)
-    legend_limits = ca.convert_input_to_list(legend_limits, n_list=n_limits)
+    legend_ecg = tools_python.convert_input_to_list(legend_ecg, n_list=n_ecgs)
+    legend_limits = tools_python.convert_input_to_list(legend_limits, n_list=n_limits)
 
-    colours_ecg = ca.convert_input_to_list(colours_ecg, n_list=n_ecgs, default_entry='colour')
-    colours_limits = ca.convert_input_to_list(colours_limits, n_list=n_limits, default_entry='colour')
+    colours_ecg = tools_python.convert_input_to_list(colours_ecg, n_list=n_ecgs, default_entry='colour')
+    colours_limits = tools_python.convert_input_to_list(colours_limits, n_list=n_limits, default_entry='colour')
     if linestyles_ecg is None:
-        linestyles_ecg = ca.convert_input_to_list(linestyles_ecg, n_list=n_ecgs, default_entry='line')
+        linestyles_ecg = tools_python.convert_input_to_list(linestyles_ecg, n_list=n_ecgs, default_entry='line')
     else:
-        linestyles_ecg = ca.convert_input_to_list(linestyles_ecg, n_list=n_ecgs, default_entry=linestyles_ecg)
-    linestyles_limits = ca.convert_input_to_list(linestyles_limits, n_list=n_limits, default_entry='line')
-    linewidths_ecg = ca.convert_input_to_list(linewidths_ecg, n_list=n_ecgs)
+        linestyles_ecg = tools_python.convert_input_to_list(linestyles_ecg, n_list=n_ecgs, default_entry=linestyles_ecg)
+    linestyles_limits = tools_python.convert_input_to_list(linestyles_limits, n_list=n_limits, default_entry='line')
+    linewidths_ecg = tools_python.convert_input_to_list(linewidths_ecg, n_list=n_ecgs)
 
-    # Plot data
-    times, _, _ = ca.get_time(time=times, dt=dt, t_end=dt * (len(ecgs[0]['V1'])), n_vcg=n_ecgs)
-
-    for (time, ecg, label, colour, linestyle, linewidth) in zip(times, ecgs, legend_ecg, colours_ecg, linestyles_ecg,
-                                                                linewidths_ecg):
+    for (ecg, label, colour, linestyle, linewidth) in zip(ecgs, legend_ecg, colours_ecg, linestyles_ecg,
+                                                          linewidths_ecg):
         for key in plot_sequence:
-            ax[key].plot(time, ecg[key], label=label, color=colour, linestyle=linestyle, linewidth=linewidth)
+            ax[key].plot(ecg.index, ecg[key])
 
     # Add limits, if supplied
     if limits is not None:
-        if isinstance(limits, float):
-            limits = [limits]
+        if isinstance(limits, pd.DataFrame):
+            for key in ax:
+                ax[key].axvline(limits[key].values)
+        else:
+            if isinstance(limits, float):
+                limits = [limits]
 
-        # Cycle through each limit provided, e.g. QRS start, QRS end...
-        for qrs_limit in limits:
-            # __plot_limits(ax=ax, limits=qrs_limit, colours=colours_ecg, linestyles=linestyles_ecg)
+            # Cycle through each limit provided, e.g. QRS start, QRS end...
             for (limit, label, colour, linestyle) in zip(limits, legend_limits, colours_limits, linestyles_limits):
+                if isinstance(limit, pd.Series):
+                    limit = limit.values
                 for key in ax:
                     ax[key].axvline(limit, label=label, color=colour, alpha=0.5, linestyle=linestyle)
 

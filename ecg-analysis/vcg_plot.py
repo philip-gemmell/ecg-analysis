@@ -1,15 +1,16 @@
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from matplotlib.collections import LineCollection
 import numpy as np
+import pandas as pd
 from math import sin, cos, acos, atan2
 import warnings
 from typing import List, Tuple, Optional, Union
 
-import common_analysis
+import tools_python
+import tools_plotting
 import vcg_analysis
 
 # import matplotlib
@@ -18,31 +19,45 @@ import vcg_analysis
 __all__ = ['Axes3D']    # Workaround to prevent Axes3D import statement to be labelled as unused
 
 
-def plot_xyz_components(vcg: Union[np.ndarray, List[np.ndarray]],
-                        dt: float = 2,
+def plot_xyz_components(vcgs: Union[pd.DataFrame, List[pd.DataFrame]],
                         legend: Optional[List[str]] = None,
-                        qrs_limits: Optional[List[List[float]]] = None,
-                        layout: Optional[str] = None,
                         colours: Optional[List[List[float]]] = None,
                         linestyles: Optional[List[str]] = None,
-                        limit_colours: Optional[List[List[float]]] = None,
-                        limit_linestyles: Optional[List[str]] = None) -> tuple:
-    """
-    Plot x, y, z components of VCG data
+                        legend_location: Optional[str] = None,
+                        limits: Optional[List[List[float]]] = None,
+                        limits_legend: Optional[List[str]] = None,
+                        limits_colours: Optional[List[List[float]]] = None,
+                        limits_linestyles: Optional[List[str]] = None,
+                        limits_legend_location: str = 'lower right',
+                        layout: str = 'grid') -> tuple:
+    """Plot x, y, z components of VCG data
 
     Multiple options given for layout of resulting plot
 
     Parameters
     ----------
-    vcg : list of np.ndarray or np.ndarray
+    vcgs : list of pd.DataFrame or pd.DataFrame
         List of vcg data: [vcg_data1, vcg_data2, ...]
-    dt : float, optional
-        Time interval for data, default=2
     legend : list of str, optional
         Legend names for each VCG trace, default=None
-    qrs_limits: list of list of float, optional
+    colours : list of list of float or list of str, optional
+        Colours to use for plotting, default=common_analysis.get_plot_colours
+    linestyles : list of str, optional
+        Linestyles to use for plotting, default='-'
+    legend_location : str, optional
+        Location to plot the legend. Default=None, which will translate to 'best' if no legend is required for
+        limits, or 'upper right' if legend is needed for limits
+    limits: list of list of float, optional
         QRS limits to plot on axes, default=None
         To be presented in form [[qrs_start1, qrs_starts, ...], [qrs_end1, qrs_end2, ...], ...]
+    limits_legend : list of str, optional
+        Legend to apply to the limits plotted, default=None
+    limits_colours : list of list of float or list of str, optional
+        Colours to use when plotting limits, default=common_analysis.get_plot_colours
+    limits_linestyles : list of str, optional
+        Linestyles to use when plotting limits, default='-'
+    limits_legend_location : str, optional
+        Location to use for the legend containing the limits data
     layout : {'grid', 'figures', 'combined', 'row', 'column', 'best'}, optional
         Layout of resulting plot
             grid        x,y,z plots are arranged in a grid (like best, but more rigid grid)
@@ -51,210 +66,63 @@ def plot_xyz_components(vcg: Union[np.ndarray, List[np.ndarray]],
             row         x,y,z plots are arranged on a horizontal row in one figure
             column      x,y,z plots are arranged in a vertical column in one figure
             best        x,y,z plots are arranged to try and optimise space (nb: figures not equal sizes...)
-    colours : list of list of float or list of str, optional
-        Colours to use for plotting, default=common_analysis.get_plot_colours
-    linestyles : list of str, optional
-        Linestyles to use for plotting, default='-'
-    limit_colours : list of list of float or list of str, optional
-        Colours to use when plotting limits, default=common_analysis.get_plot_colours
-    limit_linestyles : list of str, optional
-        Linestyles to use when plotting limits, default='-'
 
     Returns
     -------
-    fig
-        Handle for resulting figure(s)
-    ax
-        Handle for resulting axis/axes
-
-    Notes
-    -----
-    if layout != 'combined':
-        len(colours) == len(linestyles) == len(vcg)
-    else:
-        len(colours) == len(linestyles) == 3*len(vcg)
-
-    len(limit_colours) == len(limit_linestyles) == recursive_len(qrs_limits)
-    If no values passed, will default to same colour and linestyle for corresponding start/end limits, with linestyle
-    and colour both varying between limits1, limits2, etc.
-
+    fig, ax
+        Handle for resulting figure(s) and axes
     """
+    if not isinstance(vcgs, list):
+        vcgs = [vcgs]
+    n_vcgs = len(vcgs)
+    legend = tools_python.convert_input_to_list(legend, n_list=n_vcgs)
 
-    qrs_limits = __set_metric_to_metrics(qrs_limits)
-    vcg, colours, linestyles, legend, layout, qrs_limits, limit_colours, limit_linestyles = \
-        __process_inputs_plot_xyz_components(vcg, colours, linestyles, legend, layout, qrs_limits, limit_colours,
-                                             limit_linestyles)
-    fig, ax = __init_axes(layout)
-
-    # Plot data and add legend if required
-    xyz_label = ['x', 'y', 'z']
-    time = [i * dt for i in range(len(vcg[0]))]
-    for (sim_vcg, sim_legend, sim_colour, sim_linestyle) in zip(vcg, legend, colours, linestyles):
-        if sim_vcg.shape[0] < sim_vcg.shape[1]:
-            for (sim_vcg_xyz, xyz) in zip(sim_vcg, xyz_label):
-                ax[xyz].plot(time, sim_vcg_xyz)
+    if layout.lower() == 'combined':
+        n_colours = len(vcgs) * 3
+    else:
+        n_colours = len(vcgs)
+    colours = tools_python.convert_input_to_list(colours, n_list=n_colours, default_entry='colour')
+    linestyles = tools_python.convert_input_to_list(linestyles, n_list=n_colours, default_entry='line')
+    if legend_location is None:
+        if limits is None:
+            legend_location = 'best'
         else:
-            for (sim_vcg_xyz, xyz) in zip(sim_vcg.T, xyz_label):
-                ax[xyz].plot(time, sim_vcg_xyz)
+            legend_location = 'upper right'
 
-    if legend[0] is not None:
-        if layout == 'figures':
-            for xyz in xyz_label:
-                ax[xyz].legend()
+    if limits is not None:
+        limits = tools_python.convert_input_to_list(limits, n_list=n_vcgs, list_depth=2)
+        n_limits = len(limits)
+        limits_legend = tools_python.convert_input_to_list(limits_legend, n_list=n_limits, n_list2=n_limits)
+        if n_vcgs == 1:
+            # If plotting only one VCG trace, greater flexibility in colours and linestyles, so use the full range
+            # (excluding the first colour/linestyle as reserved for the VCG trace itself)
+            colours_base = tools_python.convert_input_to_list(limits_colours, n_list=n_limits+1,
+                                                              default_entry='colour')[1:]
+            limits_colours = [[colour_base] for colour_base in colours_base]
+            lines_base = tools_python.convert_input_to_list(limits_linestyles, n_list=n_limits+1,
+                                                            default_entry='line')[1:]
+            limits_linestyles = [[line_base] for line_base in lines_base]
         else:
-            ax['x'].legend()
+            # If plotting multiple VCGs, need to be more circumspect...
+            if n_limits == 1:
+                # If plotting multiple VCGs with single limits for each VCG, have colours and linestyles matching
+                # between VCG and limit. Need to pass the arguments through twice to get the correct format.
+                limits_colours = [tools_python.convert_input_to_list(None, n_list=n_vcgs, default_entry='colour')]
+                limits_linestyles = [tools_python.convert_input_to_list(None, n_list=n_vcgs, default_entry='line')]
+            else:
+                # If plotting multiple VCGs with multiple limits each VCG, need to split the load. In this instance,
+                # assign different colours to the VCGs with identical linestyles (which thus need to be redefined
+                # here), and different linestyles to the limits, with the colour of the VCG matching the colour of the
+                # limits
+                linestyles = ['-' for _ in range(n_vcgs)]
+                limits_colours = [colours for _ in range(n_limits)]
+                lines_base = tools_python.convert_input_to_list(None, n_list=n_limits, default_entry='line')
+                limits_linestyles = [[line for _ in range(n_vcgs)] for line in lines_base]
 
-    if qrs_limits is not None:
-        __plot_limits(ax, qrs_limits, colours, linestyles)
+    plt.rc('text', usetex=True)
 
-    return fig, ax
-
-
-def __process_inputs_plot_xyz_components(vcg: Union[list, np.ndarray],
-                                         colours: Optional[list] = None,
-                                         linestyles: Optional[List[str]] = None,
-                                         legend: Optional[List[str]] = None,
-                                         layout: Optional[str] = None,
-                                         qrs_limits: Optional[List[List[float]]] = None,
-                                         limit_colours: Optional[list] = None,
-                                         limit_linestyles: Optional[List[str]] = None) \
-        -> Tuple[List[np.ndarray],
-                 Union[List[tuple], List[List[float]], List[str]],
-                 List[str],
-                 List[Optional[str]],
-                 str,
-                 Optional[List[List[float]]],
-                 Union[List[tuple], List[List[float]], List[str], None],
-                 Optional[List[str]]]:
-    """
-    Assess and adapt input arguments to plot_xyz_components, ensuring data presented as expected
-
-    Parameters
-    ----------
-    vcg : list[np.ndarray] or np.ndarray
-        VCG data
-    colours: list[list[float]] or list[str], optional
-        Colours to be used to plot. If given, either as ['b', 'k', ...] or [[r1,g1,b1], [r2,g2,b2], ...].
-        Default=common_analysis.get_plot_colours
-    linestyles : list[str], optional
-        Linestyles to be used to plot data, default='-'
-    legend : list[str], optional
-        Labels for each VCG plot, default=None
-    layout : str, optional
-        Assigned figure layout (used to determine the number of different colours/linestyles to be required)
-    qrs_limits : list[list[float]] or None
-        Limits to plot on the eventual plot, presented in form
-        [[start_limit1, start_limit2, ...], [end_limit1, end_limit2, ...], ...]
-    limit_colours : list[list[float]] or list[str], optional
-        Colours to be used to plot QRS limits
-    limit_linestyles : list[str], optional
-        Linestyles to be used to plot QRS limits
-
-    Returns
-    -------
-    vcg : list[np.ndarray]
-        VCG data
-    colours : list of tuple or list of list of float or list of str
-        Colours to use to plot the VCG data
-    linestyles : list of str
-        Linestyles to be used to plot data
-    legend : list of str or list of None
-        Labels for each VCG plot, default=None
-    layout : str
-        Assigned figure layout (used to determine the number of different colours/linestyles to be required)
-    qrs_limits : list[list[float]] or None
-        Limits to plot on the eventual plot, presented in form
-        [[start_limit1, start_limit2, ...], [end_limit1, end_limit2, ...], ...]
-    limit_colours : list of tuple or list of list of float or list of str or None
-        Colours to be used to plot QRS limits
-    limit_linestyles : list of str or None
-        Linestyles to be used to plot QRS limits
-    """
-
-    if not isinstance(vcg, list):
-        vcg = [vcg]
-
-    if legend is not None:
-        assert len(vcg) == len(legend)
-        plt.rc('text', usetex=True)
-    else:
-        legend = [None for _ in vcg]
-
-    if layout is None:
-        layout = 'grid'
-    if layout == 'combined':
-        n_colours = len(vcg)*3
-    else:
-        n_colours = len(vcg)
-
-    # Adapt colours and linestyle depending on whether x,y,z plots are combined. Preference is to plot different colours
-    # for different VCG traces, with different linestyles representing different x/y/z
-    if colours is None:
-        colours = common_analysis.get_plot_colours(n_colours)
-    elif isinstance(colours, list):
-        assert len(colours) == n_colours
-    else:
-        colours = [colours for _ in range(n_colours)]
-
-    if linestyles is None:
-        linestyles = ['-' for _ in range(n_colours)]
-    elif isinstance(linestyles, list):
-        assert len(linestyles) == n_colours
-    else:
-        linestyles = [linestyles for _ in range(n_colours)]
-
-    if qrs_limits is not None:
-        # Confirm qrs_limits data are presented correctly
-        for qrs_limit in qrs_limits:
-            assert len(qrs_limit) == len(qrs_limits[0])
-
-        # Extract correct colours - different colour for each limit e.g. start1, start2, ...
-        n_limits = len(qrs_limits[0])
-        if limit_colours is None:
-            limit_colours = common_analysis.get_plot_colours(n_limits)
-        elif isinstance(limit_colours, list):
-            assert len(limit_colours) == n_limits
-        else:
-            limit_colours = [limit_colours for _ in range(n_limits)]
-
-        # Extract correct limits - different linestyle for each type of limit, e.g. start, end, ...
-        n_types = len(qrs_limits)
-        if limit_linestyles is None:
-            limit_linestyles = ['-' for _ in range(n_types)]
-        elif isinstance(limit_linestyles, list):
-            assert len(limit_linestyles) == n_types
-        else:
-            limit_linestyles = [limit_linestyles for _ in range(n_types)]
-    else:
-        limit_colours = None
-        limit_linestyles = None
-
-    return vcg, colours, linestyles, legend, layout, qrs_limits, limit_colours, limit_linestyles
-
-
-def __init_axes(layout: str) -> Tuple[Union[List[plt.figure], plt.figure], dict]:
-    """ Create and assign figure handles, including a dummy variable for the figure handles for cross-compatability
-
-    Parameters
-    ----------
-    layout : {'grid', 'figures', 'combined', 'row', 'column', 'best'}, str
-        Layout of resulting plot
-            grid        x,y,z plots are arranged in a grid (like best, but more rigid grid)
-            figures     Each x,y,z plot is on a separate figure
-            combined    x,y,z plots are combined on a single set of axes
-            row         x,y,z plots are arranged on a horizontal row in one figure
-            column      x,y,z plots are arranged in a vertical column in one figure
-            best        x,y,z plots are arranged to try and optimise space (nb: figures not equal sizes...)
-
-    Returns
-    -------
-    fig : List or plt.figure
-        Handles to the figures for plotting
-    ax : dict of plt.subplot
-        Handles to the axes for plotting
-    """
-
-    if layout == 'figures':
+    # Prepare figure and axis handles and layout, depending on requirement
+    if layout.lower() == 'figures':
         fig = [plt.figure() for _ in range(3)]
         fig_h = fig
     else:
@@ -262,15 +130,15 @@ def __init_axes(layout: str) -> Tuple[Union[List[plt.figure], plt.figure], dict]
         fig_h = [fig for _ in range(3)]
 
     ax = dict()
-    if layout == 'figures':
+    if layout.lower() == 'figures':
         ax['x'] = fig[0].add_subplot(1, 1, 1, ylabel='x')
         ax['y'] = fig[1].add_subplot(1, 1, 1, ylabel='y', sharex=ax['x'], sharey=ax['x'])
         ax['z'] = fig[2].add_subplot(1, 1, 1, ylabel='z', sharex=ax['x'], sharey=ax['x'])
-    elif layout == 'combined':
+    elif layout.lower() == 'combined':
         ax['x'] = fig.add_subplot(1, 1, 1)
         ax['y'] = ax['x']
         ax['z'] = ax['x']
-    elif layout == 'row':
+    elif layout.lower() == 'row':
         gs = gridspec.GridSpec(3, 1)
         ax['x'] = fig_h[0].add_subplot(gs[0], ylabel='x')
         ax['y'] = fig_h[1].add_subplot(gs[1], ylabel='y', sharex=ax['x'], sharey=ax['x'])
@@ -278,7 +146,7 @@ def __init_axes(layout: str) -> Tuple[Union[List[plt.figure], plt.figure], dict]
         plt.setp(ax['y'].get_yticklabels(), visible=False)
         plt.setp(ax['z'].get_yticklabels(), visible=False)
         gs.update(wspace=0.025, hspace=0.05)
-    elif layout == 'column':
+    elif layout.lower() == 'column':
         gs = gridspec.GridSpec(1, 3)
         ax['x'] = fig_h[0].add_subplot(gs[0], ylabel='x')
         ax['y'] = fig_h[1].add_subplot(gs[1], ylabel='y', sharex=ax['x'], sharey=ax['x'])
@@ -286,14 +154,14 @@ def __init_axes(layout: str) -> Tuple[Union[List[plt.figure], plt.figure], dict]
         plt.setp(ax['y'].get_xticklabels(), visible=False)
         plt.setp(ax['z'].get_xticklabels(), visible=False)
         gs.update(wspace=0.025, hspace=0.05)
-    elif layout == 'best':
+    elif layout.lower() == 'best':
         gs = gridspec.GridSpec(2, 6)
         ax['x'] = fig_h[0].add_subplot(gs[0, :3], ylabel='x')
         ax['y'] = fig_h[1].add_subplot(gs[0, 3:], ylabel='y', sharex=ax['x'], sharey=ax['x'])
         ax['z'] = fig_h[2].add_subplot(gs[1, 2:4], ylabel='z', sharex=ax['x'], sharey=ax['x'])
         plt.setp(ax['y'].get_yticklabels(), visible=False)
         gs.update(wspace=0.025, hspace=0.05)
-    elif layout == 'grid':
+    elif layout.lower() == 'grid':
         gs = gridspec.GridSpec(2, 2)
         ax['x'] = fig_h[0].add_subplot(gs[0], ylabel='x')
         ax['y'] = fig_h[1].add_subplot(gs[1], ylabel='y', sharex=ax['x'], sharey=ax['x'])
@@ -301,45 +169,53 @@ def __init_axes(layout: str) -> Tuple[Union[List[plt.figure], plt.figure], dict]
         plt.setp(ax['x'].get_xticklabels(), visible=False)
         plt.setp(ax['y'].get_yticklabels(), visible=False)
         gs.update(wspace=0.025, hspace=0.05)
+    else:
+        raise IOError("Unexpected value given for layout")
+
+    # Plot data and add legend if required
+    h_vcg = dict((key, list()) for key in ax.keys())
+    for (vcg, sim_legend, colour, linestyle) in zip(vcgs, legend, colours, linestyles):
+        for xyz in vcg:
+            h_line, = ax[xyz].plot(vcg[xyz], label=sim_legend, color=colour, linestyle=linestyle)
+            h_vcg[xyz].append(h_line)
+
+    if layout == 'figures':
+        for xyz in ax:
+            h_legend = ax[xyz].legend(handles=h_vcg[xyz], loc=legend_location, handlelength=4.0)
+            ax[xyz].add_artist(h_legend)
+    else:
+        h_legend = ax['x'].legend(handles=h_vcg['x'], loc=legend_location, handlelength=4.0)
+        ax['x'].add_artist(h_legend)
+
+    if limits is not None:
+        h_limits = dict((key, list()) for key in ax.keys())
+        for limit, limit_colours, limit_linestyles, limit_legend in zip(limits, limits_colours, limits_linestyles,
+                                                                        limits_legend):
+            add_to_legend = True
+            for sim_limit, colour, linestyle in zip(limit, limit_colours, limit_linestyles):
+                for xyz in ax:
+                    h_limit = ax[xyz].axvline(sim_limit, color=colour, alpha=0.5, linestyle=linestyle,
+                                              label=limit_legend)
+                    if add_to_legend:
+                        h_limits[xyz].append(h_limit)
+                        add_to_legend = False
+
+        if layout == 'figures':
+            for xyz in ax:
+                ax[xyz].legend(handles=h_limits[xyz], loc=limits_legend_location, handlelength=4.0)
+        else:
+            ax['x'].legend(handles=h_limits['x'], loc=limits_legend_location, handlelength=4.0)
+
     return fig, ax
 
 
-def __plot_limits(axes: dict,
-                  limits: List[List[float]],
-                  colours: Union[List[tuple], List[List[float]], List[str]],
-                  linestyles: List[str]) -> None:
-    """ Add limits to a given plot (e.g. add line marking start of QRS complex)
-
-    Parameters
-    ----------
-    axes : dict
-        Handles to the axes to plot the limits to
-    limits : list of list of float
-        Limits to plot
-    colours : list of tuple or list of list of float or list of str
-        Colours to use to plot the VCG data
-    linestyles : list of str
-        Linestyles to be used to plot data
-    """
-
-    if not isinstance(limits, list):
-        limits = [limits]
-    for sim_limit, linestyle in zip(limits, linestyles):
-        for sim_limit_startEnd, colour in zip(sim_limit, colours):
-            for key in axes:
-                axes[key].axvline(sim_limit_startEnd, color=colour, alpha=0.5, linestyle=linestyle)
-    return None
-
-
-def plot_2d(vcg_x: np.ndarray,
-            vcg_y: np.ndarray,
-            xlabel: str = 'VCG (x)',
-            ylabel: str = 'VCG (y)',
+def plot_2d(vcg: pd.DataFrame,
+            x_plot: str = 'x',
+            y_plot: str = 'y',
             linestyle: str = '-',
             colourmap: str = 'viridis',
             linewidth: float = 3,
-            axis_limits: Optional[Union[List[float], float]] = None,
-            time_limits: Optional[List[float]] = None,
+            axis_limits: Union[List[float], float, None] = None,
             fig: Optional[plt.figure] = None) -> plt.figure:
     """
     Plot x vs y (or y vs z, or other combination) for VCG trace, with line colour shifting to show time progression.
@@ -348,12 +224,10 @@ def plot_2d(vcg_x: np.ndarray,
 
     Parameters
     ----------
-    vcg_x : list of float
-        VCG data to be plotted along the x-axis of the output
-    vcg_y : list of float
-        VCG data to be plotted along the y-axis of the output
-    xlabel, ylabel : str, optional
-        Label to apply to the x/y-axis, default='VCG (x)'/'VCG (y)'
+    vcg : pd.DataFrame
+        VCG data to be plotted
+    x_plot, y_plot : str, optional
+        Which components of VCG to plot, default='x', 'y'
     linestyle : str, optional
         Linestyle to apply to the plot, default='-'
     colourmap : str, optional
@@ -362,8 +236,6 @@ def plot_2d(vcg_x: np.ndarray,
         Linewidth to use, default=3
     axis_limits : list of float or float, optional
         Limits to apply to the axes, default=None
-    time_limits : list of float, optional
-        Start and end time of data. If given, will add a colourbar to the plot, default=None
     fig : plt.figure, optional
         Handle to pre-existing figure (if present) on which to plot data, default=None
 
@@ -371,8 +243,10 @@ def plot_2d(vcg_x: np.ndarray,
     -------
     fig : plt.figure
         Handle to output figure window
-
     """
+
+    assert x_plot in vcg.columns, "x_plot value not valid for VCG data"
+    assert y_plot in vcg.columns, "y_plot value not valid for VCG data"
 
     if fig is None:
         fig = plt.figure()
@@ -381,16 +255,15 @@ def plot_2d(vcg_x: np.ndarray,
         ax = fig.gca()
 
     # Prepare line segments for plotting
-    t = np.linspace(0, 1, vcg_x.shape[0])
-    points = np.array([vcg_x, vcg_y]).transpose().reshape(-1, 1, 2)
+    points = np.array([vcg[x_plot], vcg[y_plot]]).transpose().reshape(-1, 1, 2)
     segs = np.concatenate([points[:-1], points[1:]], axis=1)
     lc = LineCollection(segs, cmap=plt.get_cmap(colourmap), linestyle=linestyle, linewidths=linewidth)
-    lc.set_array(t)
+    lc.set_array(vcg.index.values)
 
     # Add the collection to the plot
     ax.add_collection(lc)
     # Line collections don't auto-scale the plot - set it up for a square plot
-    __set_axis_limits([vcg_x, vcg_y], ax, unit_min=False, axis_limits=axis_limits)
+    tools_plotting.set_axis_limits(ax, data=vcg.loc[:, [x_plot, y_plot]], unit_min=False, axis_limits=axis_limits)
 
     # Change the positioning of the axes
     # Move left y-axis and bottom x-axis to centre, passing through (0,0)
@@ -406,30 +279,31 @@ def plot_2d(vcg_x: np.ndarray,
     ax.yaxis.set_ticks_position('left')
 
     # Move the labels to the edges of the plot
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel, rotation='horizontal')
+    ax.set_xlabel('VCG ('+x_plot+')')
+    ax.set_ylabel('VCG ('+y_plot+')', rotation='horizontal')
     ax.xaxis.set_label_coords(1.05, 0.5)
     ax.yaxis.set_label_coords(0.5, 1.02)
 
-    if time_limits is not None:
-        __add_colourbar(time_limits, colourmap, vcg_x.shape[0])
+    t_start, t_end = vcg.index[0], vcg.index[-1]
+    tools_plotting.add_colourbar(limits=[t_start, t_end], fig=fig, colourmap=colourmap, n_elements=vcg.shape[0])
 
     return fig
 
 
-def plot_3d(vcg: np.ndarray,
+def plot_3d(vcg: pd.DataFrame,
             linestyle: str = '-',
             colourmap: str = 'viridis',
-            linewidth: float = 3,
+            linewidth: float = 3.0,
             axis_limits: Optional[Union[List[float], float]] = None,
-            time_limits: Optional[List[float]] = None,
+            unit_min: bool = True,
+            sig_fig: int = None,
             fig: Optional[plt.figure] = None) -> plt.figure:
     """
     Plot the evolution of VCG in 3D space
 
     Parameters
     ----------
-    vcg : np.ndarray
+    vcg : pd.DataFrame
         VCG data
     linestyle : str, optional
         Linestyle to plot data, default='-'
@@ -438,9 +312,12 @@ def plot_3d(vcg: np.ndarray,
     linewidth : float, optional
         Linewidth to use, default=3
     axis_limits : list of float or float, optional
-        Limits to apply to the axes
-    time_limits : list of float, optional
-        Start and end time of data. If given, will add a colourbar to the plot
+        Limits to apply to the axes, default=None
+    unit_min : bool, optional
+        Whether to have the axes set to, as a minimum, unit length, default=True
+    sig_fig : int, optional
+        Maximum number of decimal places to be used on the axis plots (e.g., if set to 2, 0.12345 will be displayed
+        as 0.12). Used to avoid floating point errors, default=None (no adaption made)
     fig : plt.figure, optional
         Handle to existing figure (if exists)
 
@@ -449,12 +326,9 @@ def plot_3d(vcg: np.ndarray,
     fig : plt.figure
         Figure handle
     """
-
-    vcg_x, vcg_y, vcg_z = __get_xyz_from_vcg(vcg)
-
     # Prepare line segments for plotting
-    t = np.linspace(0, 1, vcg_x.shape[0])  # "time" variable
-    points = np.array([vcg_x, vcg_y, vcg_z]).transpose().reshape(-1, 1, 3)
+    t = np.linspace(0, 1, vcg.shape[0])  # "time" variable
+    points = vcg.values.reshape(-1, 1, 3)
     segs = np.concatenate([points[:-1], points[1:]], axis=1)
     lc = Line3DCollection(segs, cmap=plt.get_cmap(colourmap), linestyle=linestyle, linewidths=linewidth)
     lc.set_array(t)
@@ -462,21 +336,23 @@ def plot_3d(vcg: np.ndarray,
     if fig is None:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
+        # fig, ax = plt.subplots(1, 1, projection='3d')
     else:
         ax = fig.gca()
 
     # add the collection to the plot
     ax.add_collection3d(lc)
 
-    # Set axis limits (not automatic for line collections)
-    __set_axis_limits([vcg_x, vcg_y, vcg_z], ax, axis_limits=axis_limits)
+    t_start, t_end = vcg.index[0], vcg.index[-1]
+    tools_plotting.add_colourbar(limits=[t_start, t_end], fig=fig, colourmap=colourmap, n_elements=vcg.shape[0])
 
     ax.set_xlabel('VCG (x)')
     ax.set_ylabel('VCG (y)')
     ax.set_zlabel('VCG (z)')
 
-    if time_limits is not None:
-        __add_colourbar(time_limits, colourmap, vcg_x.shape[0])
+    # Set axis limits (not automatic for line collections)
+    tools_plotting.set_axis_limits(ax, data=vcg, axis_limits=axis_limits, unit_min=unit_min)
+    tools_plotting.add_xyz_axes(fig, ax, sig_fig=sig_fig)
 
     return fig
 
@@ -511,12 +387,10 @@ def animate_3d(vcg: np.ndarray,
 
     from matplotlib import animation
 
-    vcg_x, vcg_y, vcg_z = __get_xyz_from_vcg(vcg)
-
     # Extract limits
     if limits is None:
-        max_lim = max(max(vcg_x), max(vcg_y), max(vcg_z))
-        min_lim = min(min(vcg_x), min(vcg_y), min(vcg_z))
+        max_lim = vcg.max().max()
+        min_lim = vcg.min().min()
         limits = [min_lim, max_lim]
 
     # Process inputs to ensure the correct formats are used.
@@ -526,7 +400,7 @@ def animate_3d(vcg: np.ndarray,
     # Set up figure and axes
     fig = plt.figure()
     ax = Axes3D(fig)
-    add_xyz_axes(ax, axis_limits=limits, symmetrical_axes=False, equal_limits=False, unit_axes=False)
+    tools_plotting.add_xyz_axes(ax, axis_limits=limits, symmetrical_axes=False, equal_limits=False, unit_axes=False)
     line, = ax.plot([], [], lw=3)
 
     # initialization function: plot the background of each frame
@@ -537,8 +411,8 @@ def animate_3d(vcg: np.ndarray,
     # animation function.  This is called sequentially
     def animate(i):
         # Prepare line segments for plotting
-        t = np.linspace(0, 1, vcg_x[:i].shape[0])  # "time" variable
-        points = np.array([vcg_x[:i], vcg_y[:i], vcg_z[:i]]).transpose().reshape(-1, 1, 3)
+        t = np.linspace(0, 1, vcg['x'][:i].shape[0])  # "time" variable
+        points = np.array([vcg['x'][:i], vcg['y'][:i], vcg['z'][:i]]).transpose().reshape(-1, 1, 3)
         segs = np.concatenate([points[:-1], points[1:]], axis=1)
         lc = Line3DCollection(segs, cmap=plt.get_cmap(colourmap), linestyle=linestyle, linewidths=linewidth)
         lc.set_array(t)
@@ -546,7 +420,7 @@ def animate_3d(vcg: np.ndarray,
         return line,
 
     # call the animator.  blit=True means only re-draw the parts that have changed.
-    anim = animation.FuncAnimation(fig, animate, init_func=init, frames=len(vcg_x), interval=30, blit=True)
+    anim = animation.FuncAnimation(fig, animate, init_func=init, frames=vcg.shape[0], interval=30, blit=True)
 
     # save the animation as an mp4.  This requires ffmpeg or mencoder to be installed.  The extra_args ensure that the
     # x264 codec is used, so that the video can be embedded in html5.  You may need to adjust this for your system: for
@@ -555,46 +429,6 @@ def animate_3d(vcg: np.ndarray,
 
     plt.show()
     return None
-
-
-def __add_colourbar(limits: List[float],
-                    colourmap: str,
-                    n_elements: int) -> None:
-    """ Add arbitrary colourbar to a figure.
-
-    Parameters
-    ----------
-    limits : list of float
-        Numerical limits to apply
-    colourmap : str
-        Colourmap to be used
-    n_elements : int
-        Number of entries to be made in the colourmap index
-    """
-
-    # from matplotlib import colors.Normalize
-
-    cmap = plt.get_cmap(colourmap, n_elements)
-    norm = mpl.colors.Normalize(vmin=limits[0], vmax=limits[1])
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array(np.ndarray([]))
-    plt.colorbar(sm)
-    return None
-
-
-def __get_xyz_from_vcg(vcg: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """ Extract individual elements of VCG (x, y, z). """
-
-    if vcg.shape[0] == 3:
-        vcg_x = vcg[0, :]
-        vcg_y = vcg[1, :]
-        vcg_z = vcg[2, :]
-    else:
-        vcg_x = vcg[:, 0]
-        vcg_y = vcg[:, 1]
-        vcg_z = vcg[:, 2]
-
-    return vcg_x, vcg_y, vcg_z
 
 
 def plot_xyz_vector(vector: Optional[List[float]] = None,
@@ -691,52 +525,6 @@ def plot_xyz_vector(vector: Optional[List[float]] = None,
     return fig
 
 
-def __set_axis_limits(data: List[np.ndarray],
-                      ax,
-                      unit_min: bool = True,
-                      axis_limits: Optional[Union[List[float], float]] = None) -> None:
-    """ Set axis limits (not automatic for line collections, so needs to be done manually)
-
-    Parameters
-    ----------
-    data : list of np.ndarray
-        Data that has been plotted
-    ax
-        Handles to the axes that need to be adjusted
-    unit_min : bool, optional
-        Whether to have the axes set to, as a minimum, unit length
-    axis_limits : list of float or float, optional
-        Min/max values for axes, either as one value (i.e. min=-max), or two separate values. Same axis limits will
-        be applied to all dimensions
-    """
-    if axis_limits is None:
-        ax_min = min([i.min() for i in data])
-        ax_max = max([i.max() for i in data])
-        if abs(ax_min) > abs(ax_max):
-            ax_max = -ax_min
-        else:
-            ax_min = -ax_max
-        if unit_min:
-            if ax_max < 1:
-                ax_min = -1
-                ax_max = 1
-    else:
-        if isinstance(axis_limits, list):
-            ax_min = axis_limits[0]
-            ax_max = axis_limits[1]
-        else:
-            if axis_limits < 0:
-                axis_limits = -axis_limits
-            ax_min = -axis_limits
-            ax_max = axis_limits
-    ax.set_xlim(ax_min, ax_max)
-    ax.set_ylim(ax_min, ax_max)
-    if len(data) == 3:
-        ax.set_zlim(ax_min, ax_max)
-    ax.set_aspect('equal', adjustable='box')
-    return None
-
-
 def add_unit_sphere(ax) -> None:
     """ Add a unit sphere to a 3D plot
 
@@ -751,158 +539,6 @@ def add_unit_sphere(ax) -> None:
     z = np.cos(v)
     ax.plot_wireframe(x, y, z, color="k", linewidth=0.5, alpha=0.25)
     return None
-
-
-def add_xyz_axes(ax: Axes3D,
-                 axis_limits: Optional[Union[float, List[float], List[List[float]]]] = None,
-                 symmetrical_axes: bool = False,
-                 equal_limits: bool = False,
-                 unit_axes: bool = False) -> None:
-    """ Plot dummy axes (can't move splines in 3D plots)
-
-    Parameters
-    ----------
-    ax
-        Axis handles
-    axis_limits : float or list of float or list of list of float, optional
-        Axis limits, either same for all dimensions (min=-max), or individual limits ([min, max]), or individual limits
-        for each dimension
-    symmetrical_axes : bool, optional
-        Apply same limits to x, y and z axes
-    equal_limits : bool, optional
-        Set axis minimum to minus axis maximum (or vice versa)
-    unit_axes : bool, optional
-        Apply minimum of -1 -> 1 for axis limits
-    """
-
-    """ Construct dummy 3D axes - make sure they're equal sizes """
-    # Extract all current axis properties before we start plotting anything new and changing them!
-    x_min, x_max = ax.get_xlim()
-    y_min, y_max = ax.get_ylim()
-    z_min, z_max = ax.get_zlim()
-    ax_min = min([x_min, y_min, z_min])
-    ax_max = max([x_max, y_max, z_max])
-    if equal_limits:
-        x_min, x_max = __set_symmetrical_axis_limits(x_min, x_max, unit_axes=unit_axes)
-        y_min, y_max = __set_symmetrical_axis_limits(y_min, y_max, unit_axes=unit_axes)
-        z_min, z_max = __set_symmetrical_axis_limits(z_min, z_max, unit_axes=unit_axes)
-        ax_min, ax_max = __set_symmetrical_axis_limits(ax_min, ax_max, unit_axes=unit_axes)
-    if symmetrical_axes:
-        x_min = ax_min
-        y_min = ax_min
-        z_min = ax_min
-        x_max = ax_max
-        y_max = ax_max
-        z_max = ax_max
-    if axis_limits is not None:
-        if not isinstance(axis_limits, list):
-            if axis_limits < 0:
-                axis_limits = -axis_limits
-            if -axis_limits > min([x_min, y_min, z_min]):
-                warnings.warn('Lower limit provided greater than automatic.')
-            if axis_limits < max([x_max, y_max, z_max]):
-                warnings.warn('Upper limit provided less than automatic.')
-            x_min = -axis_limits
-            x_max = axis_limits
-            y_min = -axis_limits
-            y_max = axis_limits
-            z_min = -axis_limits
-            z_max = axis_limits
-        elif not isinstance(axis_limits[0], list):
-            # If same axis limits applied to all 3 dimensions
-            if axis_limits[0] > min([x_min, y_min, z_min]):
-                warnings.warn('Lower limit provided greater than automatic.')
-            if axis_limits[1] < max([x_max, y_max, z_max]):
-                warnings.warn('Upper limit provided less than automatic.')
-            x_min = axis_limits[0]
-            x_max = axis_limits[1]
-            y_min = axis_limits[0]
-            y_max = axis_limits[1]
-            z_min = axis_limits[0]
-            z_max = axis_limits[1]
-        else:
-            # Different axis limits provided for each dimension
-            x_min = axis_limits[0][0]
-            x_max = axis_limits[0][1]
-            y_min = axis_limits[1][0]
-            y_max = axis_limits[1][1]
-            z_min = axis_limits[2][0]
-            z_max = axis_limits[2][1]
-    ax.set_xlim(x_min, x_max)
-    ax.set_ylim(y_min, y_max)
-    ax.set_zlim(z_min, z_max)
-    x_ticks = ax.get_xticks()
-    y_ticks = ax.get_yticks()
-    z_ticks = ax.get_zticks()
-    x_ticks = x_ticks[(x_ticks >= x_min) & (x_ticks <= x_max)]
-    y_ticks = y_ticks[(y_ticks >= y_min) & (y_ticks <= y_max)]
-    z_ticks = z_ticks[(z_ticks >= z_min) & (z_ticks <= z_max)]
-
-    # Plot splines
-    ax.plot([0, 0], [0, 0], [x_min, x_max], 'k', linewidth=1.5)
-    ax.plot([0, 0], [y_min, y_max], [0, 0], 'k', linewidth=1.5)
-    ax.plot([z_min, z_max], [0, 0], [0, 0], 'k', linewidth=1.5)
-
-    # Import tick markers (use only those tick markers for the longest axis, as the changes are made to encourage a
-    # square set of axes)
-    x_tick_range = (x_max-x_min)/100
-    y_tick_range = (y_max-y_min)/100
-    z_tick_range = (z_max-z_min)/100
-    for x_tick in x_ticks:
-        ax.plot([x_tick, x_tick], [-x_tick_range, x_tick_range], [0, 0], 'k', linewidth=1.5)
-    for y_tick in y_ticks:
-        ax.plot([-y_tick_range, y_tick_range], [y_tick, y_tick], [0, 0], 'k', linewidth=1.5)
-    for z_tick in z_ticks:
-        ax.plot([0, 0], [-z_tick_range, z_tick_range], [z_tick, z_tick], 'k', linewidth=1.5)
-
-    # Label tick markers (only at the extremes, to prevent a confusing plot)
-    ax.text(x_ticks[0], -x_tick_range*12, 0, x_ticks[0], None)
-    ax.text(x_ticks[-1], -x_tick_range*12, 0, x_ticks[-1], None)
-    ax.text(y_tick_range*4, y_ticks[0], 0, y_ticks[0], None)
-    ax.text(y_tick_range*4, y_ticks[-1], 0, y_ticks[-1], None)
-    ax.text(z_tick_range*4, 0, z_ticks[0], z_ticks[0], None)
-    ax.text(z_tick_range*4, 0, z_ticks[-1], z_ticks[-1], None)
-
-    # Import axis labels
-    ax.text(x_max+x_tick_range, 0, 0, ax.get_xlabel(), None)
-    ax.text(0, y_max+y_tick_range, 0, ax.get_ylabel(), None)
-    ax.text(0, 0, z_max+z_tick_range*4, ax.get_zlabel(), None)
-
-    # Remove original axes, and eliminate whitespace
-    ax.set_axis_off()
-    plt.subplots_adjust(left=-0.4, right=1.4, top=1.35, bottom=-0.4)
-    return None
-
-
-def __set_symmetrical_axis_limits(ax_min: float,
-                                  ax_max: float,
-                                  unit_axes: bool = False) -> Tuple[float, float]:
-    """Sets symmetrical limits for a series of axes
-
-    Parameters
-    ----------
-    ax_min : float
-        Minimum value for axes
-    ax_max : float
-        Maximum value for axes
-    unit_axes : bool, optional
-        Whether to apply a minimum axis range of [-1,1]
-
-    Returns
-    -------
-    ax_min, ax_max : float
-        Symmetrical axis limits, where ax_min=-ax_max
-    """
-    if abs(ax_min) > abs(ax_max):
-        ax_max = -ax_min
-    else:
-        ax_min = -ax_max
-
-    if unit_axes:
-        if ax_max < 1:
-            ax_max = 1
-            ax_min = -1
-    return ax_min, ax_max
 
 
 def plot_arc3d(vector1: List[float],
@@ -963,17 +599,14 @@ def plot_arc3d(vector1: List[float],
     return fig
 
 
-def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
+def plot_spatial_velocity(vcg: Union[pd.DataFrame, List[pd.DataFrame]],
                           sv: Optional[List[List[float]]] = None,
-                          qrs_limits: Optional[List[List[float]]] = None,
+                          limits: Optional[List[List[float]]] = None,
                           fig: plt.figure = None,
                           legend_vcg: Union[List[str], str, None] = None,
                           legend_limits: Union[List[str], str, None] = None,
                           limits_linestyles: Optional[List[str]] = None,
-                          time_vcg: Optional[np.ndarray] = None,
-                          time_sv: Optional[np.ndarray] = None,
-                          t_end: Union[float, List[float]] = 200,
-                          dt: Union[float, List[float]] = 2,
+                          limits_colours: Optional[List[str]] = None,
                           filter_sv: bool = True) -> Tuple:
     """ Plot the spatial velocity for given VCG data
 
@@ -983,12 +616,12 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
 
     Parameters
     ----------
-    vcg : np.ndarray or list of np.ndarray
+    vcg : pd.DataFrame or list of pd.DataFrame
         VCG data
     sv : list of list of float, optional
         Spatial velocity data. Only required to be given here if special parameters wish to be given, otherwise it
         will be calculated using default parameters (default)
-    qrs_limits : list of list of float, optional
+    limits : list of list of float, optional
         A series of 'limits' to be plotted on the figure with the VCG and spatial plot. Presented as a list of the
         same length of the VCG data, with the required limits within:
             e.g. [[QRS_start1, QRS_start2, ...], [QRS_end1, QRS_end2, ...], ...]
@@ -999,241 +632,35 @@ def plot_spatial_velocity(vcg: Union[np.ndarray, List[np.ndarray]],
         Labels to apply to the VCG/SV data, default=None
     legend_limits : str or list of str, optional
         Labels to apply to the limits, default=None
-    limits_linestyles : list of str
-        Linestyles to apply to the different limits being supplied, default=None (will plot as straight lines)
-    time_vcg : np.ndarray, optional
-        Time variable for the VCG data NOT THE SPATIAL VELOCITY DATA; provided instead of dt and t_end, default=None
-    time_sv : np.ndarray, optional
-        Time variable for the spatial velocity data, default=None
-    t_end : int, optional
-        Duration of the data, default=200
-    dt : int, optional
-        Time step between successive data points, default=2
+    limits_linestyles : list of str, optional
+        Linestyles to apply to the different limits being supplied, default=None (will use varying linestyles based
+        on tools_plotting.get_plot_lines)
+    limits_colours : list of str, optional
+        Colours to apply to the different limits being supplied, default=None (will use varying colours based on
+        tools_plotting.get_plot_colours)
     filter_sv : bool, optional
         Whether or not to apply filtering to spatial velocity prior to finding the start/end points for the
         threshold, default=True
 
     Returns
     -------
-    fig
-    ax
+    fig, ax
         Handles to the figure and axes generated
     """
 
     # Check input arguments are correctly formatted
-    if isinstance(vcg, np.ndarray):
-        n_vcg = 1
-    else:
-        n_vcg = len(vcg)
-    vcg = common_analysis.convert_input_to_list(vcg, n_list=n_vcg)
-    qrs_limits = common_analysis.convert_input_to_list(qrs_limits, n_list=n_vcg, list_depth=2)
-    legend_vcg = common_analysis.convert_input_to_list(legend_vcg, n_list=n_vcg)
-    legend_limits = common_analysis.convert_input_to_list(legend_limits, n_list=len(qrs_limits))
-    limits_linestyles = common_analysis.convert_input_to_list(limits_linestyles, n_list=len(qrs_limits),
-                                                              default_entry='line')
-    time_vcg = common_analysis.convert_input_to_list(time_vcg, n_list=n_vcg)
-    time_sv = common_analysis.convert_input_to_list(time_sv, n_list=n_vcg)
-    dt = common_analysis.convert_input_to_list(dt, n_list=n_vcg)
-    t_end = common_analysis.convert_input_to_list(t_end, n_list=n_vcg)
-
-    fig, ax, colours = __plot_spatial_velocity_prep_axes(len(vcg), fig)
-    if sv is None and (time_sv is None or time_sv[0] is None):
-        time_sv, sv, _, _ = vcg_analysis.get_spatial_velocity(vcg=vcg, time=time_vcg, t_end=t_end, dt=dt,
-                                                              filter_sv=filter_sv)
-    elif sv is None:
-        _, sv, _, _ = vcg_analysis.get_spatial_velocity(vcg=vcg, time=time_vcg, t_end=t_end, dt=dt, filter_sv=filter_sv)
-    else:
-        for sim_time, sim_sv in zip(time_sv, sv):
-            assert len(sim_time) == len(sim_sv)
-
-    """ Plot spatial velocity and VCG components"""
-    i_colour_init = get_i_colour(ax['sv'])
-    i_colour = i_colour_init
-    if time_vcg is None or time_vcg[0] is None:
-        time_vcg = [list(range(0, sim_t_end + sim_dt, sim_dt)) for (sim_dt, sim_t_end) in zip(dt, t_end)]
-    for sim_time, sim_vcg in zip(time_vcg, vcg):
-        assert len(sim_time) == len(sim_vcg), "VCG and time data are different lengths"
-    h_lines = list()
-    for (sim_time_sv, sim_sv, sim_time_vcg, sim_vcg, sim_label) in zip(time_sv, sv, time_vcg, vcg, legend_vcg):
-        ax['x'].plot(sim_time_vcg, sim_vcg[:, 0])
-        ax['y'].plot(sim_time_vcg, sim_vcg[:, 1])
-        ax['z'].plot(sim_time_vcg, sim_vcg[:, 2])
-        h_lines.append(ax['sv'].plot(sim_time_sv, sim_sv))
-        i_colour += 1
-
-    """ Plot QRS limits, if provided """
-    h_limits = list()
-    if qrs_limits is not None:
-        # Cycle through each limit provided, e.g. QRS start, QRS end...
-        for (qrs_limit, limits_linestyle) in zip(qrs_limits, limits_linestyles):
-            i_colour = i_colour_init
-            add_limit_handle = True
-
-            # Plot limits for each given VCG
-            for sim_qrs_limit in qrs_limit:
-                for key in ax:
-                    if key == 'sv' and add_limit_handle:
-                        h_limits.append(ax[key].axvline(sim_qrs_limit, color=colours[i_colour], alpha=0.8,
-                                                        linestyle=limits_linestyle, label=None))
-                        add_limit_handle = False
-                    else:
-                        ax[key].axvline(sim_qrs_limit, color=colours[i_colour], alpha=0.8,
-                                        linestyle=limits_linestyle, label=None)
-                i_colour += 1
-
-    """ Add legend_vcg and legend_limits """
-    if legend_vcg[0] is not None:
-        labels = [line.get_label() for line in ax['sv'].get_lines()]
-        labels = [labelstr for labelstr in labels if not labelstr.startswith('_')] # Remove implicit labels from list
-        plt.rc('font', family='sans-serif')
-        plt.rc('text', usetex=True)
-        leg_vcg = ax['sv'].legend(labels, loc='upper right')
-    else:
-        leg_vcg = None
-
-    if legend_limits[0] is not None:
-        plt.rc('font', family='sans-serif')
-        plt.rc('text', usetex=True)
-        ax['sv'].legend(h_limits, legend_limits, loc='upper center', handlelength=5)
-        if legend_vcg[0] is not None:
-            ax['sv'].add_artist(leg_vcg)
-
-    if legend_limits is not None:
-        print()
-
-    return fig, ax
-
-
-def plot_spatial_velocity_multilimit(vcg: np.ndarray,
-                                     sv: Optional[List[List[float]]] = None,
-                                     qrs_limits: Optional[List[List[float]]] = None,
-                                     fig: plt.figure = None,
-                                     legend: Optional[Union[List[str], str]] = None,
-                                     t_end: int = 200,
-                                     dt: int = 2,
-                                     filter_sv: bool = True) -> None:
-    """ Plot a single instance of a spatial velocity curve, but with multiple limits for QRS
-
-    DEPRECATED: Plan to integrate into plot_spatial_velocity
-    https://riptutorial.com/matplotlib/example/32429/multiple-legends-on-the-same-axes
-
-    Parameters
-    ----------
-    vcg : np.ndarray
-        VCG data
-    sv : list of list of float, optional
-        Spatial velocity data. Only required to be given here if special parameters wish to be given, otherwise it
-        will be calculated using default paramters (default)
-    qrs_limits : list of list of float, optional
-        A series of 'limits' to be plotted on the figure with the VCG and spatial plot. Presented as a list of the
-        same length of the VCG data, with the required limits within:
-            e.g. [[QRS_start1, QRS_end1, ...], [QRS_start2, QRS_end, ...], ...]
-        Default=None
-    fig : plt.figure, optional
-        Handle to existing figure, if data is wished to be plotted on existing plot, default=None
-    legend : str or list of str, optional
-        Labels to apply to the limits, default=None
-    t_end : int, optional
-        Duration of the data, default=200
-    dt : int, optional
-        Time step between successive data points, default=2
-    filter_sv : bool, optional
-        Whether or not to apply filtering to spatial velocity prior to finding the start/end points for the
-        threshold, default=True
-    """
-
-    """ Confirm VCG and limit data are correctly formatted """
-    if isinstance(vcg, np.ndarray):
+    if isinstance(vcg, pd.DataFrame):
         vcg = [vcg]
-    for qrs_limit in qrs_limits:
-        assert len(qrs_limit) == len(qrs_limits[0])
+    n_vcg = len(vcg)
+    vcg = tools_python.convert_input_to_list(vcg, n_list=n_vcg)
+    limits = tools_python.convert_input_to_list(limits, n_list=n_vcg, list_depth=2)
+    legend_vcg = tools_python.convert_input_to_list(legend_vcg, n_list=n_vcg)
+    legend_limits = tools_python.convert_input_to_list(legend_limits, n_list=len(limits))
+    limits_linestyles = tools_python.convert_input_to_list(limits_linestyles, n_list=len(limits),
+                                                           default_entry='line')
+    limits_colours = tools_python.convert_input_to_list(limits_colours, n_list=len(limits), default_entry='colour')
 
-    fig, ax, colours = __plot_spatial_velocity_prep_axes(vcg, fig)
-    vcg, legend = __plot_spatial_velocity_preprocess_inputs(vcg, legend)
-    x_val, sv = __plot_spatial_velocity_get_plot_data(sv, vcg, t_end, dt, filter_sv)
-
-    """ Plot spatial velocity and VCG components"""
-    x_vcg_data = list(range(0, t_end + dt, dt))
-    __plot_spatial_velocity_plot_data(x_val[0], sv[0], x_vcg_data, vcg[0], None, None, ax)
-
-    """ Plot QRS limits, along with proxy patches for the legend. Adjust values for QRS limits to prevent overlap. """
-    colours = common_analysis.get_plot_colours(n=len(qrs_limits[0]))
-    import matplotlib.lines as mlines
-    line_handles = None
-    for qrs_limit in qrs_limits:
-        line_handles = list()
-        for i in range(len(qrs_limit)):
-            line_handles.append(mlines.Line2D([], [], color=colours[i], label=legend[i]))
-            if i > 0:
-                if qrs_limit[i] <= qrs_limit[i-1]:
-                    qrs_limit[i] += 0.1
-            __plot_spatial_velocity_plot_limits(qrs_limit[i], ax, colours[i])
-    ax['sv'].legend(handles=line_handles)
-    return None
-
-
-def __plot_spatial_velocity_preprocess_inputs(vcg: Union[np.ndarray, List[np.ndarray]],
-                                              qrs_limits: Optional[List[List[float]]],
-                                              legend_vcg: Union[str, List[str], None],
-                                              legend_limits: Union[str, List[str], None],
-                                              limits_linestyles: Optional[List[str]],
-                                              time: Union[np.ndarray, List[np.ndarray], None],
-                                              dt: Union[float, List[float]],
-                                              t_end: Union[float, List[float]])\
-        -> Tuple[List[np.ndarray], Optional[List[List[float]]], List[Optional[str]], List[Optional[str]], List[str],
-                 List[np.ndarray], List[float], List[float]]:
-    """ Preprocess other inputs """
-    if isinstance(vcg, np.ndarray):
-        vcg = [vcg]
-
-    if qrs_limits is not None:
-        assert isinstance(qrs_limits, list), "QRS limits variable passed incorrectly"
-        assert isinstance(qrs_limits[0], list), "QRS limits variable passed incorrectly"
-        for qrs_limit in qrs_limits:
-            assert len(qrs_limit) == len(vcg)
-
-    if isinstance(legend_vcg, str):
-        assert len(vcg) == 1, "Only one legend entry passed for multiple VCG entries"
-        legend_vcg = [legend_vcg]
-    elif legend_vcg is None:
-        if len(vcg) > 1:
-            legend_vcg = [str(i) for i in range(len(vcg))]
-        else:
-            legend_vcg = [None for _ in range(len(vcg))]
-    else:
-        assert len(legend_vcg) == len(vcg), "legend and vcg are of different lengths"
-
-    if legend_limits is not None:
-        if isinstance(legend_limits, list):
-            assert len(legend_limits) == len(qrs_limits)
-
-    if limits_linestyles is None:
-        if qrs_limits is not None:
-            limits_linestyles = ['-' for _ in range(len(qrs_limits))]
-    else:
-        assert len(limits_linestyles) >= len(qrs_limits)
-
-    if not isinstance(time, list):
-        time = [time for _ in range(len(vcg))]
-    else:
-        assert len(time) == len(vcg), "Time and VCG variables not the same length"
-
-    if isinstance(dt, (int, float)):
-        dt = [dt for _ in range(len(vcg))]
-    else:
-        assert len(dt) == len(vcg), "dt and VCG variables not the same length"
-
-    if isinstance(t_end, (int, float)):
-        t_end = [t_end for _ in range(len(vcg))]
-    else:
-        assert len(t_end) == len(vcg), "t_end and VCG variables not the same length"
-
-    return vcg, qrs_limits, legend_vcg, legend_limits, limits_linestyles, time, dt, t_end
-
-
-def __plot_spatial_velocity_prep_axes(len_vcg: int,
-                                      fig: plt.figure) -> Tuple:
-    """ Prepare figure and axes """
+    # Prepare figures and aces
     if fig is None:
         fig = plt.figure()
         ax = dict()
@@ -1245,7 +672,7 @@ def __plot_spatial_velocity_prep_axes(len_vcg: int,
         plt.setp(ax['x'].get_xticklabels(), visible=False)
         plt.setp(ax['y'].get_xticklabels(), visible=False)
         gs.update(hspace=0.05)
-        colours = common_analysis.get_plot_colours(len_vcg)
+        # colours = tools_plotting.get_plot_colours(n_vcg)
     else:
         ax = dict()
         ax_sv, ax_vcg_x, ax_vcg_y, ax_vcg_z = fig.get_axes()
@@ -1253,9 +680,9 @@ def __plot_spatial_velocity_prep_axes(len_vcg: int,
         ax['x'] = ax_vcg_x
         ax['y'] = ax_vcg_y
         ax['z'] = ax_vcg_z
-        colours = common_analysis.get_plot_colours(len(ax_sv.lines) + len_vcg)
+        colours = tools_plotting.get_plot_colours(len(ax_sv.lines) + n_vcg)
         """ If too many lines already exist on the plot, need to recolour them all to prevent cross-talk """
-        if len(ax_sv.lines) + len_vcg > 10:
+        if len(ax_sv.lines) + n_vcg > 10:
             for key in ax:
                 lines = ax[key].get_lines()
                 i_vcg = 0
@@ -1271,56 +698,62 @@ def __plot_spatial_velocity_prep_axes(len_vcg: int,
     ax['z'].set_ylabel('VCG (z)')
     ax['z'].set_xlabel('Time (ms)')
 
-    return fig, ax, colours
-
-
-def __plot_spatial_velocity_get_plot_data(sv: List[List[float]],
-                                          vcg: List[np.ndarray],
-                                          t_end: float,
-                                          dt: float,
-                                          filter_sv: bool) -> Tuple[List[float], List[List[float]]]:
-    """ Prepare spatial velocity """
     if sv is None:
-        x_val, sv, _, _ = vcg_analysis.get_spatial_velocity(vcg=vcg, t_end=t_end, dt=dt, filter_sv=filter_sv)
+        sv = vcg_analysis.get_spatial_velocity(vcgs=vcg, filter_sv=filter_sv)
+
+    """ Plot spatial velocity and VCG components"""
+    i_colour_init = tools_python.get_i_colour(ax['sv'])
+    i_colour = i_colour_init
+    h_lines = list()
+    for (sim_sv, sim_vcg, sim_label) in zip(sv, vcg, legend_vcg):
+        for lead in ['x', 'y', 'z']:
+            ax[lead].plot(sim_vcg.index, sim_vcg[lead])
+        h_lines.append(ax['sv'].plot(sim_sv.index, sim_sv))
+        i_colour += 1
+
+    """ Plot QRS limits, if provided """
+    h_limits = list()
+    if limits[0] is not None:
+        # Cycle through each limit provided, e.g. QRS start, QRS end...
+        for (qrs_limit, limits_linestyle, limits_colour) in zip(limits, limits_linestyles, limits_colours):
+            # i_colour = i_colour_init
+            add_limit_handle = True
+
+            # Plot limits for each given VCG
+            for sim_qrs_limit in qrs_limit:
+                for key in ax:
+                    if key == 'sv' and add_limit_handle:
+                        if not isinstance(sim_qrs_limit, float):
+                            sim_qrs_limit = sim_qrs_limit.values
+                        h_limits.append(ax[key].axvline(sim_qrs_limit, color=limits_colour, alpha=0.8,
+                                                        linestyle=limits_linestyle, label=None))
+                        add_limit_handle = False
+                    else:
+                        ax[key].axvline(sim_qrs_limit, color=limits_colour, alpha=0.8,
+                                        linestyle=limits_linestyle, label=None)
+                # i_colour += 1
+
+    """ Add legend_vcg and legend_limits """
+    if legend_vcg[0] is not None:
+        labels = [line.get_label() for line in ax['sv'].get_lines()]
+        labels = [labelstr for labelstr in labels if not labelstr.startswith('_')]  # Remove implicit labels from list
+        plt.rc('font', family='sans-serif')
+        plt.rc('text', usetex=True)
+        leg_vcg = ax['sv'].legend(labels, loc='upper right')
     else:
-        x_val = list()
-        for sim_sv in sv:
-            x_val.append([(i * dt) + 2 for i in range(len(sim_sv))])
-    return x_val, sv
+        leg_vcg = None
 
+    if legend_limits[0] is not None:
+        plt.rc('font', family='sans-serif')
+        plt.rc('text', usetex=True)
+        ax['sv'].legend(h_limits, legend_limits, loc='upper center', handlelength=5)
+        if legend_vcg[0] is not None:
+            ax['sv'].add_artist(leg_vcg)
 
-def __plot_spatial_velocity_plot_data(x_sv_data: List[float],
-                                      sv_data: List[float],
-                                      x_vcg_data: List[float],
-                                      vcg_data: List[float],
-                                      data_label: str,
-                                      plot_colour: str,
-                                      ax: dict) -> None:
-    ax['vcg_x'].plot(x_vcg_data, vcg_data[:, 0])
-    ax['vcg_y'].plot(x_vcg_data, vcg_data[:, 1])
-    ax['vcg_z'].plot(x_vcg_data, vcg_data[:, 2])
-    ax['sv'].plot(x_sv_data, sv_data)
-    return None
+    # if legend_limits is not None:
+    #     print()
 
-
-def __plot_spatial_velocity_plot_limits(qrs_limit: float,
-                                        ax: dict,
-                                        limit_colour: str) -> None:
-    for key in ax:
-        # ax[key].axvspan(qrs_limit, qrs_limit+0.1, color=limit_colour, alpha=0.5)
-        ax[key].axvline(qrs_limit, color=limit_colour, alpha=0.5)
-    return None
-
-
-def get_i_colour(axis_handle):
-    """ Get index appropriate to colour value to plot on a figure (will be 0 if brand new figure) """
-    if axis_handle is None:
-        return 0
-    else:
-        if len(axis_handle.lines) == 0:
-            return 0
-        else:
-            return len(axis_handle.lines)-1
+    return fig, ax
 
 
 def plot_metric_change(metrics: List[List[List[float]]],
@@ -1431,10 +864,10 @@ def plot_metric_change(metrics: List[List[List[float]]],
     legend_z = ['None', r'0.5 \textrightarrow 0.7', r'0.4 \textrightarrow 0.8', r'0.3 \textrightarrow 0.9']
 
     """ Assert correct data has been passed (insofar that it is of the right length!) """
-    metrics = __set_metric_to_metrics(metrics)
-    metrics_phi = __set_metric_to_metrics(metrics_phi)
-    metrics_rho = __set_metric_to_metrics(metrics_rho)
-    metrics_z = __set_metric_to_metrics(metrics_z)
+    metrics = tools_python.convert_input_to_list(metrics, n_list=-1, list_depth=2)
+    metrics_phi = tools_python.convert_input_to_list(metrics_phi, n_list=-1, list_depth=2)
+    metrics_rho = tools_python.convert_input_to_list(metrics_rho, n_list=-1, list_depth=2)
+    metrics_z = tools_python.convert_input_to_list(metrics_z, n_list=-1, list_depth=2)
 
     if metrics_lv is None:
         metrics_lv = [True, False]
@@ -1459,7 +892,7 @@ def plot_metric_change(metrics: List[List[List[float]]],
     else:
         assert len(linestyles) >= len(metrics_rho)
     if colours is None:
-        colours = common_analysis.get_plot_colours(len(metrics_rho))
+        colours = tools_plotting.get_plot_colours(len(metrics_rho))
     else:
         assert len(colours) >= len(metrics_rho)
 
@@ -1580,14 +1013,6 @@ def plot_metric_change(metrics: List[List[List[float]]],
             ax[key].set_ylim(ax_limits)
 
     return fig, ax
-
-
-def __set_metric_to_metrics(metric: Union[List, List[List[float]]]):
-    """ Function to change single list of metrics to list of one entry if required (so loops work correctly) """
-    if not isinstance(metric[0], list):
-        return [metric]
-    else:
-        return metric
 
 
 def plot_metric_change_barplot(metrics_cont: List[List[float]],
@@ -1719,7 +1144,7 @@ def plot_density_effect(metrics: List[List[float]],
     else:
         assert len(metrics) == len(linestyles)
     if colours is None:
-        colours = common_analysis.get_plot_colours(len(metrics))
+        colours = tools_plotting.get_plot_colours(len(metrics))
     else:
         assert len(metrics) == len(colours)
     if markers is None:

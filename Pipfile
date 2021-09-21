@@ -14,6 +14,7 @@ carputils = {editable = true, git = "https://git.opencarp.org/openCARP/carputils
 [dev-packages]
 ipython = "*"
 pyqt5 = "*"
+seaborn = "*"
 
 [requires]
 python_version = "3.8"

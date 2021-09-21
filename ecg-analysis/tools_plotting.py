@@ -177,7 +177,7 @@ def set_axis_limits(ax,
     data : pd.DataFrame, optional
         Data that has been plotted, default=None
     unit_min : bool, optional
-        Whether to have the axes set to, as a minimum, unit length
+        Whether to have the axes set to, as a minimum, unit length, default=True
     axis_limits : list of float or float, optional
         Min/max values for axes, either as one value (i.e. min=-max), or two separate values. Same axis limits will
         be applied to all dimensions
@@ -266,7 +266,8 @@ def add_xyz_axes(fig: plt.figure,
                  axis_limits: Optional[Union[float, List[float], List[List[float]]]] = None,
                  symmetrical_axes: bool = False,
                  equal_limits: bool = False,
-                 unit_axes: bool = False) -> None:
+                 unit_axes: bool = False,
+                 sig_fig: int = None) -> None:
     """ Plot dummy axes (can't move splines in 3D plots)
 
     Parameters
@@ -284,6 +285,9 @@ def add_xyz_axes(fig: plt.figure,
         Set axis minimum to minus axis maximum (or vice versa)
     unit_axes : bool, optional
         Apply minimum of -1 -> 1 for axis limits
+    sig_fig : int, optional
+        Maximum number of decimal places to be used on the axis plots (e.g., if set to 2, 0.12345 will be displayed
+        as 0.12). Used to avoid floating point errors, default=None (no adaption made)
     """
 
     """ Construct dummy 3D axes - make sure they're equal sizes """
@@ -369,6 +373,10 @@ def add_xyz_axes(fig: plt.figure,
         ax.plot([0, 0], [-z_tick_range, z_tick_range], [z_tick, z_tick], 'k', linewidth=1.5)
 
     # Label tick markers (only at the extremes, to prevent a confusing plot)
+    if sig_fig is not None:
+        x_ticks = [round(x_tick, sig_fig) for x_tick in x_ticks]
+        y_ticks = [round(y_tick, sig_fig) for y_tick in y_ticks]
+        z_ticks = [round(z_tick, sig_fig) for z_tick in z_ticks]
     ax.text(x_ticks[0], -x_tick_range*12, 0, x_ticks[0], None)
     ax.text(x_ticks[-1], -x_tick_range*12, 0, x_ticks[-1], None)
     ax.text(y_tick_range*4, y_ticks[0], 0, y_ticks[0], None)

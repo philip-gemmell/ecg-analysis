@@ -1,4 +1,3 @@
-import sys
 import re
 import numpy as np
 import pandas as pd
@@ -12,6 +11,7 @@ import general_analysis
 # Add carputils functions (https://git.opencarp.org/openCARP/carputils)
 # sys.path.append('/home/pg16/software/carputils/')
 # sys.path.append('/home/philip/Documents/carputils/')
+
 
 def read_ecg_from_igb(phie_file: Union[List[str], str],
                       electrode_file: Optional[str] = None,

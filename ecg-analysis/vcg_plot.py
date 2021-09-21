@@ -295,6 +295,8 @@ def plot_3d(vcg: pd.DataFrame,
             colourmap: str = 'viridis',
             linewidth: float = 3.0,
             axis_limits: Optional[Union[List[float], float]] = None,
+            unit_min: bool = True,
+            sig_fig: int = None,
             fig: Optional[plt.figure] = None) -> plt.figure:
     """
     Plot the evolution of VCG in 3D space
@@ -310,7 +312,12 @@ def plot_3d(vcg: pd.DataFrame,
     linewidth : float, optional
         Linewidth to use, default=3
     axis_limits : list of float or float, optional
-        Limits to apply to the axes
+        Limits to apply to the axes, default=None
+    unit_min : bool, optional
+        Whether to have the axes set to, as a minimum, unit length, default=True
+    sig_fig : int, optional
+        Maximum number of decimal places to be used on the axis plots (e.g., if set to 2, 0.12345 will be displayed
+        as 0.12). Used to avoid floating point errors, default=None (no adaption made)
     fig : plt.figure, optional
         Handle to existing figure (if exists)
 
@@ -344,8 +351,8 @@ def plot_3d(vcg: pd.DataFrame,
     ax.set_zlabel('VCG (z)')
 
     # Set axis limits (not automatic for line collections)
-    tools_plotting.set_axis_limits(ax, data=vcg, axis_limits=axis_limits)
-    tools_plotting.add_xyz_axes(fig, ax)
+    tools_plotting.set_axis_limits(ax, data=vcg, axis_limits=axis_limits, unit_min=unit_min)
+    tools_plotting.add_xyz_axes(fig, ax, sig_fig=sig_fig)
 
     return fig
 
